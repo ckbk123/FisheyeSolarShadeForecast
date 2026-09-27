@@ -1,6 +1,6 @@
 # Manual updates, current debug data, and complete exports
 
-Prepared 27 September 2026. This is an implementation specification; application behavior has not yet been changed.
+Prepared 27 September 2026. This is the full implementation specification. See [milestone progress](IMPLEMENTATION_PROGRESS.md) for completed work, verification, and remaining scope.
 
 ## Intended behavior
 

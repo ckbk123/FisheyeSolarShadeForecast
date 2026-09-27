@@ -24,11 +24,11 @@ public static class SmokeTest
         {
             var example = PortablePaths.Example();
             // Retain legacy settings without a timezone-mode flag, but supply the image inputs
-            // needed by the independent preview before LoadExample starts a full calculation.
+            // needed when the smoke test explicitly updates the loaded example.
             AppData.Write(AppData.PathFor("settings.json"), new { Zone = "SE Asia Standard Time", Latitude = 43.5, Longitude = 1.5,
                 example.SkyImage, example.SkyFolder, example.ProfilePath, example.CoverageAngle, example.Model, example.Resolution });
         }
-        var window = new MainWindow(timeZoneTest ? () => simulatedSystemZone : null, autoStartExample: portable);
+        var window = new MainWindow(timeZoneTest ? () => simulatedSystemZone : null, loadExampleOnFirstRun: portable);
         window.ContentRendered += async (_, _) =>
         {
             try
@@ -36,32 +36,14 @@ public static class SmokeTest
                 double readyMs = Program.Startup.Elapsed.TotalMilliseconds;
                 Capture(window, Path.Combine(output, "startup.png"));
                 var timer = Stopwatch.StartNew();
-                if (!portable)
-                {
-                    window.PrepareOrientationForTest();
-                    await Until(() => window.CardinalsForTest != null, 120);
-                    var previewOnly = window.CardinalsForTest;
-                    if (window.Completed != null || !window.CardinalsVisibleForTest)
-                        throw new InvalidOperationException("Independent orientation preview required a weather calculation.");
-                    window.CommitFieldForTest("CameraTilt", "not-a-number");
-                    window.CommitFieldForTest("PanelTilt", "40");
-                    if (window.CardinalsVisibleForTest) throw new InvalidOperationException("Invalid pose retained cardinals after an unrelated edit.");
-                    window.CommitFieldForTest("CameraTilt", "0");
-                    await Until(() => window.CardinalsForTest != null, 30);
-                    if (!ReferenceEquals(previewOnly, window.CardinalsForTest) || window.Completed != null)
-                        throw new InvalidOperationException("Preview-only recovery failed after invalid pose and unrelated edit.");
-                    window.CommitFieldForTest("Latitude", "invalid");
-                    window.CommitFieldForTest("CameraRoll", "5");
-                    window.CommitFieldForTest("PanelTilt", "45");
-                    await Until(() => window.CardinalsForTest?.Pose.RollDegrees == 5, 30);
-                    if (window.Completed != null) throw new InvalidOperationException("Independent pose preview invoked the full calculation.");
-                    window.CommitFieldForTest("Latitude", "10.8");
-                    window.CommitFieldForTest("CameraRoll", "0");
-                    await Until(() => window.CardinalsForTest?.Pose.RollDegrees == 0, 30);
-                    Capture(window, Path.Combine(output, "cardinal-preview-before-calculate.png"));
-                    await window.LoadExample();
-                }
-                else if (!startsExample) window.Calculate();
+                await Task.Delay(500);
+                if (window.Completed != null || window.CardinalsForTest != null || window.UpdatingForTest)
+                    throw new InvalidOperationException("Startup performed scientific work without Update results.");
+                if (!portable) await window.LoadExample();
+                await Task.Delay(500);
+                if (window.Completed != null || window.ExportEnabledForTest)
+                    throw new InvalidOperationException("Loading inputs calculated or enabled export.");
+                window.Calculate();
                 await Until(() => window.Completed != null, 120);
                 var first = window.Completed!; double firstMs = timer.Elapsed.TotalMilliseconds;
                 if (portable)
@@ -118,6 +100,7 @@ public static class SmokeTest
                 if (!window.SunPathVisibleForTest) throw new InvalidOperationException("A valid sun path disappeared during a panel-only edit.");
                 if (!window.CardinalsVisibleForTest || !ReferenceEquals(first.Cardinals, window.CardinalsForTest))
                     throw new InvalidOperationException("A panel-only edit cleared current cardinals.");
+                window.Calculate();
                 await Until(() => window.Completed != first, 30);
                 var second = window.Completed!;
                 double editMs = timer.Elapsed.TotalMilliseconds;
@@ -131,6 +114,7 @@ public static class SmokeTest
                 Capture(window, Path.Combine(output, "panel-edited.png"));
                 window.SetDiffuseModelForTest(!second.Settings.Isotropic);
                 if (!window.SunPathVisibleForTest) throw new InvalidOperationException("A valid sun path disappeared during a diffuse-model edit.");
+                window.Calculate();
                 await Until(() => window.Completed != second, 30);
                 var changedDiffuse = window.Completed!;
                 if (changedDiffuse.SunPathGenerationCount != second.SunPathGenerationCount || changedDiffuse.SunPath == null || !changedDiffuse.SunPath.Png.SequenceEqual(second.SunPath.Png))
@@ -138,6 +122,7 @@ public static class SmokeTest
                 window.SetCameraPoseForTest(changedDiffuse.Settings.BottomAzimuth == 180 ? 210 : 180, changedDiffuse.Settings.CameraTilt, changedDiffuse.Settings.CameraRoll);
                 if (window.SunPathVisibleForTest || window.CardinalsVisibleForTest)
                     throw new InvalidOperationException("A stale overlay remained visible after a camera change.");
+                window.Calculate();
                 await Until(() => window.Completed != changedDiffuse, 30);
                 var reprojected = window.Completed!;
                 if (reprojected.PreparationCount != changedDiffuse.PreparationCount)
@@ -159,6 +144,7 @@ public static class SmokeTest
                     throw new InvalidOperationException("Invalid camera input allowed an old result or overlay to publish.");
                 Capture(window, Path.Combine(output, "sun-path-invalid-camera.png"));
                 window.CommitFieldForTest("CameraTilt", reprojected.Settings.CameraTilt.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                window.Calculate();
                 await Until(() => window.Completed != reprojected, 30);
                 var correctedCamera = window.Completed!;
                 if (!window.SunPathVisibleForTest || correctedCamera.SunPathGenerationCount != reprojected.SunPathGenerationCount || correctedCamera.PreparationCount != reprojected.PreparationCount)
@@ -166,10 +152,10 @@ public static class SmokeTest
                 if (!window.CardinalsVisibleForTest || correctedCamera.CardinalGenerationCount != reprojected.CardinalGenerationCount ||
                     !ReferenceEquals(correctedCamera.Cardinals, reprojected.Cardinals))
                     throw new InvalidOperationException("Corrected camera input failed to restore cached cardinal directions.");
-                AppData.Write(Path.Combine(output, "cardinal-ui-result.json"), new { Passed = true, IndependentPreviewBeforeCalculate = !portable,
+                AppData.Write(Path.Combine(output, "cardinal-ui-result.json"), new { Passed = true, NoAutomaticPreview = true,
                     OriginalColoredPhotoOverlay = true, ToggleIsDisplayOnly = true, PanelEditReusesOverlay = true,
                     PoseEditRegeneratesExactlyOnce = true, InvalidPoseClearsImmediately = true, RecoveryReusesCache = true,
-                    PreviewAcceptsUnrelatedInvalidField = !portable, PreviewRecoveryAfterUnrelatedEdit = !portable,
+                    ManualUpdateRequired = true,
                     NativePngMatchesDisplayedResult = true, FirstGeneration = first.CardinalGenerationCount,
                     PoseGeneration = reprojected.CardinalGenerationCount, FirstDebugDirectory = first.DebugDirectory });
                 AppData.Write(Path.Combine(output, "sun-path-ui-result.json"), new { Passed = true, EarlyPublication = true,
@@ -186,6 +172,7 @@ public static class SmokeTest
                         var previous = window.Completed!;
                         simulatedSystemZone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
                         window.RefreshSystemTimeZone();
+                        window.Calculate();
                         await Until(() => window.Completed != previous, 60);
                         var current = window.Completed!;
                         if (!ReferenceEquals(previous.Cardinals, current.Cardinals) || previous.CardinalGenerationCount != current.CardinalGenerationCount)
@@ -203,6 +190,7 @@ public static class SmokeTest
                     AppServices.Export(window.Completed!, Path.Combine(output, "paris-export"));
                     window.SetTimeZoneForTest(false, "Romance Standard Time");
                     var manualPrevious = window.Completed;
+                    window.Calculate();
                     await Until(() => window.Completed != manualPrevious, 30);
                     var manual = window.Completed!;
                     simulatedSystemZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
@@ -224,6 +212,7 @@ public static class SmokeTest
                     var fixedZone = TimeZoneSelection.FixedOffset(TimeSpan.FromHours(1));
                     var beforeFixed = window.Completed;
                     window.SetTimeZoneForTest(false, fixedZone.Id);
+                    window.Calculate();
                     await Until(() => window.Completed != beforeFixed, 30);
                     var fixedResult = window.Completed!;
                     if (fixedResult.Settings.Zone != fixedZone.Id || fixedResult.Raw.TimeZoneId != fixedZone.Id || TimeZoneSelection.Resolve(fixedResult.Settings.Zone).GetUtcOffset(fixedResult.Run.Rows[0].Start) != TimeSpan.FromHours(1))
@@ -261,7 +250,7 @@ public static class SmokeTest
                     }
                     AppData.Write(Path.Combine(output, "live-providers.json"), live);
                 }
-                AppData.Write(Path.Combine(output, "smoke-result.json"), new { Passed = true, Portable = portable, AutoStartedExample = startsExample, RestoredSavedSettings = portable && !startsExample, ExecutableDirectory = AppContext.BaseDirectory, WorkingDirectory = Environment.CurrentDirectory, DataDirectory = AppData.Root, FirstSettings = first.Settings, UiReadyMilliseconds = readyMs, FirstRunMilliseconds = firstMs, PanelEditIncludingDebounceMilliseconds = editMs, FirstDebugDirectory = first.DebugDirectory, SecondDebugDirectory = second.DebugDirectory, NativeCadence = first.Raw.NativeCadence, FirstRows = first.Run.Rows.Count, first.Run.BeforeEnergy, first.Run.AfterEnergy, First = first.TotalMilliseconds, Second = second.TotalMilliseconds, second.PreparationCount, second.Run.SkyCoverage, ModelHashes = modelHashes, LoadedDependencies = dependencies, Models = Directory.Exists(AppData.PathFor("models-v1")) ? Directory.GetFiles(AppData.PathFor("models-v1")).Select(Path.GetFileName).ToArray() : [] });
+                AppData.Write(Path.Combine(output, "smoke-result.json"), new { Passed = true, Portable = portable, LoadedExampleWithoutCalculation = startsExample, RestoredSavedSettings = portable && !startsExample, ExecutableDirectory = AppContext.BaseDirectory, WorkingDirectory = Environment.CurrentDirectory, DataDirectory = AppData.Root, FirstSettings = first.Settings, UiReadyMilliseconds = readyMs, FirstRunMilliseconds = firstMs, ExplicitPanelUpdateMilliseconds = editMs, FirstDebugDirectory = first.DebugDirectory, SecondDebugDirectory = second.DebugDirectory, NativeCadence = first.Raw.NativeCadence, FirstRows = first.Run.Rows.Count, first.Run.BeforeEnergy, first.Run.AfterEnergy, First = first.TotalMilliseconds, Second = second.TotalMilliseconds, second.PreparationCount, second.Run.SkyCoverage, ModelHashes = modelHashes, LoadedDependencies = dependencies, Models = Directory.Exists(AppData.PathFor("models-v1")) ? Directory.GetFiles(AppData.PathFor("models-v1")).Select(Path.GetFileName).ToArray() : [] });
                 exitCode = 0;
             }
             catch (Exception ex) { File.WriteAllText(Path.Combine(output, "smoke-error.txt"), ex.ToString()); }
