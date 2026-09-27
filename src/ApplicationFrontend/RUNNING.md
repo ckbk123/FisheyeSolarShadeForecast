@@ -7,9 +7,15 @@ Extract the complete package, then launch `APPLICATION.exe`. Keep `Example`, `Da
 1. Select checkerboard photos, set inner-corner columns/rows and one square's side in millimetres, then **Calibrate**. The library saves native `calibration.yml`, reusable `camera-profile.json`, validation and solver diagnostics in a new calibration run under `Debug Data`.
 2. Select a sky photo and segmentation model. The physical lens setup and oriented image dimensions must match calibration. **Load profile** accepts the profile JSON or native OmniCalib YAML. YAML requires an explicit maximum incident half-angle based on calibration evidence; fitted coverage is provisional.
 3. Set camera pose, site/elevation, time zone and dates. Dates include the complete end day. The editable example defaults are not GPS measurements.
-4. Use NASA POWER/Open-Meteo or **Import XLSX / CSV**, then **Calculate**. An import remains selected until **Use API**. Each completed calculation saves its actual library stage outputs automatically.
-5. Tune panel orientation. Valid committed edits recompute the dependent results and create another Debug Data run. The app reuses matching data, masks, solar geometry and visibility work.
-6. **Export results** copies the complete successful run, including its numbered stage folders and manifest, into a new scenario folder at the chosen destination.
+4. Use NASA POWER/Open-Meteo or **Import XLSX / CSV**, then **Update results**. An import remains selected until **Use API**. Loading the example or editing inputs does not start calculations or generate debug files.
+5. Adjust inputs freely, then click **Update results** again. The app reuses matching data, masks, solar geometry and visibility work. **Refresh data & update** explicitly refreshes provider data or rereads the selected import; it does not switch an import to API mode.
+6. **Export results** is enabled only after a successful complete shaded calculation matching the current interface inputs. It copies the successful run, including its numbered stage folders and manifest, into a new scenario folder at the chosen destination.
+
+The bottom-left indicator combines color and text: **red** means inputs need attention or an update failed; **yellow** means an update is needed, running, or stopped; **green** means complete results are up to date. Green appears after success, never merely after clicking Update. Invalid or missing inputs disable Update; a processing failure can be retried. Stop cancels publication, although active native work may need to finish before another update can start. An edit made during processing supersedes that result.
+
+Typing a new value immediately disables export, even before leaving the field. Previous graphs and summaries are dimmed and labeled when stale. Graph navigation and overlay visibility do not invalidate calculations. Changes in the automatic Windows time zone require another explicit update.
+
+This is milestone 1 of the improvement plan. Precise file invalidation, a single current debug set, and the PDF export recap are subsequent milestones. Historical debug folders still remain in this version.
 
 Both curves show irradiance received by the selected panel before/after obstruction shading, in W/m². Summary cards integrate the actual represented durations in kWh/m². Electrical PV power, ground reflection and rear-side irradiance are outside this calculation.
 
@@ -17,7 +23,7 @@ Both curves show irradiance received by the selected panel before/after obstruct
 
 **Show cardinal directions** places magenta N/E/S/W labels and short ticks over the original colour photograph. The shading library projects the four constant compass bearings through the same calibration and camera pose used for sun paths and shading. The ticks identify the visible ends of these bearing lines, not necessarily the horizon: the horizon can be outside the calibrated lens coverage. Labels remain upright.
 
-The preview depends on the image geometry, effective calibration, heading, tilt and roll. Relevant committed edits clear stale markers and request an updated preview; weather, dates, time zone, panel settings and the visibility toggle do not regenerate it. The preview can run before irradiance retrieval and does not need solar positions. It cannot establish whether the entered camera heading matches the real photograph.
+The preview depends on image geometry, effective calibration, heading, tilt and roll. Relevant edits clear stale markers; Update results generates their replacement. During an update the preview is available before irradiance retrieval. Weather, dates, time zone, panel settings and the visibility toggle do not regenerate its geometry. It cannot establish whether the entered camera heading matches the real photograph.
 
 At the default upward pose with zero roll and image top facing North, the shared projection places N at the top, E on the left, S at the bottom and W on the right. A roll rotates this arrangement; it does not mirror it. No independent E/W swap is applied to the compass.
 
@@ -51,7 +57,7 @@ The chart holds each interval mean over its actual start/end bounds, including t
 
 ## Automatic Debug Data
 
-Every calculation and automatic edit creates `Debug Data/calculation-<timestamp>-<id>/`. Independent image-orientation previews create `orientation-<timestamp>-<id>/` with the image, calibration and orientation stages only. **Calibrate** creates `Debug Data/calibration-<timestamp>-<id>/`. No Export click is needed.
+Each explicit update creates `Debug Data/calculation-<timestamp>-<id>/`. Interface edits and startup create no diagnostic runs. Orientation is prepared within the explicit calculation. **Calibrate** creates `Debug Data/calibration-<timestamp>-<id>/`. No Export click is needed to save the update's diagnostics.
 
 | Stage folder | Actual library output |
 |---|---|
@@ -83,7 +89,7 @@ A compatible library change needs no frontend source rewrite. The self-contained
 - `Example/Sky Photo`: demonstration sky photograph.
 - `Example/Irradiance/horizontal-irradiance.xlsx`: original buffered hourly Open-Meteo input workbook.
 - `Example/Debug Data/reference-run`: fixed native library outputs from the verified example run, with its own `run.json`.
-- `Example/settings.json`: executable-relative default input paths. First launch calculates the example; **Load example** restores those inputs later without a download.
+- `Example/settings.json`: executable-relative default input paths. First launch and **Load example** load the inputs without calculating; click **Update results** when ready.
 - `Data`: current settings, validated weather/mask caches and extracted model weights.
 - Top-level `Debug Data`: all new calculation/calibration runs and reusable profiles generated by Calibrate.
 

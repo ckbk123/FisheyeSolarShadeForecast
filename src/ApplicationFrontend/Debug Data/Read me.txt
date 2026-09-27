@@ -1,8 +1,8 @@
 AUTOMATIC LIBRARY OUTPUTS
 
-Calculate and automatic edits create a new calculation-<timestamp>-<id> run.
-Independent image previews create orientation-<timestamp>-<id> runs with only
-the image, calibration and orientation stages; no irradiance is needed.
+Update results creates a new calculation-<timestamp>-<id> run.
+Editing inputs and loading the example do not calculate or write diagnostics.
+Image orientation is prepared during the explicit update, before irradiance.
 Calibrate creates a calibration-<timestamp>-<id> run. No Export click is needed.
 This Debug Data folder is beside APPLICATION.exe.
 

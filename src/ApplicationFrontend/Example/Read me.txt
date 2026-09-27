@@ -1,7 +1,7 @@
 SOLARSHADE EXAMPLE
 
-Extract the complete package and open APPLICATION.exe. First launch calculates
-this example automatically from local files; no weather download is required.
+Extract the complete package and open APPLICATION.exe. First launch loads
+this example. Click Update results to calculate; no weather download is required.
 Load example restores its input settings and preserves your time-zone preference.
 
 Calib Images
@@ -38,7 +38,7 @@ current UI time zone can differ from the fixed reference run. Read its run.json
 before comparing complete-period values. Unknown sky is treated as blocked;
 no ground reflection or electrical PV model is added.
 
-Every new calculation and valid automatic edit saves its actual stage outputs
+Every explicit Update results operation saves its actual stage outputs
 in a new top-level Debug Data run. The fixed reference run remains unchanged.
 Export results copies a complete successful run into a new scenario folder.
 

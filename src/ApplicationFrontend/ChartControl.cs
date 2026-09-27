@@ -86,7 +86,7 @@ public sealed class IrradianceChart : FrameworkElement
             FlowDirection.LeftToRight, new Typeface("Segoe UI"), size, brush ?? Brushes.SlateGray, VisualTreeHelper.GetDpi(this).PixelsPerDip);
         void Text(string value, double x, double y, double size = 11) => dc.DrawText(Label(value, size), new(x, y));
         if (rows.Length == 0)
-        { Text("Your panel irradiance will appear here", Left + 30, h / 2 - 16, 18); Text("Choose your inputs, then select Calculate. You can tune the panel afterwards.", Left + 30, h / 2 + 14); return; }
+        { Text("Your panel irradiance will appear here", Left + 30, h / 2 - 16, 18); Text("Choose your inputs, then select Update results.", Left + 30, h / 2 + 14); return; }
 
         var start = rows[first].Start; var end = rows[last].End;
         if (end <= start) return;
