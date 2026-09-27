@@ -9,6 +9,13 @@ public sealed class DebugDataRun
     private readonly DateTimeOffset started = DateTimeOffset.UtcNow;
     private readonly Dictionary<string, StageRecord> stages = new();
     private readonly Dictionary<string, object> inputs = new();
+    private readonly Dictionary<string, string> artifactHashes = new();
+    internal object SyncRoot { get; } = new();
+    private ArtifactGroup invalidated;
+    private bool cleanupPending;
+    private string currentStatus = "Running";
+    private string? manifestHash;
+    public bool IsCurrent { get { lock (SyncRoot) return currentStatus == "Complete" && invalidated == ArtifactGroup.None; } }
     private sealed record StageRecord(string Status, string Origin, string LibraryVersion, string[] Artifacts);
 
     public DebugDataRun(UserSettings settings, string kind = "calculation", string? root = null)
@@ -39,6 +46,7 @@ public sealed class DebugDataRun
             if (Path.IsPathRooted(local) || local == ".." || local.StartsWith(".." + Path.DirectorySeparatorChar))
                 throw new IOException("A stage artifact is outside its Debug Data run.");
             if (!File.Exists(full)) throw new IOException("A stage reported a missing artifact: " + full);
+            artifactHashes[local.Replace('\\', '/')] = AppData.FileKey(full);
             return local.Replace('\\', '/');
         }).ToArray();
         stages[name] = stages[name] with { Status = skipped ? "Skipped" : "Complete", Artifacts = relative };
@@ -62,14 +70,80 @@ public sealed class DebugDataRun
 
     public void Status(string status, string? error = null)
     {
+        currentStatus = invalidated == ArtifactGroup.None ? status : "Stale";
         if (status is "Cancelled" or "Failed")
             foreach (string stage in stages.Where(p => p.Value.Status == "Running").Select(p => p.Key).ToArray())
                 stages[stage] = stages[stage] with { Status = status };
         AppData.Write(Path.Combine(DirectoryPath, "run.json"), new
         {
-            Status = status, StartedUtc = started, UpdatedUtc = DateTimeOffset.UtcNow,
-            Settings = settings, Inputs = inputs, Stages = stages, Error = error
+            Status = currentStatus, StartedUtc = started, UpdatedUtc = DateTimeOffset.UtcNow,
+            Settings = settings, Inputs = inputs, Stages = stages, ArtifactHashes = artifactHashes,
+            InvalidatedGroups = InputDependencies.Groups.Where(g => invalidated.HasFlag(g)).Select(g => g.ToString()).ToArray(), Error = error
         });
+        manifestHash = AppData.FileKey(Path.Combine(DirectoryPath, "run.json"));
+    }
+
+    public ArtifactGroup ChangedArtifacts(bool checkContents)
+    {
+        lock (SyncRoot)
+        {
+            var changed = ArtifactGroup.None;
+            string manifest = Path.Combine(DirectoryPath, "run.json");
+            try
+            {
+                if (!File.Exists(manifest) || (checkContents && AppData.FileKey(manifest) != manifestHash)) return ArtifactGroup.All;
+            }
+            catch (IOException) { return ArtifactGroup.All; }
+            catch (UnauthorizedAccessException) { return ArtifactGroup.All; }
+            foreach (var (relative, hash) in artifactHashes)
+            {
+                var group = InputDependencies.ForArtifact(relative);
+                if ((invalidated & group) != 0) continue;
+                string path = Path.Combine(DirectoryPath, relative);
+                try { if (!File.Exists(path) || (checkContents && AppData.FileKey(path) != hash)) changed |= group; }
+                catch (IOException) { changed |= group; }
+                catch (UnauthorizedAccessException) { changed |= group; }
+            }
+            return changed;
+        }
+    }
+
+    /// <summary>Called only after this run's writer has relinquished ownership.</summary>
+    public void Invalidate(ArtifactGroup groups, IEnumerable<string> protectedInputs)
+    {
+        lock (SyncRoot)
+        {
+            if ((groups & ~invalidated) == 0 && !cleanupPending) return;
+            invalidated |= groups; cleanupPending = true;
+            foreach (string stage in stages.Keys.ToArray())
+                if (artifactHashes.Keys.Any(p => p.StartsWith(stage + "/", StringComparison.Ordinal) && (InputDependencies.ForArtifact(p) & invalidated) != 0))
+                    stages[stage] = stages[stage] with { Status = "Stale" };
+            // Advertise stale before attempting deletion, including when Excel holds a file open.
+            Status("Stale", "Inputs or artifacts changed; an explicit update is required.");
+            string root = Path.GetFullPath(DirectoryPath);
+            if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0) throw new IOException("Cannot clean a redirected debug directory.");
+            var protectedPaths = protectedInputs.Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var options = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = false };
+            foreach (string candidate in Directory.EnumerateFiles(root, "*", options))
+            {
+                string full = Path.GetFullPath(candidate), relative = Path.GetRelativePath(root, full);
+                if (Path.IsPathRooted(relative) || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar)) throw new IOException("Invalid debug artifact path.");
+                if ((InputDependencies.ForArtifact(relative) & invalidated) == 0) continue;
+                if (protectedPaths.Contains(full)) throw new IOException("A selected input is inside stale debug output. Save it outside that run before updating: " + full);
+                File.Delete(full);
+            }
+            cleanupPending = false;
+        }
+    }
+
+    public void CopyCurrent(string destination)
+    {
+        lock (SyncRoot)
+        {
+            if (!IsCurrent || ChangedArtifacts(checkContents: true) != ArtifactGroup.None)
+                throw new InvalidOperationException("Debug data is stale or incomplete. Update results before exporting.");
+            CopyCompleted(DirectoryPath, destination);
+        }
     }
 
     public static void CopyCompleted(string source, string destination)

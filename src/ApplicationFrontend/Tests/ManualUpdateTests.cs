@@ -14,7 +14,7 @@ public sealed class ManualUpdateCollection;
 [Collection("Manual update UI")]
 public sealed class ManualUpdateTests
 {
-    private static void Sta(Func<Task> action)
+    internal static void Sta(Func<Task> action)
     {
         Exception? failure = null;
         var thread = new Thread(() =>
@@ -33,13 +33,13 @@ public sealed class ManualUpdateTests
         if (failure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
-    private static async Task Until(Func<bool> ready)
+    internal static async Task Until(Func<bool> ready)
     {
         var deadline = DateTime.UtcNow.AddSeconds(20);
         while (!ready()) { Assert.True(DateTime.UtcNow < deadline, "Update did not finish."); await Task.Delay(10); }
     }
 
-    private sealed class Fixture : IDisposable
+    internal sealed class Fixture : IDisposable
     {
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "solar-manual-" + Guid.NewGuid().ToString("N"));
         public string Debug => Path.Combine(Root, "Debug Data");

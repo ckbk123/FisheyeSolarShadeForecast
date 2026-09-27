@@ -13,7 +13,9 @@ Extract the complete package, then launch `APPLICATION.exe`. Keep `Example`, `Da
 
 The bottom-left indicator combines color and text: **red** means inputs need attention or an update failed; **yellow** means an update is needed, running, or stopped; **green** means complete results are up to date. Green appears after success, never merely after clicking Update. Invalid or missing inputs disable Update; a processing failure can be retried. Stop cancels publication, although active native work may need to finish before another update can start. An edit made during processing supersedes that result.
 
-Typing a new value immediately disables export, even before leaving the field. Previous graphs and summaries are dimmed and labeled when stale. Graph navigation and overlay visibility do not invalidate calculations. Changes in the automatic Windows time zone require another explicit update.
+Typing a relevant new value immediately disables export, even before leaving the field. Previous graphs and summaries are dimmed and labeled when stale. Graph navigation, overlay visibility and future checkerboard setup do not invalidate calculated results. Changes in the automatic Windows time zone require another explicit update.
+
+Edits remove affected diagnostic files and hide stale previews. Camera rotation preserves the mask and numerical solar positions but removes orientation, sun-path and shading files. Panel edits preserve camera previews and upstream files. Repeated edits do not regenerate diagnostics; even reverting to the original value requires Update to restore removed files. Selected source files are monitored and their contents rechecked on activation, Update and Export. Replacing a file under the same name cannot silently retain current results. If Excel holds an affected workbook open, close it and retry Update.
 
 This is milestone 1 of the improvement plan. Precise file invalidation, a single current debug set, and the PDF export recap are subsequent milestones. Historical debug folders still remain in this version.
 
@@ -58,6 +60,8 @@ The chart holds each interval mean over its actual start/end bounds, including t
 ## Automatic Debug Data
 
 Each explicit update creates `Debug Data/calculation-<timestamp>-<id>/`. Interface edits and startup create no diagnostic runs. Orientation is prepared within the explicit calculation. **Calibrate** creates `Debug Data/calibration-<timestamp>-<id>/`. No Export click is needed to save the update's diagnostics.
+
+The active/latest run is invalidated as its inputs change; the manifest records stale groups and file fingerprints. Older run folders still exist in this milestone. Migration to one stable current dataset is the next milestone. Input files selected from inside a run are protected from cleanup; save them outside that run and select the saved copy before updating.
 
 | Stage folder | Actual library output |
 |---|---|
