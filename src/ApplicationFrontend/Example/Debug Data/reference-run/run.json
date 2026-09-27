@@ -1,0 +1,138 @@
+{
+  "Status": "Complete",
+  "StartedUtc": "2026-09-16T16:00:26.2041919+00:00",
+  "UpdatedUtc": "2026-09-16T16:00:29.1788594+00:00",
+  "Settings": {
+    "FirstRun": false,
+    "CalibrationFolder": "Example/Calib Images",
+    "SkyFolder": "Example/Sky Photo",
+    "SkyImage": "Example/Sky Photo/sky.jpg",
+    "ProfilePath": "Example/Calib Images/calibration.yml",
+    "ImportPath": "Example/Irradiance/horizontal-irradiance.xlsx",
+    "Columns": 6,
+    "Rows": 9,
+    "SquareMm": 22,
+    "BottomAzimuth": 180,
+    "CameraTilt": 0,
+    "CameraRoll": 0,
+    "PanelTilt": 30,
+    "PanelAzimuth": 0,
+    "Latitude": 10.8,
+    "Longitude": 106.7,
+    "Elevation": 0,
+    "Start": "2025-05-02T00:00:00",
+    "End": "2025-05-30T00:00:00",
+    "Zone": "SE Asia Standard Time",
+    "UseSystemTimeZone": true,
+    "Provider": 1,
+    "ImportWindow": 0,
+    "ImportIntervalMinutes": 60,
+    "Model": 1,
+    "Resolution": 1024,
+    "CoverageAngle": 66.43,
+    "CenteredDisk": false,
+    "Substeps": 60,
+    "Isotropic": false,
+    "ShowSunPath": true,
+    "ShowCardinalDirections": true
+  },
+  "Inputs": {
+    "sky-mask": {
+      "Fingerprint": "9607A7DA7BFF72B616A280D7BC8E41136E081872B974455FDC025DA73325C1AB"
+    },
+    "camera-profile": {
+      "Fingerprint": "3DF356507A97D10AF257D9E5B9A4C849720F3354E4B82B3C6BC5EA6F61FE902A"
+    },
+    "cardinal-directions": {
+      "Fingerprint": "5E3908BD2154C92FE5E00DCE5DE5F29D5B181562C9ED9A3C2A43383EA6E51CDF"
+    },
+    "irradiance-request": {
+      "Fingerprint": "425EA02985A123FEF93F6E23D3E5A2026395BBB026B0864CFD13E6B191D6BE75"
+    },
+    "source-dataset": {
+      "Fingerprint": "5D515663D96D53C6F03A4FF5E245693C0066A0C92A1A3A2E6791FED93B73AF0A",
+      "Source": "Imported: horizontal-irradiance.xlsx",
+      "FetchedUtc": "2026-09-16T16:00:26.3276164+00:00"
+    },
+    "solar-timeline": {
+      "Fingerprint": "82CDDEDD368AE8C051B119AFCE844B90C00D4C2411644F17BD7C6BC3EE422D16"
+    },
+    "sun-path-overlay": {
+      "Fingerprint": "B11631395D08690B98D5F16287E8E20B3C2047782AB7636D235535CE78833F86",
+      "Origin": "Computed"
+    },
+    "camera-scene": {
+      "Fingerprint": "25F7CCB3D6F85A7B7546BF2FAD66619C3E37711485D6299A155B1F0F26A156BD"
+    }
+  },
+  "Stages": {
+    "01-calibration": {
+      "Status": "Complete",
+      "Origin": "Loaded effective camera profile",
+      "LibraryVersion": "94820c8d-ca67-42eb-aa90-288cd4febc60",
+      "Artifacts": [
+        "01-calibration/calibration.yml",
+        "01-calibration/camera-profile.json"
+      ]
+    },
+    "02-sky-mask": {
+      "Status": "Complete",
+      "Origin": "Reused in-memory mask",
+      "LibraryVersion": "a2260402-2b48-468b-8c3e-2429891c6857",
+      "Artifacts": [
+        "02-sky-mask/sky-mask.png",
+        "02-sky-mask/mask-details.json"
+      ]
+    },
+    "02-orientation": {
+      "Status": "Complete",
+      "Origin": "Reused in-memory orientation overlay",
+      "LibraryVersion": "412d3fc7-0d60-4d36-b81f-0f66d4a1e6a1",
+      "Artifacts": [
+        "02-orientation/cardinal-directions-overlay.png",
+        "02-orientation/cardinal-directions.xlsx",
+        "02-orientation/cardinal-directions-details.json"
+      ]
+    },
+    "03-irradiance": {
+      "Status": "Complete",
+      "Origin": "Imported",
+      "LibraryVersion": "030bde77-e956-4906-8037-1a06efaa4492",
+      "Artifacts": [
+        "03-irradiance/horizontal-irradiance.xlsx"
+      ]
+    },
+    "04-solar-positions": {
+      "Status": "Complete",
+      "Origin": "Computed",
+      "LibraryVersion": "412d3fc7-0d60-4d36-b81f-0f66d4a1e6a1",
+      "Artifacts": [
+        "04-solar-positions/sun-path-overlay.png",
+        "04-solar-positions/sun-path-projection.xlsx",
+        "04-solar-positions/sun-path-details.json",
+        "04-solar-positions/solar-positions.xlsx",
+        "04-solar-positions/solar-integration-samples.xlsx"
+      ]
+    },
+    "05-transposition": {
+      "Status": "Complete",
+      "Origin": "Computed",
+      "LibraryVersion": "a84136a7-ed27-449d-98b0-287faf2ee65b",
+      "Artifacts": [
+        "05-transposition/panel-unshaded.xlsx"
+      ]
+    },
+    "06-shading": {
+      "Status": "Complete",
+      "Origin": "Computed",
+      "LibraryVersion": "4b49ebf5-70ca-4dca-a621-6702138f226b",
+      "Artifacts": [
+        "06-shading/panel-shaded.xlsx",
+        "06-shading/shading-correction-factors.xlsx",
+        "06-shading/shading-visibility.xlsx",
+        "06-shading/panel-results.json"
+      ]
+    }
+  },
+  "Error": null
+}

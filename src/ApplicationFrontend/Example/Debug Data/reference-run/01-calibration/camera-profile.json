@@ -1,0 +1,28 @@
+{
+  "Calibration": {
+    "SchemaVersion": 2,
+    "CameraModel": 0,
+    "ImageWidth": 3000,
+    "ImageHeight": 4000,
+    "PrincipalPoint": [
+      1530.5316248189056,
+      1997.8459601528616
+    ],
+    "IncidentAngleToRadiusPolynomial": [
+      0,
+      824.9346460936491,
+      -47.154450106730124,
+      90.17908124542645,
+      -116.02812744232502
+    ],
+    "MaximumIncidentAngleDegrees": 66.43,
+    "ImageCircleRadiusPixels": 1468.4683751810944,
+    "RmsError": null,
+    "UsedImageCount": 0,
+    "RejectedImages": [],
+    "CreatedUtc": "2026-09-05T07:11:55.8974047+00:00",
+    "Algorithm": "Native OmniCalib YAML; caller-provided angular coverage"
+  },
+  "Source": "C:\\Users\\baokh\\OneDrive\\BKHCM\\Solar Forecast Estimator\\artifacts\\application-publish-a55662fe4f694009b532529b70492ab6\\Example\\Calib Images\\calibration.yml",
+  "CoverageNote": "Caller override of maximum incident angle. Caller-provided maximum incident angle; not inferred from lens advertising or polynomial extrapolation."
+}

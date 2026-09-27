@@ -1,0 +1,4 @@
+**/bin/
+**/obj/
+Tools/.venv/
+Tools/preview-runtime/node_modules/

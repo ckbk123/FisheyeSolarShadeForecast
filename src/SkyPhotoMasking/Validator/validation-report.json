@@ -1,0 +1,236 @@
+{
+  "utc": "2026-09-05T17:09:27.7943122+00:00",
+  "imagePath": "C:\\Users\\baokh\\OneDrive\\BKHCM\\Solar Forecast Estimator\\src\\SkyPhotoMasking\\Validator\\example_image.jpg",
+  "hardware": {
+    "Architecture": "X64",
+    "LogicalProcessors": 16,
+    "CpuVectorAcceleration": true,
+    "DirectMLAdapters": [
+      {
+        "DeviceId": 0,
+        "Name": "NVIDIA GeForce RTX 3070",
+        "DedicatedMemoryBytes": 8407482368
+      }
+    ],
+    "ProbeMessage": null
+  },
+  "failures": 0,
+  "records": [
+    {
+      "model": "EfficientNetB4",
+      "maskPath": "C:\\Users\\baokh\\OneDrive\\BKHCM\\Solar Forecast Estimator\\src\\SkyPhotoMasking\\Validator\\example_image-efficientnet-b4.png",
+      "cold": {
+        "Model": "EfficientNetB4",
+        "Width": 3000,
+        "Height": 4000,
+        "InputSize": 1024,
+        "Disk": {
+          "CenterX": 1521.8750635782878,
+          "CenterY": 2003.1250317891438,
+          "Radius": 882.9166889190674,
+          "ImageWidth": 3000,
+          "ImageHeight": 4000
+        },
+        "Crop": {
+          "X": 639,
+          "Y": 1120,
+          "Width": 1767,
+          "Height": 1767
+        },
+        "DiskMethod": "Auto",
+        "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
+        "AccelerationFallback": null,
+        "SessionLoadMilliseconds": 996.9007,
+        "InferenceMilliseconds": 102.0652,
+        "TotalMilliseconds": 1323.7092
+      },
+      "warm": {
+        "Model": "EfficientNetB4",
+        "Width": 3000,
+        "Height": 4000,
+        "InputSize": 1024,
+        "Disk": {
+          "CenterX": 1521.8750635782878,
+          "CenterY": 2003.1250317891438,
+          "Radius": 882.9166889190674,
+          "ImageWidth": 3000,
+          "ImageHeight": 4000
+        },
+        "Crop": {
+          "X": 639,
+          "Y": 1120,
+          "Width": 1767,
+          "Height": 1767
+        },
+        "DiskMethod": "Auto",
+        "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
+        "AccelerationFallback": null,
+        "SessionLoadMilliseconds": 0.0868,
+        "InferenceMilliseconds": 56.0142,
+        "TotalMilliseconds": 260.5299
+      }
+    },
+    {
+      "model": "EfficientNetB5",
+      "maskPath": "C:\\Users\\baokh\\OneDrive\\BKHCM\\Solar Forecast Estimator\\src\\SkyPhotoMasking\\Validator\\example_image-efficientnet-b5.png",
+      "cold": {
+        "Model": "EfficientNetB5",
+        "Width": 3000,
+        "Height": 4000,
+        "InputSize": 1024,
+        "Disk": {
+          "CenterX": 1521.8750635782878,
+          "CenterY": 2003.1250317891438,
+          "Radius": 882.9166889190674,
+          "ImageWidth": 3000,
+          "ImageHeight": 4000
+        },
+        "Crop": {
+          "X": 639,
+          "Y": 1120,
+          "Width": 1767,
+          "Height": 1767
+        },
+        "DiskMethod": "Auto",
+        "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
+        "AccelerationFallback": null,
+        "SessionLoadMilliseconds": 969.8219,
+        "InferenceMilliseconds": 136.808,
+        "TotalMilliseconds": 1265.2255
+      },
+      "warm": {
+        "Model": "EfficientNetB5",
+        "Width": 3000,
+        "Height": 4000,
+        "InputSize": 1024,
+        "Disk": {
+          "CenterX": 1521.8750635782878,
+          "CenterY": 2003.1250317891438,
+          "Radius": 882.9166889190674,
+          "ImageWidth": 3000,
+          "ImageHeight": 4000
+        },
+        "Crop": {
+          "X": 639,
+          "Y": 1120,
+          "Width": 1767,
+          "Height": 1767
+        },
+        "DiskMethod": "Auto",
+        "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
+        "AccelerationFallback": null,
+        "SessionLoadMilliseconds": 0.0012,
+        "InferenceMilliseconds": 69.6919,
+        "TotalMilliseconds": 237.8341
+      }
+    },
+    {
+      "model": "EfficientNetB6",
+      "maskPath": "C:\\Users\\baokh\\OneDrive\\BKHCM\\Solar Forecast Estimator\\src\\SkyPhotoMasking\\Validator\\example_image-efficientnet-b6.png",
+      "cold": {
+        "Model": "EfficientNetB6",
+        "Width": 3000,
+        "Height": 4000,
+        "InputSize": 1024,
+        "Disk": {
+          "CenterX": 1521.8750635782878,
+          "CenterY": 2003.1250317891438,
+          "Radius": 882.9166889190674,
+          "ImageWidth": 3000,
+          "ImageHeight": 4000
+        },
+        "Crop": {
+          "X": 639,
+          "Y": 1120,
+          "Width": 1767,
+          "Height": 1767
+        },
+        "DiskMethod": "Auto",
+        "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
+        "AccelerationFallback": null,
+        "SessionLoadMilliseconds": 1251.8604,
+        "InferenceMilliseconds": 153.1228,
+        "TotalMilliseconds": 1579.7958
+      },
+      "warm": {
+        "Model": "EfficientNetB6",
+        "Width": 3000,
+        "Height": 4000,
+        "InputSize": 1024,
+        "Disk": {
+          "CenterX": 1521.8750635782878,
+          "CenterY": 2003.1250317891438,
+          "Radius": 882.9166889190674,
+          "ImageWidth": 3000,
+          "ImageHeight": 4000
+        },
+        "Crop": {
+          "X": 639,
+          "Y": 1120,
+          "Width": 1767,
+          "Height": 1767
+        },
+        "DiskMethod": "Auto",
+        "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
+        "AccelerationFallback": null,
+        "SessionLoadMilliseconds": 0.0015,
+        "InferenceMilliseconds": 80.9993,
+        "TotalMilliseconds": 247.8592
+      }
+    },
+    {
+      "model": "EfficientNetB7",
+      "maskPath": "C:\\Users\\baokh\\OneDrive\\BKHCM\\Solar Forecast Estimator\\src\\SkyPhotoMasking\\Validator\\example_image-efficientnet-b7.png",
+      "cold": {
+        "Model": "EfficientNetB7",
+        "Width": 3000,
+        "Height": 4000,
+        "InputSize": 1024,
+        "Disk": {
+          "CenterX": 1521.8750635782878,
+          "CenterY": 2003.1250317891438,
+          "Radius": 882.9166889190674,
+          "ImageWidth": 3000,
+          "ImageHeight": 4000
+        },
+        "Crop": {
+          "X": 639,
+          "Y": 1120,
+          "Width": 1767,
+          "Height": 1767
+        },
+        "DiskMethod": "Auto",
+        "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
+        "AccelerationFallback": null,
+        "SessionLoadMilliseconds": 1387.5876,
+        "InferenceMilliseconds": 176.529,
+        "TotalMilliseconds": 1736.3455
+      },
+      "warm": {
+        "Model": "EfficientNetB7",
+        "Width": 3000,
+        "Height": 4000,
+        "InputSize": 1024,
+        "Disk": {
+          "CenterX": 1521.8750635782878,
+          "CenterY": 2003.1250317891438,
+          "Radius": 882.9166889190674,
+          "ImageWidth": 3000,
+          "ImageHeight": 4000
+        },
+        "Crop": {
+          "X": 639,
+          "Y": 1120,
+          "Width": 1767,
+          "Height": 1767
+        },
+        "DiskMethod": "Auto",
+        "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
+        "AccelerationFallback": null,
+        "SessionLoadMilliseconds": 0.0013,
+        "InferenceMilliseconds": 101.0787,
+        "TotalMilliseconds": 269.4941
+      }
+    }
+  ]
+}

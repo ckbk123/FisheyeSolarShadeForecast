@@ -1,0 +1,51 @@
+{
+  "reference": "C:\\Users\\baokh\\OneDrive\\Documents\\ChatGPT\\Fisheye Solar Shading Estimator\\inference.py",
+  "torch": "2.5.1+cpu",
+  "note": "Same detected disk supplied to original Python helpers. Does not validate automatic disk detection against calibration or ground-truth segmentation.",
+  "results": [
+    {
+      "model": "b4",
+      "size": 1024,
+      "preprocessing_exact": true,
+      "python_cpu_inference_seconds": 2.0853744000196457,
+      "probability_mae": 1.8150359437640873e-08,
+      "probability_max_error": 5.602836608886719e-06,
+      "disk_disagreement_fraction": 0.0,
+      "full_size_disagreeing_pixels": 0,
+      "passed": true
+    },
+    {
+      "model": "b5",
+      "size": 1024,
+      "preprocessing_exact": true,
+      "python_cpu_inference_seconds": 2.4659978999989107,
+      "probability_mae": 2.4287269084766194e-08,
+      "probability_max_error": 1.341104507446289e-05,
+      "disk_disagreement_fraction": 0.0,
+      "full_size_disagreeing_pixels": 0,
+      "passed": true
+    },
+    {
+      "model": "b6",
+      "size": 1024,
+      "preprocessing_exact": true,
+      "python_cpu_inference_seconds": 2.853332999977283,
+      "probability_mae": 2.0991183902197008e-08,
+      "probability_max_error": 7.957220077514648e-06,
+      "disk_disagreement_fraction": 0.0,
+      "full_size_disagreeing_pixels": 0,
+      "passed": true
+    },
+    {
+      "model": "b7",
+      "size": 1024,
+      "preprocessing_exact": true,
+      "python_cpu_inference_seconds": 4.010317699983716,
+      "probability_mae": 2.1928974192064743e-08,
+      "probability_max_error": 9.953975677490234e-06,
+      "disk_disagreement_fraction": 0.0,
+      "full_size_disagreeing_pixels": 0,
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,4811 @@
+{
+  "AstropyVersion": "8.0.1",
+  "Samples": 240,
+  "MaxAngularErrorDegrees": 0.0005341660623229266,
+  "P95AngularErrorDegrees": 0.0005081025388241824,
+  "MeanAngularErrorDegrees": 0.0003082890635488037,
+  "AcceptanceDegrees": 0.016666666666666666,
+  "Passed": true,
+  "Cases": [
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 92.98944704952649,
+        "ZenithDegrees": 75.47653992626704,
+        "Direction": {
+          "East": 0.9667276826707507,
+          "North": -0.05048550818673333,
+          "Up": 0.2507763964594108
+        }
+      },
+      "AstropyAzimuthDegrees": 92.98970517422175,
+      "AstropyZenithDegrees": 75.47655147838145,
+      "AngularErrorDegrees": 0.00025014322966256027
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 100.70608235302035,
+        "ZenithDegrees": 46.202894942828166,
+        "Direction": {
+          "East": 0.7092309681729534,
+          "North": -0.13408856217417467,
+          "Up": 0.6921067051246633
+        }
+      },
+      "AstropyAzimuthDegrees": 100.70635108476712,
+      "AstropyZenithDegrees": 46.20294886699897,
+      "AngularErrorDegrees": 0.00020132544175063545
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 124.86809083917703,
+        "ZenithDegrees": 18.593143974713044,
+        "Direction": {
+          "East": 0.2616036167274215,
+          "North": -0.18228070015474693,
+          "Up": 0.9478065699636332
+        }
+      },
+      "AstropyAzimuthDegrees": 124.86848179681277,
+      "AstropyZenithDegrees": 18.593264341350732,
+      "AngularErrorDegrees": 0.00017328344660357434
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 234.60767981175948,
+        "ZenithDegrees": 18.31397124498625,
+        "Direction": {
+          "East": -0.25615707853363545,
+          "North": -0.18198968993943265,
+          "Up": 0.9493488841689667
+        }
+      },
+      "AstropyAzimuthDegrees": 234.60721161927435,
+      "AstropyZenithDegrees": 18.314053399333048,
+      "AngularErrorDegrees": 0.00016850201558338978
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 259.3090606362703,
+        "ZenithDegrees": 45.865220076475225,
+        "Direction": {
+          "East": -0.7052459324549248,
+          "North": -0.13314209785187178,
+          "Up": 0.6963485883775354
+        }
+      },
+      "AstropyAzimuthDegrees": 259.3088069564347,
+      "AstropyZenithDegrees": 45.86527080164336,
+      "AngularErrorDegrees": 0.0001890011920424669
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 267.11276601606755,
+        "ZenithDegrees": 75.1276673559689,
+        "Direction": {
+          "East": -0.9652732621131165,
+          "North": -0.048683012919915294,
+          "Up": 0.2566661132727538
+        }
+      },
+      "AstropyAzimuthDegrees": 267.1125385982199,
+      "AstropyZenithDegrees": 75.12775344044735,
+      "AngularErrorDegrees": 0.00023605576488076584
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 272.89606579896946,
+        "ZenithDegrees": 104.58382836910265,
+        "Direction": {
+          "East": -0.9665442569424588,
+          "North": 0.04889648219978331,
+          "Up": -0.25179621403038704
+        }
+      },
+      "AstropyAzimuthDegrees": 272.89579371553583,
+      "AstropyZenithDegrees": 104.58397067272311,
+      "AngularErrorDegrees": 0.0002993093852643033
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 280.67456192727286,
+        "ZenithDegrees": 133.84517935728232,
+        "Direction": {
+          "East": -0.7087337118079949,
+          "North": 0.13359075580181237,
+          "Up": -0.6927120871698158
+        }
+      },
+      "AstropyAzimuthDegrees": 280.67415912079616,
+      "AstropyZenithDegrees": 133.84539191463597,
+      "AngularErrorDegrees": 0.00035996701238503114
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 305.0185697283488,
+        "ZenithDegrees": 161.41912241250134,
+        "Direction": {
+          "East": -0.26095779541231606,
+          "North": 0.18285068869147175,
+          "Up": -0.9478748095917511
+        }
+      },
+      "AstropyAzimuthDegrees": 305.01792296184016,
+      "AstropyZenithDegrees": 161.41946540277726,
+      "AngularErrorDegrees": 0.00040014206685242434
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 54.42909354658946,
+        "ZenithDegrees": 161.59901735923762,
+        "Direction": {
+          "East": 0.2567609783504088,
+          "North": 0.18362567413654343,
+          "Up": -0.9488705980240092
+        }
+      },
+      "AstropyAzimuthDegrees": 54.430346094080896,
+      "AstropyZenithDegrees": 161.5991208537246,
+      "AngularErrorDegrees": 0.0004087054992021549
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 79.10228084292463,
+        "ZenithDegrees": 134.05944492322055,
+        "Direction": {
+          "East": 0.7056593010369655,
+          "North": 0.13585943021253755,
+          "Up": -0.695404318423711
+        }
+      },
+      "AstropyAzimuthDegrees": 79.10281317695461,
+      "AstropyZenithDegrees": 134.059410645401,
+      "AngularErrorDegrees": 0.0003840779535082389
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 86.8869777646731,
+        "ZenithDegrees": 104.79600833691096,
+        "Direction": {
+          "East": 0.9654144667171238,
+          "North": 0.05250504510416229,
+          "Up": -0.255378400989397
+        }
+      },
+      "AstropyAzimuthDegrees": 86.88732206668871,
+      "AstropyZenithDegrees": 104.79597621828476,
+      "AngularErrorDegrees": 0.0003344312945000545
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 68.74687330724586,
+        "ZenithDegrees": 70.92010330644442,
+        "Direction": {
+          "East": 0.8807880789701013,
+          "North": 0.34257508670950043,
+          "Up": 0.3268863256701584
+        }
+      },
+      "AstropyAzimuthDegrees": 68.74690874274336,
+      "AstropyZenithDegrees": 70.92017265778748,
+      "AngularErrorDegrees": 7.701369395125207e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 67.21138926079256,
+        "ZenithDegrees": 43.47890288736188,
+        "Direction": {
+          "East": 0.6343754434103042,
+          "North": 0.26651851033640234,
+          "Up": 0.7256277836784125
+        }
+      },
+      "AstropyAzimuthDegrees": 67.21136764044239,
+      "AstropyZenithDegrees": 43.47899702042643,
+      "AngularErrorDegrees": 9.530136499289841e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 44.25955168940066,
+        "ZenithDegrees": 18.20336521607173,
+        "Direction": {
+          "East": 0.21802056044380766,
+          "North": 0.22372973259468354,
+          "Up": 0.9499537051756151
+        }
+      },
+      "AstropyAzimuthDegrees": 44.25955151923201,
+      "AstropyZenithDegrees": 18.20348293150269,
+      "AngularErrorDegrees": 0.00011771544296102331
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 311.31506919392075,
+        "ZenithDegrees": 19.98809235132724,
+        "Direction": {
+          "East": -0.2567413990131003,
+          "North": 0.22567249834580919,
+          "Up": 0.9397636817429991
+        }
+      },
+      "AstropyAzimuthDegrees": 311.3153965003318,
+      "AstropyZenithDegrees": 19.98810083906656,
+      "AngularErrorDegrees": 0.00011220297856135193
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 292.30171674939385,
+        "ZenithDegrees": 45.75022940741079,
+        "Direction": {
+          "East": -0.662723959878367,
+          "North": 0.2718261019461869,
+          "Up": 0.6977875918242441
+        }
+      },
+      "AstropyAzimuthDegrees": 292.3018244420121,
+      "AstropyZenithDegrees": 45.750226752961424,
+      "AngularErrorDegrees": 7.718638780274126e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 291.4322524374178,
+        "ZenithDegrees": 73.21064862367909,
+        "Direction": {
+          "East": -0.8911711052967385,
+          "North": 0.34982495972577293,
+          "Up": 0.28885387073233204
+        }
+      },
+      "AstropyAzimuthDegrees": 291.4322838982095,
+      "AstropyZenithDegrees": 73.21068543723248,
+      "AngularErrorDegrees": 4.75650643929889e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 296.47784629818034,
+        "ZenithDegrees": 100.22341105005985,
+        "Direction": {
+          "East": -0.8808953596404192,
+          "North": 0.4387730360192299,
+          "Up": -0.1774868677577142
+        }
+      },
+      "AstropyAzimuthDegrees": 296.47783304362144,
+      "AstropyZenithDegrees": 100.22350214257165,
+      "AngularErrorDegrees": 9.202170766997399e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 309.04929178995144,
+        "ZenithDegrees": 125.19193491813873,
+        "Direction": {
+          "East": -0.6346612221620822,
+          "North": 0.5148431969260776,
+          "Up": -0.5763172873189457
+        }
+      },
+      "AstropyAzimuthDegrees": 309.04926114858824,
+      "AstropyZenithDegrees": 125.19208177275294,
+      "AngularErrorDegrees": 0.00014897424018243198
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 338.60999746982674,
+        "ZenithDegrees": 143.2079087006664,
+        "Direction": {
+          "East": -0.21843217144842492,
+          "North": 0.5576596153376775,
+          "Up": -0.8008140482644891
+        }
+      },
+      "AstropyAzimuthDegrees": 338.6100653314535,
+      "AstropyZenithDegrees": 143.20808570295847,
+      "AngularErrorDegrees": 0.00018160857769903787
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 24.75837207299686,
+        "ZenithDegrees": 142.26514274600447,
+        "Direction": {
+          "East": 0.2563044382780594,
+          "North": 0.5557537025534477,
+          "Up": -0.7908513495070375
+        }
+      },
+      "AstropyAzimuthDegrees": 24.75860490572726,
+      "AstropyZenithDegrees": 142.26525037726196,
+      "AngularErrorDegrees": 0.00017857609873812229
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 52.425964002237926,
+        "ZenithDegrees": 123.305044161951,
+        "Direction": {
+          "East": 0.66239423128135,
+          "North": 0.5096342100233264,
+          "Up": -0.5490963980387135
+        }
+      },
+      "AstropyAzimuthDegrees": 52.42612473314753,
+      "AstropyZenithDegrees": 123.30508865130122,
+      "AngularErrorDegrees": 0.0001415078162967179
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 64.1534161812652,
+        "ZenithDegrees": 98.06496447616148,
+        "Direction": {
+          "East": 0.8910636316034382,
+          "North": 0.4316511173475393,
+          "Up": -0.14029582077279798
+        }
+      },
+      "AstropyAzimuthDegrees": 64.15349388743812,
+      "AstropyZenithDegrees": 98.06500506461266,
+      "AngularErrorDegrees": 8.698747450534985e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 116.74141538257413,
+        "ZenithDegrees": 78.91994248408129,
+        "Direction": {
+          "East": 0.8763996426013699,
+          "North": -0.4415771265577905,
+          "Up": 0.19218040417575374
+        }
+      },
+      "AstropyAzimuthDegrees": 116.74162263154642,
+      "AstropyZenithDegrees": 78.91960115107992,
+      "AngularErrorDegrees": 0.0003973335394891126
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 129.66524816051748,
+        "ZenithDegrees": 54.07140359952779,
+        "Direction": {
+          "East": 0.6233340381930416,
+          "North": -0.5168635468238233,
+          "Up": 0.5867765765558925
+        }
+      },
+      "AstropyAzimuthDegrees": 129.66554837017844,
+      "AstropyZenithDegrees": 54.07116059891368,
+      "AngularErrorDegrees": 0.0003437208490434148
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 159.9891117487056,
+        "ZenithDegrees": 36.4585314393295,
+        "Direction": {
+          "East": 0.20334844662671445,
+          "North": -0.5583650887782434,
+          "Up": 0.8042871607132409
+        }
+      },
+      "AstropyAzimuthDegrees": 159.98961737917398,
+      "AstropyZenithDegrees": 36.45847388421082,
+      "AngularErrorDegrees": 0.00030592882773255455
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 206.0345717641881,
+        "ZenithDegrees": 38.14407084636808,
+        "Direction": {
+          "East": -0.27109090078218867,
+          "North": -0.5549685702399106,
+          "Up": 0.7864601767152428
+        }
+      },
+      "AstropyAzimuthDegrees": 206.03491955909587,
+      "AstropyZenithDegrees": 38.14427260282582,
+      "AngularErrorDegrees": 0.0002947036448581275
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 232.97315453678135,
+        "ZenithDegrees": 57.44758976355523,
+        "Direction": {
+          "East": -0.6729318077374358,
+          "North": -0.5075849996315401,
+          "Up": 0.53807085990999
+        }
+      },
+      "AstropyAzimuthDegrees": 232.9732152087996,
+      "AstropyZenithDegrees": 57.44790261009533,
+      "AngularErrorDegrees": 0.000316998910680501
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 244.3843964186202,
+        "ZenithDegrees": 82.78218198356423,
+        "Direction": {
+          "East": -0.8945693417276205,
+          "North": -0.42890539912414144,
+          "Up": 0.12564175835753394
+        }
+      },
+      "AstropyAzimuthDegrees": 244.38431735597106,
+      "AstropyZenithDegrees": 82.78254190972501,
+      "AngularErrorDegrees": 0.00036837355061159724
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 248.80200622842503,
+        "ZenithDegrees": 109.90011826645384,
+        "Direction": {
+          "East": -0.8766642515166911,
+          "North": -0.3400003391627191,
+          "Up": -0.34038149109773236
+        }
+      },
+      "AstropyAzimuthDegrees": 248.80180114989875,
+      "AstropyZenithDegrees": 109.90050570935692,
+      "AngularErrorDegrees": 0.0004327775238861189
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 247.01608457387627,
+        "ZenithDegrees": 137.32533384316093,
+        "Direction": {
+          "East": -0.6240244160448061,
+          "North": -0.2646759283060451,
+          "Up": -0.7352143776853606
+        }
+      },
+      "AstropyAzimuthDegrees": 247.01562279151614,
+      "AstropyZenithDegrees": 137.32571209194145,
+      "AngularErrorDegrees": 0.0004909663987800728
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 222.48201552055988,
+        "ZenithDegrees": 162.39144400083256,
+        "Direction": {
+          "East": -0.20430428041455775,
+          "North": -0.2230995493060271,
+          "Up": -0.9531455041617399
+        }
+      },
+      "AstropyAzimuthDegrees": 222.4803602547458,
+      "AstropyZenithDegrees": 162.3916094035745,
+      "AngularErrorDegrees": 0.0005273466412680795
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 129.9685418070345,
+        "ZenithDegrees": 159.36278402569138,
+        "Direction": {
+          "East": 0.27011639136838256,
+          "North": -0.2264019522699894,
+          "Up": -0.9358308026146929
+        }
+      },
+      "AstropyAzimuthDegrees": 129.96827810378542,
+      "AstropyZenithDegrees": 159.36225865742597,
+      "AngularErrorDegrees": 0.0005335262492194962
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 112.15412642951559,
+        "ZenithDegrees": 133.4645317170122,
+        "Direction": {
+          "East": 0.6722165453904557,
+          "North": -0.2736988563347521,
+          "Up": -0.6879054093001232
+        }
+      },
+      "AstropyAzimuthDegrees": 112.15428621660749,
+      "AstropyZenithDegrees": 133.46403545137076,
+      "AngularErrorDegrees": 0.0005096366904915284
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 111.50224928312404,
+        "ZenithDegrees": 106.00632856817714,
+        "Direction": {
+          "East": 0.8943326062165472,
+          "North": -0.3523275398000214,
+          "Up": -0.27574352967274257
+        }
+      },
+      "AstropyAzimuthDegrees": 111.50241966251083,
+      "AstropyZenithDegrees": 106.00589503373754,
+      "AngularErrorDegrees": 0.0004634372539599829
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 70.45831467324912,
+        "ZenithDegrees": 70.07383928119386,
+        "Direction": {
+          "East": 0.8859794548584506,
+          "North": 0.3144673895916429,
+          "Up": 0.3408088415111034
+        }
+      },
+      "AstropyAzimuthDegrees": 70.45842871253979,
+      "AstropyZenithDegrees": 70.0743008214726,
+      "AngularErrorDegrees": 0.000473828964442114
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 69.2369391935091,
+        "ZenithDegrees": 42.3022161956463,
+        "Direction": {
+          "East": 0.6293300780712354,
+          "North": 0.2385959022373154,
+          "Up": 0.7396050623612674
+        }
+      },
+      "AstropyAzimuthDegrees": 69.23715761278959,
+      "AstropyZenithDegrees": 42.302678384644594,
+      "AngularErrorDegrees": 0.00048500451344291365
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 46.02438070655943,
+        "ZenithDegrees": 16.47856184438487,
+        "Direction": {
+          "East": 0.20412928662682922,
+          "North": 0.19695756439960024,
+          "Up": 0.9589259367474628
+        }
+      },
+      "AstropyAzimuthDegrees": 46.02558868247872,
+      "AstropyZenithDegrees": 16.478899555878712,
+      "AngularErrorDegrees": 0.0004811035459736373
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 306.06179509210426,
+        "ZenithDegrees": 19.939972656468314,
+        "Direction": {
+          "East": -0.2756871283003245,
+          "North": 0.20075306891493008,
+          "Up": 0.9400504308869593
+        }
+      },
+      "AstropyAzimuthDegrees": 306.06239668375827,
+      "AstropyZenithDegrees": 19.939563807038354,
+      "AngularErrorDegrees": 0.00045743778996501375
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 290.06961661194094,
+        "ZenithDegrees": 46.52126602415935,
+        "Direction": {
+          "East": -0.6815669282752876,
+          "North": 0.24900832643613413,
+          "Up": 0.6880852967814852
+        }
+      },
+      "AstropyAzimuthDegrees": 290.069590884718,
+      "AstropyZenithDegrees": 46.5208462643908,
+      "AngularErrorDegrees": 0.0004201746916762541
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 289.9731623193917,
+        "ZenithDegrees": 74.30090117503812,
+        "Direction": {
+          "East": -0.9047924582963074,
+          "North": 0.32883765070594384,
+          "Up": 0.27058530427264604
+        }
+      },
+      "AstropyAzimuthDegrees": 289.97300756587975,
+      "AstropyZenithDegrees": 74.30054459495521,
+      "AngularErrorDegrees": 0.000386451202743579
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 295.3145915636374,
+        "ZenithDegrees": 101.5699927790406,
+        "Direction": {
+          "East": -0.8856053234483149,
+          "North": 0.4188996845454221,
+          "Up": -0.200564865736129
+        }
+      },
+      "AstropyAzimuthDegrees": 295.314320976718,
+      "AstropyZenithDegrees": 101.56972781241478,
+      "AngularErrorDegrees": 0.00037480581970614126
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 308.1992841269829,
+        "ZenithDegrees": 126.80828359526083,
+        "Direction": {
+          "East": -0.6291983883845711,
+          "North": 0.49511757875087997,
+          "Up": -0.5991393588023779
+        }
+      },
+      "AstropyAzimuthDegrees": 308.19882543044565,
+      "AstropyZenithDegrees": 126.80815639746159,
+      "AngularErrorDegrees": 0.00038865698775566554
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 339.17531507932074,
+        "ZenithDegrees": 144.92343983916092,
+        "Direction": {
+          "East": -0.20430092638380715,
+          "North": 0.537128766256111,
+          "Up": -0.8183848849648351
+        }
+      },
+      "AstropyAzimuthDegrees": 339.17463228324,
+      "AstropyZenithDegrees": 144.92357385427383,
+      "AngularErrorDegrees": 0.00041463691389040396
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 27.280172503500314,
+        "ZenithDegrees": 143.09212560848673,
+        "Direction": {
+          "East": 0.2752481878064663,
+          "North": 0.5337366995215619,
+          "Up": -0.7996021327467093
+        }
+      },
+      "AstropyAzimuthDegrees": 27.27990085760009,
+      "AstropyZenithDegrees": 143.09253356377067,
+      "AngularErrorDegrees": 0.000439362222689985
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 54.49120801340934,
+        "ZenithDegrees": 123.21971763709321,
+        "Direction": {
+          "East": 0.6809948089435184,
+          "North": 0.4859065590528508,
+          "Up": -0.5478511531989316
+        }
+      },
+      "AstropyAzimuthDegrees": 54.49123253419401,
+      "AstropyZenithDegrees": 123.22017675605883,
+      "AngularErrorDegrees": 0.0004595770075836072
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 10.8,
+        "LongitudeDegrees": 106.7,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 65.794167728314,
+        "ZenithDegrees": 97.50347762530471,
+        "Direction": {
+          "East": 0.904268199870677,
+          "North": 0.40650488681557984,
+          "Up": -0.13058636872850848
+        }
+      },
+      "AstropyAzimuthDegrees": 65.79424666637648,
+      "AstropyZenithDegrees": 97.50394982208533,
+      "AngularErrorDegrees": 0.0004786384345035026
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 265.47436621710483,
+        "ZenithDegrees": 178.11726348917662,
+        "Direction": {
+          "East": -0.03275160325570166,
+          "North": -0.002592351224739935,
+          "Up": -0.9994601603862501
+        }
+      },
+      "AstropyAzimuthDegrees": 265.46649307573324,
+      "AstropyZenithDegrees": 178.11739213342503,
+      "AngularErrorDegrees": 0.00028888075045719903
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 90.24519278170233,
+        "ZenithDegrees": 151.871726608079,
+        "Direction": {
+          "East": 0.47144280460766663,
+          "North": -0.002017514715859384,
+          "Up": -0.8818943313220857
+        }
+      },
+      "AstropyAzimuthDegrees": 90.24561907321142,
+      "AstropyZenithDegrees": 151.8715868605323,
+      "AngularErrorDegrees": 0.00024478576661215025
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 90.09733077368755,
+        "ZenithDegrees": 121.86666854918786,
+        "Direction": {
+          "East": 0.8492777341607496,
+          "North": -0.0014427055388063835,
+          "Up": -0.5279443615188172
+        }
+      },
+      "AstropyAzimuthDegrees": 90.09753292367357,
+      "AstropyZenithDegrees": 121.86656006517973,
+      "AngularErrorDegrees": 0.0002030847878612683
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 90.04975347737972,
+        "ZenithDegrees": 91.86090416427311,
+        "Direction": {
+          "East": 0.9994722299101333,
+          "North": -0.0008679039172530299,
+          "Up": -0.03247319481135372
+        }
+      },
+      "AstropyAzimuthDegrees": 90.04992057213151,
+      "AstropyZenithDegrees": 91.86083897548001,
+      "AngularErrorDegrees": 0.00017927853549792647
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 90.01904541274371,
+        "ZenithDegrees": 61.85444510669388,
+        "Direction": {
+          "East": 0.8817520450397288,
+          "North": -0.00029309894021203474,
+          "Up": 0.47171309623675634
+        }
+      },
+      "AstropyAzimuthDegrees": 90.01925973590517,
+      "AstropyZenithDegrees": 61.854423730056055,
+      "AngularErrorDegrees": 0.00019018505394568215
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 89.96941084796752,
+        "ZenithDegrees": 31.847403518022915,
+        "Direction": {
+          "East": 0.5276586964320807,
+          "North": 0.0002817072000261076,
+          "Up": 0.8494564266168398
+        }
+      },
+      "AstropyAzimuthDegrees": 89.96985110690855,
+      "AstropyZenithDegrees": 31.847414382178904,
+      "AngularErrorDegrees": 0.00023256042784028141
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 88.47199294341783,
+        "ZenithDegrees": 1.8406600429865563,
+        "Direction": {
+          "East": 0.032108630988934295,
+          "North": 0.0008565002490250774,
+          "Up": 0.9994840179929542
+        }
+      },
+      "AstropyAzimuthDegrees": 88.48090895988074,
+      "AstropyZenithDegrees": 1.8406753924721926,
+      "AngularErrorDegrees": 0.0002867951632193537
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 270.17372115940515,
+        "ZenithDegrees": 28.16752154230319,
+        "Direction": {
+          "East": -0.47204894700889494,
+          "North": 0.0014312597255887515,
+          "Up": 0.8815711787050388
+        }
+      },
+      "AstropyAzimuthDegrees": 270.1730097790031,
+      "AstropyZenithDegrees": 28.16750963478045,
+      "AngularErrorDegrees": 0.0003360188981673892
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 270.13527024092866,
+        "ZenithDegrees": 58.174593886865104,
+        "Direction": {
+          "East": -0.8496565785747592,
+          "North": 0.0020059673611185595,
+          "Up": 0.5273326033724638
+        }
+      },
+      "AstropyAzimuthDegrees": 270.1348355669263,
+      "AstropyZenithDegrees": 58.174615434707704,
+      "AngularErrorDegrees": 0.000369952756540362
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 270.1479330505984,
+        "ZenithDegrees": 88.18108298582145,
+        "Direction": {
+          "East": -0.9994928037099923,
+          "North": 0.002580615000212998,
+          "Up": 0.0317407586260837
+        }
+      },
+      "AstropyAzimuthDegrees": 270.1475550769407,
+      "AstropyZenithDegrees": 88.18115058281083,
+      "AngularErrorDegrees": 0.000383783157696703
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 270.2051033147276,
+        "ZenithDegrees": 118.1868243721773,
+        "Direction": {
+          "East": -0.8814064482305493,
+          "North": 0.003155208950658618,
+          "Up": -0.47234808952094404
+        }
+      },
+      "AstropyAzimuthDegrees": 270.2046956758703,
+      "AstropyZenithDegrees": 118.1869390172024,
+      "AngularErrorDegrees": 0.00037714488781974594
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-03-20T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 270.4054450844603,
+        "ZenithDegrees": 148.1916582929532,
+        "Direction": {
+          "East": -0.5270663293703722,
+          "North": 0.0037297689506563592,
+          "Up": -0.8498159643520572
+        }
+      },
+      "AstropyAzimuthDegrees": 270.4048400349058,
+      "AstropyZenithDegrees": 148.19180946216835,
+      "AngularErrorDegrees": 0.00035292321752895383
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 358.9924169895823,
+        "ZenithDegrees": 156.55877696432358,
+        "Direction": {
+          "East": -0.006995349725811879,
+          "North": 0.3977465813340857,
+          "Up": -0.917468649120645
+        }
+      },
+      "AstropyAzimuthDegrees": 358.99253402798513,
+      "AstropyZenithDegrees": 156.5587822476631,
+      "AngularErrorDegrees": 4.6857627750188e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 48.69029110079857,
+        "ZenithDegrees": 142.94850297351198,
+        "Direction": {
+          "East": 0.4525937294128804,
+          "North": 0.3977492116315287,
+          "Up": -0.798094280610153
+        }
+      },
+      "AstropyAzimuthDegrees": 48.690289589016295,
+      "AstropyZenithDegrees": 142.94844096766442,
+      "AngularErrorDegrees": 6.201253798938e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 63.303222236305515,
+        "ZenithDegrees": 117.7068718935071,
+        "Direction": {
+          "East": 0.7909578902987059,
+          "North": 0.3977546423221017,
+          "Up": -0.46494823398464175
+        }
+      },
+      "AstropyAzimuthDegrees": 63.303171473619194,
+      "AstropyZenithDegrees": 117.70681796797552,
+      "AngularErrorDegrees": 7.019799757676717e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 66.56103970972634,
+        "ZenithDegrees": 90.41579343335144,
+        "Direction": {
+          "East": 0.9174601999068268,
+          "North": 0.3977613844741671,
+          "Up": -0.007256900724091614
+        }
+      },
+      "AstropyAzimuthDegrees": 66.56098985349325,
+      "AstropyZenithDegrees": 90.41576820258206,
+      "AngularErrorDegrees": 5.587579806110927e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 63.51162172776422,
+        "ZenithDegrees": 63.10317386215013,
+        "Direction": {
+          "East": 0.7982033792750862,
+          "North": 0.39776739226457375,
+          "Up": 0.4523853080780517
+        }
+      },
+      "AstropyAzimuthDegrees": 63.511598795650706,
+      "AstropyZenithDegrees": 63.10317498842828,
+      "AngularErrorDegrees": 2.0482366152828816e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 49.46299477316683,
+        "ZenithDegrees": 37.73514017114804,
+        "Direction": {
+          "East": 0.4651209133389498,
+          "North": 0.3977706108596805,
+          "Up": 0.7908483275009549
+        }
+      },
+      "AstropyAzimuthDegrees": 49.463043554569175,
+      "AstropyZenithDegrees": 37.73514026204927,
+      "AngularErrorDegrees": 2.9854951385468794e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 1.0707622880274719,
+        "ZenithDegrees": 23.44315316084179,
+        "Direction": {
+          "East": 0.00743451269383151,
+          "North": 0.3977695270246763,
+          "Up": 0.9174552476233218
+        }
+      },
+      "AstropyAzimuthDegrees": 1.0708413564901098,
+      "AstropyZenithDegrees": 23.443081628277895,
+      "AngularErrorDegrees": 7.81435689695434e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 311.33262657924803,
+        "ZenithDegrees": 37.03338516861884,
+        "Direction": {
+          "East": -0.45224513611756356,
+          "North": 0.3977635748053626,
+          "Up": 0.7982847082439104
+        }
+      },
+      "AstropyAzimuthDegrees": 311.33250948557753,
+      "AstropyZenithDegrees": 37.033295898572874,
+      "AngularErrorDegrees": 0.0001137657841562309
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 296.70208248410995,
+        "ZenithDegrees": 62.27268107675749,
+        "Direction": {
+          "East": -0.7907727804344552,
+          "North": 0.39775328728723164,
+          "Up": 0.46526415311751845
+        }
+      },
+      "AstropyAzimuthDegrees": 296.7019512033997,
+      "AstropyZenithDegrees": 62.272629585398846,
+      "AngularErrorDegrees": 0.00012710305523945016
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 293.43769989959446,
+        "ZenithDegrees": 89.56389022433929,
+        "Direction": {
+          "East": -0.9174665310530496,
+          "North": 0.39774015361829984,
+          "Up": 0.0076114779888452316
+        }
+      },
+      "AstropyAzimuthDegrees": 293.43758487302756,
+      "AstropyZenithDegrees": 89.56388418253331,
+      "AngularErrorDegrees": 0.00011518180392013147
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 296.4804071651729,
+        "ZenithDegrees": 116.87697067316547,
+        "Direction": {
+          "East": -0.7983989855627343,
+          "North": 0.39772621976186073,
+          "Up": -0.4520762258362376
+        }
+      },
+      "AstropyAzimuthDegrees": 296.48032193338133,
+      "AstropyZenithDegrees": 116.87700489617382,
+      "AngularErrorDegrees": 8.337273134505591e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-06-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 310.5114388135985,
+        "ZenithDegrees": 142.2480713749911,
+        "Direction": {
+          "East": -0.46547451791505795,
+          "North": 0.39771354026099,
+          "Up": -0.7906689655379262
+        }
+      },
+      "AstropyAzimuthDegrees": 310.5114279317844,
+      "AstropyZenithDegrees": 142.24812104795032,
+      "AngularErrorDegrees": 5.0117755271248064e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 178.80945019166887,
+        "ZenithDegrees": 156.5590799832656,
+        "Direction": {
+          "East": 0.008265364294106379,
+          "North": -0.3977173634214389,
+          "Up": -0.9174707529868104
+        }
+      },
+      "AstropyAzimuthDegrees": 178.80819853705745,
+      "AstropyZenithDegrees": 156.55894137269414,
+      "AngularErrorDegrees": 0.0005168470679935832
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 130.49679041514364,
+        "ZenithDegrees": 142.23343341935927,
+        "Direction": {
+          "East": 0.465729777805121,
+          "North": -0.3977256900151757,
+          "Up": -0.7905125233464332
+        }
+      },
+      "AstropyAzimuthDegrees": 130.49644539173562,
+      "AstropyZenithDegrees": 142.23299821819643,
+      "AngularErrorDegrees": 0.0004837888276323606
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 116.47822777850378,
+        "ZenithDegrees": 116.8653301515147,
+        "Direction": {
+          "East": 0.7984963089487181,
+          "North": -0.39773679254955796,
+          "Up": -0.45189499714830106
+        }
+      },
+      "AstropyAzimuthDegrees": 116.47815854610572,
+      "AstropyZenithDegrees": 116.86490340338223,
+      "AngularErrorDegrees": 0.00043119404939033533
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 113.43828052257514,
+        "ZenithDegrees": 89.55745843570074,
+        "Direction": {
+          "East": 0.9174617106798438,
+          "North": -0.3977491086380738,
+          "Up": 0.007723730577390317
+        }
+      },
+      "AstropyAzimuthDegrees": 113.43831329278288,
+      "AstropyZenithDegrees": 89.55709124671901,
+      "AngularErrorDegrees": 0.000368648302168049
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 116.70286355012138,
+        "ZenithDegrees": 62.27170819215763,
+        "Direction": {
+          "East": 0.7907603003665967,
+          "North": -0.3977605170803822,
+          "Up": 0.46527918330404244
+        }
+      },
+      "AstropyAzimuthDegrees": 116.70301191775428,
+      "AstropyZenithDegrees": 62.27142234229514,
+      "AngularErrorDegrees": 0.00031457524519845105
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 131.32906632516955,
+        "ZenithDegrees": 37.03701895303514,
+        "Direction": {
+          "East": 0.4523078689862332,
+          "North": -0.3977689056885982,
+          "Up": 0.7982465091188483
+        }
+      },
+      "AstropyAzimuthDegrees": 131.32948359787835,
+      "AstropyZenithDegrees": 37.0368668125927,
+      "AngularErrorDegrees": 0.0002937965285326894
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 181.04686035454455,
+        "ZenithDegrees": 23.44316210599453,
+        "Direction": {
+          "East": -0.007268578174610505,
+          "North": -0.3977727370609133,
+          "Up": 0.9174551855117442
+        }
+      },
+      "AstropyAzimuthDegrees": 181.04750504736896,
+      "AstropyZenithDegrees": 23.443350189026845,
+      "AngularErrorDegrees": 0.00031805626505362113
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 229.44936281511556,
+        "ZenithDegrees": 37.72290501962198,
+        "Direction": {
+          "East": -0.46489793009567737,
+          "North": -0.3977714606169766,
+          "Up": 0.7909790008030502
+        }
+      },
+      "AstropyAzimuthDegrees": 229.44930019934964,
+      "AstropyZenithDegrees": 37.72327469468524,
+      "AngularErrorDegrees": 0.0003716549477224408
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 243.50677606646997,
+        "ZenithDegrees": 63.08352305198321,
+        "Direction": {
+          "East": -0.7980308272979466,
+          "North": -0.39776566020838744,
+          "Up": 0.4526911510523931
+        }
+      },
+      "AstropyAzimuthDegrees": 243.50656277670618,
+      "AstropyZenithDegrees": 63.08391059675457,
+      "AngularErrorDegrees": 0.0004316953177671864
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 246.56139753527202,
+        "ZenithDegrees": 90.3903441988487,
+        "Direction": {
+          "East": -0.9174655508514786,
+          "North": -0.39775689760335725,
+          "Up": -0.00681273878446234
+        }
+      },
+      "AstropyAzimuthDegrees": 246.56112671809205,
+      "AstropyZenithDegrees": 90.39074458760264,
+      "AngularErrorDegrees": 0.00048337324264890726
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 243.31164157409984,
+        "ZenithDegrees": 117.67698257915795,
+        "Direction": {
+          "East": -0.7912329299330924,
+          "North": -0.39774729393096475,
+          "Up": -0.46448631923888656
+        }
+      },
+      "AstropyAzimuthDegrees": 243.3112641808499,
+      "AstropyZenithDegrees": 117.67737956259033,
+      "AngularErrorDegrees": 0.0005189345987395146
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2025-12-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 228.7256021247076,
+        "ZenithDegrees": 142.9192489003941,
+        "Direction": {
+          "East": -0.45314496815078426,
+          "North": -0.39773896151072374,
+          "Up": -0.7977865355695066
+        }
+      },
+      "AstropyAzimuthDegrees": 228.72488302774997,
+      "AstropyZenithDegrees": 142.9195608030002,
+      "AngularErrorDegrees": 0.0005341037708341026
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 1.4838970275265047,
+        "ZenithDegrees": 158.10718002912785,
+        "Direction": {
+          "East": 0.009655878213611923,
+          "North": 0.3727464624612248,
+          "Up": -0.9278829876329054
+        }
+      },
+      "AstropyAzimuthDegrees": 1.4829993870512568,
+      "AstropyZenithDegrees": 158.1072975931515,
+      "AngularErrorDegrees": 0.0003547504311166966
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 51.69871370415822,
+        "ZenithDegrees": 143.00710070298427,
+        "Direction": {
+          "East": 0.47220415995191595,
+          "North": 0.37294158774138125,
+          "Up": -0.7987100872388198
+        }
+      },
+      "AstropyAzimuthDegrees": 51.6985199046293,
+      "AstropyZenithDegrees": 143.00742592316806,
+      "AngularErrorDegrees": 0.00034549455952194636
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 65.21748750315683,
+        "ZenithDegrees": 117.1046822933102,
+        "Direction": {
+          "East": 0.8081952630690076,
+          "North": 0.3731393426605339,
+          "Up": -0.45561765517995706
+        }
+      },
+      "AstropyAzimuthDegrees": 65.21747705964688,
+      "AstropyZenithDegrees": 117.10503804586591,
+      "AngularErrorDegrees": 0.0003558740038198277
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 68.07732071444998,
+        "ZenithDegrees": 89.45761834583311,
+        "Direction": {
+          "East": 0.927646976568286,
+          "North": 0.37333828874110847,
+          "Up": 0.009466204285703774
+        }
+      },
+      "AstropyAzimuthDegrees": 68.07740084116558,
+      "AstropyZenithDegrees": 89.45799137964642,
+      "AngularErrorDegrees": 0.00038154153312530437
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 64.93228219889404,
+        "ZenithDegrees": 61.839453586824575,
+        "Direction": {
+          "East": 0.7985859766106324,
+          "North": 0.3735364713094919,
+          "Up": 0.47194379174060097
+        }
+      },
+      "AstropyAzimuthDegrees": 64.93250726119714,
+      "AstropyZenithDegrees": 61.839820967918115,
+      "AngularErrorDegrees": 0.0004175404697797132
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 50.63861382379993,
+        "ZenithDegrees": 36.10648082092865,
+        "Direction": {
+          "East": 0.4556144020404107,
+          "North": 0.3737319427363007,
+          "Up": 0.8079232337492898
+        }
+      },
+      "AstropyAzimuthDegrees": 50.63924383730002,
+      "AstropyZenithDegrees": 36.106747810796776,
+      "AngularErrorDegrees": 0.000457294096244218
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 358.5662345558246,
+        "ZenithDegrees": 21.965015490109153,
+        "Direction": {
+          "East": -0.009358982842109058,
+          "North": 0.3739232845346864,
+          "Up": 0.9274124145831525
+        }
+      },
+      "AstropyAzimuthDegrees": 358.5674097244719,
+      "AstropyZenithDegrees": 21.964795458083927,
+      "AngularErrorDegrees": 0.0004915543915414452
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 308.4154192774802,
+        "ZenithDegrees": 37.01928542246185,
+        "Direction": {
+          "East": -0.4717484764631716,
+          "North": 0.37410998821801644,
+          "Up": 0.7984328974122948
+        }
+      },
+      "AstropyAzimuthDegrees": 308.4154821475115,
+      "AstropyZenithDegrees": 37.01877624615476,
+      "AngularErrorDegrees": 0.0005105813809007643
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 294.8637640634066,
+        "ZenithDegrees": 62.89756622120257,
+        "Direction": {
+          "East": -0.8076815212573575,
+          "North": 0.37429259240881624,
+          "Up": 0.4555827207953441
+        }
+      },
+      "AstropyAzimuthDegrees": 294.8635917882042,
+      "AstropyZenithDegrees": 62.89708189952247,
+      "AngularErrorDegrees": 0.0005080217939995853
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 291.99270615939804,
+        "ZenithDegrees": 90.52995916791146,
+        "Direction": {
+          "East": -0.9271918712169719,
+          "North": 0.3744725390995876,
+          "Up": -0.009249400492898569
+        }
+      },
+      "AstropyAzimuthDegrees": 291.9924701625525,
+      "AstropyZenithDegrees": 90.52953665344786,
+      "AngularErrorDegrees": 0.0004839506401401495
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 295.1408685559754,
+        "ZenithDegrees": 118.1330871418878,
+        "Direction": {
+          "East": -0.7983130863868988,
+          "North": 0.37465178752364897,
+          "Up": -0.4715212128937134
+        }
+      },
+      "AstropyAzimuthDegrees": 295.14055211049737,
+      "AstropyZenithDegrees": 118.13273958425354,
+      "AngularErrorDegrees": 0.00044572463773842337
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 0,
+        "LongitudeDegrees": 0,
+        "ElevationMetres": 0
+      },
+      "Timestamp": "2026-05-31T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 309.4436458074704,
+        "ZenithDegrees": 143.84365107322756,
+        "Direction": {
+          "East": -0.4556202281727144,
+          "North": 0.3748322892436114,
+          "Up": -0.8074100337624232
+        }
+      },
+      "AstropyAzimuthDegrees": 309.44308143125147,
+      "AstropyZenithDegrees": 143.84341861683137,
+      "AngularErrorDegrees": 0.0004060912356651922
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 25.256783709306394,
+        "ZenithDegrees": 113.01991356507911,
+        "Direction": {
+          "East": 0.3926991986841762,
+          "North": 0.8323859855311153,
+          "Up": -0.39105103304325867
+        }
+      },
+      "AstropyAzimuthDegrees": 25.256933036185586,
+      "AstropyZenithDegrees": 113.02014009339436,
+      "AngularErrorDegrees": 0.0002649597200256757
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 55.83576631822257,
+        "ZenithDegrees": 104.79990528678519,
+        "Direction": {
+          "East": 0.7999802711366308,
+          "North": 0.5429363195225345,
+          "Up": -0.2554441597208422
+        }
+      },
+      "AstropyAzimuthDegrees": 55.83591967885027,
+      "AstropyZenithDegrees": 104.80006498981884,
+      "AngularErrorDegrees": 0.00021792163330901722
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 83.80799875991117,
+        "ZenithDegrees": 92.97286798023059,
+        "Direction": {
+          "East": 0.9928280889365116,
+          "North": 0.10771540841964161,
+          "Up": -0.05186305628926856
+        }
+      },
+      "AstropyAzimuthDegrees": 83.80813082559185,
+      "AstropyZenithDegrees": 92.97299622704175,
+      "AngularErrorDegrees": 0.00018396106446963152
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 111.19374233141356,
+        "ZenithDegrees": 80.48751692469905,
+        "Direction": {
+          "East": 0.9195429407682445,
+          "North": -0.35655166697244656,
+          "Up": 0.16526248474005942
+        }
+      },
+      "AstropyAzimuthDegrees": 111.19385328177232,
+      "AstropyZenithDegrees": 80.48765175311455,
+      "AngularErrorDegrees": 0.00017364470062608228
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 140.4139348627776,
+        "ZenithDegrees": 70.25289819346091,
+        "Direction": {
+          "East": 0.5997626718178963,
+          "North": -0.725347642147942,
+          "Up": 0.3378691100474848
+        }
+      },
+      "AstropyAzimuthDegrees": 140.41402293002963,
+      "AstropyZenithDegrees": 70.25307127030844,
+      "AngularErrorDegrees": 0.00019190120194173663
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 172.45295055267204,
+        "ZenithDegrees": 65.17645371190999,
+        "Direction": {
+          "East": 0.11920510764483211,
+          "North": -0.8997427529256157,
+          "Up": 0.41982510747836216
+        }
+      },
+      "AstropyAzimuthDegrees": 172.452994708929,
+      "AstropyZenithDegrees": 65.17668417088417,
+      "AngularErrorDegrees": 0.0002339176412159373
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 205.276853726326,
+        "ZenithDegrees": 67.08910024587092,
+        "Direction": {
+          "East": -0.3933077344649013,
+          "North": -0.8329196657396061,
+          "Up": 0.38929918627491317
+        }
+      },
+      "AstropyAzimuthDegrees": 205.27683122281493,
+      "AstropyZenithDegrees": 67.08938712904617,
+      "AngularErrorDegrees": 0.00028763104330963745
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 235.85951475556897,
+        "ZenithDegrees": 75.2492553744116,
+        "Direction": {
+          "East": -0.8003863519288361,
+          "North": -0.542727496861526,
+          "Up": 0.2546145160757172
+        }
+      },
+      "AstropyAzimuthDegrees": 235.85943675349975,
+      "AstropyZenithDegrees": 75.24958577139611,
+      "AngularErrorDegrees": 0.00033889830477433746
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 263.8552637084448,
+        "ZenithDegrees": 87.01830906073627,
+        "Direction": {
+          "East": -0.9929086564102972,
+          "North": -0.10689550307411394,
+          "Up": 0.05201683812027175
+        }
+      },
+      "AstropyAzimuthDegrees": 263.8551668894393,
+      "AstropyZenithDegrees": 87.01867138868306,
+      "AngularErrorDegrees": 0.0003750068005148009
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 291.267498450698,
+        "ZenithDegrees": 99.44171949215553,
+        "Direction": {
+          "East": -0.9192727019044208,
+          "North": 0.3578088489958323,
+          "Up": -0.16404428400167897
+        }
+      },
+      "AstropyAzimuthDegrees": 291.2674270664847,
+      "AstropyZenithDegrees": 99.4421004889427,
+      "AngularErrorDegrees": 0.00038744951170360554
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 320.4987475764875,
+        "ZenithDegrees": 109.60374403997922,
+        "Direction": {
+          "East": -0.5992241726784074,
+          "North": 0.7268846754780495,
+          "Up": -0.3355131285554246
+        }
+      },
+      "AstropyAzimuthDegrees": 320.49874942300494,
+      "AstropyZenithDegrees": 109.60411793023835,
+      "AngularErrorDegrees": 0.0003738943054904799
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-03-20T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 352.5077387352707,
+        "ZenithDegrees": 114.60054208857375,
+        "Direction": {
+          "East": -0.1185568558773571,
+          "North": 0.9014695844876673,
+          "Up": -0.4162893947341298
+        }
+      },
+      "AstropyAzimuthDegrees": 352.507841271653,
+      "AstropyZenithDegrees": 114.60086765665059,
+      "AngularErrorDegrees": 0.00033865360896314387
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 22.42090552367737,
+        "ZenithDegrees": 89.55337179804582,
+        "Direction": {
+          "East": 0.3813961024039638,
+          "North": 0.9243788456085975,
+          "Up": 0.007795053712574685
+        }
+      },
+      "AstropyAzimuthDegrees": 22.420899379315394,
+      "AstropyZenithDegrees": 89.55338395995425,
+      "AngularErrorDegrees": 1.3625817649147176e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 48.978164112315355,
+        "ZenithDegrees": 82.2060515612539,
+        "Direction": {
+          "East": 0.7474899268022399,
+          "North": 0.6502833883820224,
+          "Up": 0.13561092921876847
+        }
+      },
+      "AstropyAzimuthDegrees": 48.97814436884995,
+      "AstropyZenithDegrees": 82.20601446635541,
+      "AngularErrorDegrees": 4.1936466913158114e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 74.86608675038316,
+        "ZenithDegrees": 71.11573935573007,
+        "Direction": {
+          "East": 0.9133593423638823,
+          "North": 0.24702333094444967,
+          "Up": 0.3236575129449731
+        }
+      },
+      "AstropyAzimuthDegrees": 74.86605369486935,
+      "AstropyZenithDegrees": 71.11567494575615,
+      "AngularErrorDegrees": 7.160202453768118e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 101.9993967538341,
+        "ZenithDegrees": 58.56274397984855,
+        "Direction": {
+          "East": 0.8345689774065198,
+          "North": -0.17738392847175052,
+          "Up": 0.5215645347131693
+        }
+      },
+      "AstropyAzimuthDegrees": 101.9993679091736,
+      "AstropyZenithDegrees": 58.562676137589875,
+      "AngularErrorDegrees": 7.216823081873377e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 133.73666797439682,
+        "ZenithDegrees": 47.44342020706139,
+        "Direction": {
+          "East": 0.5322189060036504,
+          "North": -0.5092514871724251,
+          "Up": 0.6763179421728739
+        }
+      },
+      "AstropyAzimuthDegrees": 133.73666998600177,
+      "AstropyZenithDegrees": 47.443374869857074,
+      "AngularErrorDegrees": 4.5361412342254615e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 172.4616132682885,
+        "ZenithDegrees": 41.715225053351965,
+        "Direction": {
+          "East": 0.08729786569222549,
+          "North": -0.659677558944645,
+          "Up": 0.7464613860545076
+        }
+      },
+      "AstropyAzimuthDegrees": 172.46164749748834,
+      "AstropyZenithDegrees": 41.715231876965724,
+      "AngularErrorDegrees": 2.3777252667033014e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 212.92607421122307,
+        "ZenithDegrees": 44.50385270465012,
+        "Direction": {
+          "East": -0.3810098469971459,
+          "North": -0.5883642795846719,
+          "Up": 0.7132033167337499
+        }
+      },
+      "AstropyAzimuthDegrees": 212.92608482686754,
+      "AstropyZenithDegrees": 44.50392244444111,
+      "AngularErrorDegrees": 7.013564481449038e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 247.18052636063405,
+        "ZenithDegrees": 54.16505765045908,
+        "Direction": {
+          "East": -0.7472540221096998,
+          "North": -0.3144155642429041,
+          "Up": 0.5854522007838834
+        }
+      },
+      "AstropyAzimuthDegrees": 247.18049220879004,
+      "AstropyZenithDegrees": 54.16517084712764,
+      "AngularErrorDegrees": 0.00011653353334080581
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 275.5520944011975,
+        "ZenithDegrees": 66.58241393471495,
+        "Direction": {
+          "East": -0.9133277407028983,
+          "North": 0.08878164648801516,
+          "Up": 0.3974295627018913
+        }
+      },
+      "AstropyAzimuthDegrees": 275.552041514747,
+      "AstropyZenithDegrees": 66.58254692957115,
+      "AngularErrorDegrees": 0.00014157269372438313
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 301.5840397615493,
+        "ZenithDegrees": 78.49222138971228,
+        "Direction": {
+          "East": -0.8347481975584095,
+          "North": 0.5132200403854336,
+          "Up": 0.19950096947072846
+        }
+      },
+      "AstropyAzimuthDegrees": 301.5839950094208,
+      "AstropyZenithDegrees": 78.49235137789766,
+      "AngularErrorDegrees": 0.00013718590083679292
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 327.7847971626958,
+        "ZenithDegrees": 87.43898430698579,
+        "Direction": {
+          "East": -0.5325683267628153,
+          "North": 0.8452067098584427,
+          "Up": 0.044683273596745135
+        }
+      },
+      "AstropyAzimuthDegrees": 327.7847750070423,
+      "AstropyZenithDegrees": 87.43908573870499,
+      "AngularErrorDegrees": 0.00010381852728273381
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-06-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 354.9651743107298,
+        "ZenithDegrees": 91.46441799178514,
+        "Direction": {
+          "East": -0.08773257279105938,
+          "North": 0.9958161877284799,
+          "Up": -0.025556132911267182
+        }
+      },
+      "AstropyAzimuthDegrees": 354.9651704513227,
+      "AstropyZenithDegrees": 91.46446771366288,
+      "AngularErrorDegrees": 4.987133866605427e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 34.16415693531756,
+        "ZenithDegrees": 135.26932544946337,
+        "Direction": {
+          "East": 0.39521609630812526,
+          "North": 0.5823261033206879,
+          "Up": -0.7104227942643101
+        }
+      },
+      "AstropyAzimuthDegrees": 34.16481361803852,
+      "AstropyZenithDegrees": 135.26932711195693,
+      "AngularErrorDegrees": 0.0004621599599678956
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 68.17565901974696,
+        "ZenithDegrees": 125.45725728390944,
+        "Direction": {
+          "East": 0.7561681564557654,
+          "North": 0.302818382645095,
+          "Up": -0.580095463087325
+        }
+      },
+      "AstropyAzimuthDegrees": 68.17616798190552,
+      "AstropyZenithDegrees": 125.45714298278725,
+      "AngularErrorDegrees": 0.00043004289516785
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 96.41179175655058,
+        "ZenithDegrees": 113.01481130362673,
+        "Direction": {
+          "East": 0.9146466511352355,
+          "North": -0.10278467161505911,
+          "Up": -0.39096907147251847
+        }
+      },
+      "AstropyAzimuthDegrees": 96.41219208026247,
+      "AstropyZenithDegrees": 113.0146770276856,
+      "AngularErrorDegrees": 0.0003921639276816567
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 122.41377982698617,
+        "ZenithDegrees": 101.1679363207514,
+        "Direction": {
+          "East": 0.8282130255654456,
+          "North": -0.5258794204747154,
+          "Up": -0.1936853618756671
+        }
+      },
+      "AstropyAzimuthDegrees": 122.41413141361471,
+      "AstropyZenithDegrees": 101.1678486445204,
+      "AngularErrorDegrees": 0.00035589758134908073
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 148.63781171872654,
+        "ZenithDegrees": 92.35392761834211,
+        "Direction": {
+          "East": 0.5200070639952049,
+          "North": -0.8531739126617587,
+          "Up": -0.041072230868464954
+        }
+      },
+      "AstropyAzimuthDegrees": 148.6381453103477,
+      "AstropyZenithDegrees": 92.3539325582221,
+      "AngularErrorDegrees": 0.0003333467334349149
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 175.8377897459448,
+        "ZenithDegrees": 88.50999367443134,
+        "Direction": {
+          "East": 0.07255585580473896,
+          "North": -0.9970253323529765,
+          "Up": 0.026002585157606957
+        }
+      },
+      "AstropyAzimuthDegrees": 175.83810306038583,
+      "AstropyZenithDegrees": 88.51011780210195,
+      "AngularErrorDegrees": 0.00033690836994146675
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 203.2251176040169,
+        "ZenithDegrees": 90.59721793728947,
+        "Direction": {
+          "East": -0.39432338464030786,
+          "North": -0.918912631641018,
+          "Up": -0.010423230611989135
+        }
+      },
+      "AstropyAzimuthDegrees": 203.22539328970524,
+      "AstropyZenithDegrees": 90.59746114576818,
+      "AngularErrorDegrees": 0.00036762032358004
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 229.74635304958727,
+        "ZenithDegrees": 98.08230408104684,
+        "Direction": {
+          "East": -0.7556106598025303,
+          "North": -0.6397542098327792,
+          "Up": -0.1405954543860548
+        }
+      },
+      "AstropyAzimuthDegrees": 229.74659183884233,
+      "AstropyZenithDegrees": 98.08264211123931,
+      "AngularErrorDegrees": 0.0004125015726372544
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 255.6303011790561,
+        "ZenithDegrees": 109.2479015266161,
+        "Direction": {
+          "East": -0.9145644640077504,
+          "North": -0.2343047552166503,
+          "Up": -0.3296560675265689
+        }
+      },
+      "AstropyAzimuthDegrees": 255.63053823156022,
+      "AstropyZenithDegrees": 109.24829805617311,
+      "AngularErrorDegrees": 0.0004553270174044279
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 282.8399189039499,
+        "ZenithDegrees": 121.8015915843601,
+        "Direction": {
+          "East": -0.828626650961376,
+          "North": 0.1888665696666089,
+          "Up": -0.5269794039418447
+        }
+      },
+      "AstropyAzimuthDegrees": 282.8402261639047,
+      "AstropyZenithDegrees": 121.80200019272414,
+      "AngularErrorDegrees": 0.00048492390597475567
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 314.75898872567603,
+        "ZenithDegrees": 132.82250525922208,
+        "Direction": {
+          "East": -0.5208136303312201,
+          "North": 0.5164504153429655,
+          "Up": -0.679729454234031
+        }
+      },
+      "AstropyAzimuthDegrees": 314.75947169191164,
+      "AstropyZenithDegrees": 132.8228534838235,
+      "AngularErrorDegrees": 0.0004967334360522015
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2025-12-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 353.64841176718863,
+        "ZenithDegrees": 138.331747118028,
+        "Direction": {
+          "East": -0.07354813169224818,
+          "North": 0.6607357360070305,
+          "Up": -0.7470066662941017
+        }
+      },
+      "AstropyAzimuthDegrees": 353.6490972026966,
+      "AstropyZenithDegrees": 138.33193056129332,
+      "AngularErrorDegrees": 0.0004912260460521802
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 23.63693084847942,
+        "ZenithDegrees": 90.90981679759133,
+        "Direction": {
+          "East": 0.4008890567782663,
+          "North": 0.9159889918666213,
+          "Up": -0.015878631383174233
+        }
+      },
+      "AstropyAzimuthDegrees": 23.63656521866277,
+      "AstropyZenithDegrees": 90.91000052475212,
+      "AngularErrorDegrees": 0.0004091541512322047
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 50.42237629098302,
+        "ZenithDegrees": 83.3160009837246,
+        "Direction": {
+          "East": 0.7655234024770022,
+          "North": 0.6327926229777944,
+          "Up": 0.11639336993539058
+        }
+      },
+      "AstropyAzimuthDegrees": 50.42203063137417,
+      "AstropyZenithDegrees": 83.31620401294408,
+      "AngularErrorDegrees": 0.00039885188365903747
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 76.48412924201688,
+        "ZenithDegrees": 72.0612503947313,
+        "Direction": {
+          "East": 0.9250378831456285,
+          "North": 0.2223529665111172,
+          "Up": 0.3080001185538093
+        }
+      },
+      "AstropyAzimuthDegrees": 76.48378369956326,
+      "AstropyZenithDegrees": 72.06146770738158,
+      "AngularErrorDegrees": 0.0003940783890991693
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 103.78855264482898,
+        "ZenithDegrees": 59.492347408623615,
+        "Direction": {
+          "East": 0.8367328184809395,
+          "North": -0.20534404104972437,
+          "Up": 0.507653440136391
+        }
+      },
+      "AstropyAzimuthDegrees": 103.78817779809592,
+      "AstropyZenithDegrees": 59.49257161923114,
+      "AngularErrorDegrees": 0.0003931533748441798
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 135.61640313260844,
+        "ZenithDegrees": 48.55385221682031,
+        "Direction": {
+          "East": 0.5242990329324916,
+          "North": -0.5357032575884889,
+          "Up": 0.6619158132837856
+        }
+      },
+      "AstropyAzimuthDegrees": 135.61595316163465,
+      "AstropyZenithDegrees": 48.55406471057461,
+      "AngularErrorDegrees": 0.00039864451648411424
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 174.00235160010462,
+        "ZenithDegrees": 43.1541638287627,
+        "Direction": {
+          "East": 0.07146575803775365,
+          "North": -0.6802198267371304,
+          "Up": 0.7295160263776236
+        }
+      },
+      "AstropyAzimuthDegrees": 174.00179552146048,
+      "AstropyZenithDegrees": 43.15432887948821,
+      "AngularErrorDegrees": 0.0004146069093026321
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 213.7106925953594,
+        "ZenithDegrees": 46.1792208873653,
+        "Direction": {
+          "East": -0.4004373543228381,
+          "North": -0.6001878046398169,
+          "Up": 0.692404884749207
+        }
+      },
+      "AstropyAzimuthDegrees": 213.71009819967736,
+      "AstropyZenithDegrees": 46.1793179533247,
+      "AngularErrorDegrees": 0.00043970974127110145
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 247.48764529938728,
+        "ZenithDegrees": 55.90355089500599,
+        "Direction": {
+          "East": -0.7649917434007782,
+          "North": -0.31706322967073824,
+          "Up": 0.5605876746053186
+        }
+      },
+      "AstropyAzimuthDegrees": 247.48708754756444,
+      "AstropyZenithDegrees": 55.90360742745971,
+      "AngularErrorDegrees": 0.00046531857889156776
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 275.76208276127954,
+        "ZenithDegrees": 68.31900915848617,
+        "Direction": {
+          "East": -0.9245600077119351,
+          "North": 0.0932952534013534,
+          "Up": 0.369438476383394
+        }
+      },
+      "AstropyAzimuthDegrees": 275.7615684265173,
+      "AstropyZenithDegrees": 68.31906336351338,
+      "AngularErrorDegrees": 0.00048101226492340034
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 301.91605077091236,
+        "ZenithDegrees": 80.19951315622399,
+        "Direction": {
+          "East": -0.8364362701682369,
+          "North": 0.520960883302855,
+          "Up": 0.1702178721972442
+        }
+      },
+      "AstropyAzimuthDegrees": 301.91556880758725,
+      "AstropyZenithDegrees": 80.19959040897092,
+      "AngularErrorDegrees": 0.0004811718260112454
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 328.3760187511966,
+        "ZenithDegrees": 89.06388501610127,
+        "Direction": {
+          "East": -0.5242723695294456,
+          "North": 0.8513938962803935,
+          "Up": 0.016337561766409093
+        }
+      },
+      "AstropyAzimuthDegrees": 328.375564673295,
+      "AstropyZenithDegrees": 89.06399784372726,
+      "AngularErrorDegrees": 0.000467826662377766
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 65,
+        "LongitudeDegrees": 25,
+        "ElevationMetres": 1500
+      },
+      "Timestamp": "2026-05-31T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 355.88151452564654,
+        "ZenithDegrees": 92.92029003610584,
+        "Direction": {
+          "East": -0.07172598126982896,
+          "North": 0.9961223952937659,
+          "Up": -0.05094661132097591
+        }
+      },
+      "AstropyAzimuthDegrees": 355.88109092153996,
+      "AstropyZenithDegrees": 92.9204402845868,
+      "AngularErrorDegrees": 0.0004489423941692772
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 46.89358766854953,
+        "ZenithDegrees": 44.33376284635265,
+        "Direction": {
+          "East": 0.5102109007832131,
+          "North": 0.4775540314172919,
+          "Up": 0.7152810523137562
+        }
+      },
+      "AstropyAzimuthDegrees": 46.89380688034429,
+      "AstropyZenithDegrees": 44.33356848654596,
+      "AngularErrorDegrees": 0.0002474749231246289
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 1.206178177985559,
+        "ZenithDegrees": 33.79161759696077,
+        "Direction": {
+          "East": 0.011707588965777976,
+          "North": 0.5560507987288149,
+          "Up": 0.83106584672555
+        }
+      },
+      "AstropyAzimuthDegrees": 1.2062090204219469,
+      "AstropyZenithDegrees": 33.79141643592154,
+      "AngularErrorDegrees": 0.0002018910937123293
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 314.71234988262523,
+        "ZenithDegrees": 43.584290973345276,
+        "Direction": {
+          "East": -0.48993552447263544,
+          "North": 0.485040672249995,
+          "Up": 0.7243609101290576
+        }
+      },
+      "AstropyAzimuthDegrees": 314.71220669852966,
+      "AstropyZenithDegrees": 43.58415029762466,
+      "AngularErrorDegrees": 0.00017185491059216665
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 288.25154508544085,
+        "ZenithDegrees": 64.93234720755818,
+        "Direction": {
+          "East": -0.8602375519672889,
+          "North": 0.2836895239699405,
+          "Up": 0.42368810247047833
+        }
+      },
+      "AstropyAzimuthDegrees": 288.2513830088946,
+      "AstropyZenithDegrees": 64.93226372535987,
+      "AngularErrorDegrees": 0.00016888609720663785
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 270.3498709522937,
+        "ZenithDegrees": 89.45168613337806,
+        "Direction": {
+          "East": -0.9999355658765141,
+          "North": 0.0061060825090483205,
+          "Up": 0.009569736235036763
+        }
+      },
+      "AstropyAzimuthDegrees": 270.3496791116309,
+      "AstropyZenithDegrees": 89.45163263921029,
+      "AngularErrorDegrees": 0.00019915093563191894
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 252.59827480223197,
+        "ZenithDegrees": 114.02071409505135,
+        "Direction": {
+          "East": -0.8715933174752692,
+          "North": -0.2731696105957296,
+          "Up": -0.40706688980980976
+        }
+      },
+      "AstropyAzimuthDegrees": 252.59800578495995,
+      "AstropyZenithDegrees": 114.0206522432257,
+      "AngularErrorDegrees": 0.0002533850087391397
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 226.7653046442498,
+        "ZenithDegrees": 135.61289750279593,
+        "Direction": {
+          "East": -0.5096253159972605,
+          "North": -0.4791510971517593,
+          "Up": -0.714630158468671
+        }
+      },
+      "AstropyAzimuthDegrees": 226.7649096116393,
+      "AstropyZenithDegrees": 135.61274823099353,
+      "AngularErrorDegrees": 0.00031406766124914004
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 181.1385860093581,
+        "ZenithDegrees": 146.17813298530172,
+        "Direction": {
+          "East": -0.011060321581258614,
+          "North": -0.556502821982817,
+          "Up": -0.8307720977570685
+        }
+      },
+      "AstropyAzimuthDegrees": 181.1383217235069,
+      "AstropyZenithDegrees": 146.17779932681245,
+      "AngularErrorDegrees": 0.00036464779912416393
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 134.64134145812628,
+        "ZenithDegrees": 136.42325459589932,
+        "Direction": {
+          "East": 0.4904683944712585,
+          "North": -0.48436607282716343,
+          "Up": -0.7244516971605331
+        }
+      },
+      "AstropyAzimuthDegrees": 134.6415018138094,
+      "AstropyZenithDegrees": 136.4228774580543,
+      "AngularErrorDegrees": 0.0003930032153226291
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 108.14094620911877,
+        "ZenithDegrees": 115.10320549493034,
+        "Direction": {
+          "East": 0.8605335578563387,
+          "North": -0.2819465566619794,
+          "Up": -0.4242500854325955
+        }
+      },
+      "AstropyAzimuthDegrees": 108.1412022098514,
+      "AstropyZenithDegrees": 115.10288768297902,
+      "AngularErrorDegrees": 0.0003933766404346369
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 90.19307404645049,
+        "ZenithDegrees": 90.61389115582264,
+        "Direction": {
+          "East": 0.9999369237606145,
+          "North": -0.003369578012111935,
+          "Up": -0.01071421691862601
+        }
+      },
+      "AstropyAzimuthDegrees": 90.19333223771328,
+      "AstropyZenithDegrees": 90.6136300214746,
+      "AngularErrorDegrees": 0.0003672141427702346
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-03-20T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 72.37437640530014,
+        "ZenithDegrees": 66.09484986945462,
+        "Direction": {
+          "East": 0.8712999104817591,
+          "North": 0.276821543097181,
+          "Up": 0.4052237644459836
+        }
+      },
+      "AstropyAzimuthDegrees": 72.37462851578628,
+      "AstropyZenithDegrees": 66.09462461564799,
+      "AngularErrorDegrees": 0.0003222762470185252
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 29.98358044334106,
+        "ZenithDegrees": 63.72812945465551,
+        "Direction": {
+          "East": 0.448129360697246,
+          "North": 0.7766967674785236,
+          "Up": 0.44263100599651833
+        }
+      },
+      "AstropyAzimuthDegrees": 29.98369646416645,
+      "AstropyZenithDegrees": 63.728160884070064,
+      "AngularErrorDegrees": 0.00010868011340315827
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 359.1733402408407,
+        "ZenithDegrees": 57.34493756755053,
+        "Direction": {
+          "East": -0.012146950678993764,
+          "North": 0.8418466089350736,
+          "Up": 0.5395801503147789
+        }
+      },
+      "AstropyAzimuthDegrees": 359.17346132345955,
+      "AstropyZenithDegrees": 57.34499043327394,
+      "AngularErrorDegrees": 0.00011483592184914255
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 328.64305785048714,
+        "ZenithDegrees": 64.37052093871716,
+        "Direction": {
+          "East": -0.469169078776221,
+          "North": 0.7699228148403944,
+          "Up": 0.43254969045014463
+        }
+      },
+      "AstropyAzimuthDegrees": 328.6431758922597,
+      "AstropyZenithDegrees": 64.37057925590652,
+      "AngularErrorDegrees": 0.00012135792358214475
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 305.93402868575595,
+        "ZenithDegrees": 81.36065053215835,
+        "Direction": {
+          "East": -0.8005060190565743,
+          "North": 0.5801945865769255,
+          "Up": 0.1502143640302951
+        }
+      },
+      "AstropyAzimuthDegrees": 305.9341189605295,
+      "AstropyZenithDegrees": 81.36071744408775,
+      "AngularErrorDegrees": 0.00011154753900580992
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 289.423399901253,
+        "ZenithDegrees": 103.40237117360886,
+        "Direction": {
+          "East": -0.917403163887498,
+          "North": 0.3234898500969564,
+          "Up": -0.23178816141782826
+        }
+      },
+      "AstropyAzimuthDegrees": 289.4234444295325,
+      "AstropyZenithDegrees": 103.4024543340117,
+      "AngularErrorDegrees": 9.37650997987757e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 274.97003143355596,
+        "ZenithDegrees": 127.67103757764484,
+        "Direction": {
+          "East": -0.7885565077042989,
+          "North": 0.06857416231157468,
+          "Up": -0.6111270067837501
+        }
+      },
+      "AstropyAzimuthDegrees": 274.9699989008806,
+      "AstropyZenithDegrees": 127.67113382638352,
+      "AngularErrorDegrees": 9.96339094961043e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 255.46586400537123,
+        "ZenithDegrees": 152.39874024044633,
+        "Direction": {
+          "East": -0.44848863369619746,
+          "North": -0.11627216540185382,
+          "Up": -0.8861933925493249
+        }
+      },
+      "AstropyAzimuthDegrees": 255.46562635104635,
+      "AstropyZenithDegrees": 152.39882083739522,
+      "AngularErrorDegrees": 0.00013645443772548042
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 176.31004977455217,
+        "ZenithDegrees": 169.5184935125929,
+        "Direction": {
+          "East": 0.011707755600355908,
+          "North": -0.1815410176665486,
+          "Up": -0.9833136769939673
+        }
+      },
+      "AstropyAzimuthDegrees": 176.3094369499804,
+      "AstropyZenithDegrees": 169.51835998771492,
+      "AngularErrorDegrees": 0.00017394744052500507
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 103.17718908224028,
+        "ZenithDegrees": 151.220063415644,
+        "Direction": {
+          "East": 0.4687701659372799,
+          "North": -0.10975217176864542,
+          "Up": -0.8764753232802398
+        }
+      },
+      "AstropyAzimuthDegrees": 103.17741695010771,
+      "AstropyZenithDegrees": 151.21990769930846,
+      "AngularErrorDegrees": 0.00019048122878195402
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 84.3007795028599,
+        "ZenithDegrees": 126.46208784336329,
+        "Direction": {
+          "East": 0.8002748015079945,
+          "North": 0.07986704830700785,
+          "Up": -0.5942907509511368
+        }
+      },
+      "AstropyAzimuthDegrees": 84.30095954036294,
+      "AstropyZenithDegrees": 126.46198297698467,
+      "AngularErrorDegrees": 0.00017878098024445559
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 69.85592210537303,
+        "ZenithDegrees": 102.25939392550643,
+        "Direction": {
+          "East": 0.9174208122761124,
+          "North": 0.33652885935649346,
+          "Up": -0.21233789116136473
+        }
+      },
+      "AstropyAzimuthDegrees": 69.85606054452606,
+      "AstropyZenithDegrees": 102.25934291999026,
+      "AngularErrorDegrees": 0.00014457817153175454
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-06-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 53.13614379142372,
+        "ZenithDegrees": 80.3821706764847,
+        "Direction": {
+          "East": 0.7888176474744585,
+          "North": 0.5914832845118453,
+          "Up": 0.16707556127674814
+        }
+      },
+      "AstropyAzimuthDegrees": 53.13625393480425,
+      "AstropyZenithDegrees": 80.38217369420472,
+      "AngularErrorDegrees": 0.00010863713719351745
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 74.5065122550052,
+        "ZenithDegrees": 26.818126617181484,
+        "Direction": {
+          "East": 0.4347651243728562,
+          "North": 0.12051782554189748,
+          "Up": 0.8924431300400646
+        }
+      },
+      "AstropyAzimuthDegrees": 74.50635560868986,
+      "AstropyZenithDegrees": 26.81776876932672,
+      "AngularErrorDegrees": 0.0003647596919842433
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 351.436678553799,
+        "ZenithDegrees": 10.56946294995204,
+        "Direction": {
+          "East": -0.027312777802033734,
+          "North": 0.18138258085596162,
+          "Up": 0.9830332504705868
+        }
+      },
+      "AstropyAzimuthDegrees": 351.43484206408266,
+      "AstropyZenithDegrees": 10.569420756432876,
+      "AngularErrorDegrees": 0.0003394941392064264
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 282.319059851837,
+        "ZenithDegrees": 29.56664314661453,
+        "Direction": {
+          "East": -0.48207404964533157,
+          "North": 0.10527714221212192,
+          "Up": 0.8697823486287815
+        }
+      },
+      "AstropyAzimuthDegrees": 282.3186109749441,
+      "AstropyZenithDegrees": 29.566891312157644,
+      "AngularErrorDegrees": 0.000332633643779051
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 263.8232432087687,
+        "ZenithDegrees": 54.33661780097748,
+        "Direction": {
+          "East": -0.8077397457147488,
+          "North": -0.08741708825070216,
+          "Up": 0.5830220886676952
+        }
+      },
+      "AstropyAzimuthDegrees": 263.8229614391119,
+      "AstropyZenithDegrees": 54.33687663720492,
+      "AngularErrorDegrees": 0.00034554777163100446
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 249.3792634711082,
+        "ZenithDegrees": 78.48948295892001,
+        "Direction": {
+          "East": -0.9171087553390281,
+          "North": -0.3450973850408525,
+          "Up": 0.19954780309104977
+        }
+      },
+      "AstropyAzimuthDegrees": 249.37896450389408,
+      "AstropyZenithDegrees": 78.48971878138353,
+      "AngularErrorDegrees": 0.00037607791009622456
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 232.5206548892561,
+        "ZenithDegrees": 100.25060743854631,
+        "Direction": {
+          "East": -0.7809063801797884,
+          "North": -0.5987633982499937,
+          "Up": -0.17795397806910435
+        }
+      },
+      "AstropyAzimuthDegrees": 232.5202650889495,
+      "AstropyZenithDegrees": 100.2507721331387,
+      "AngularErrorDegrees": 0.00041744077170872116
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 209.16690617475496,
+        "ZenithDegrees": 116.64143399510225,
+        "Direction": {
+          "East": -0.4356129588001956,
+          "North": -0.7804958550257589,
+          "Up": -0.4484055869555471
+        }
+      },
+      "AstropyAzimuthDegrees": 209.16639308374803,
+      "AstropyZenithDegrees": 116.64144023292621,
+      "AngularErrorDegrees": 0.0004586586453425009
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 178.20924011379014,
+        "ZenithDegrees": 122.6426822431288,
+        "Direction": {
+          "East": 0.026313723858247852,
+          "North": -0.8416395616481759,
+          "Up": -0.5393982167243215
+        }
+      },
+      "AstropyAzimuthDegrees": 178.20873057693174,
+      "AstropyZenithDegrees": 122.64244985835984,
+      "AngularErrorDegrees": 0.00048794686657418617
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 147.85741653266754,
+        "ZenithDegrees": 115.25015817270496,
+        "Direction": {
+          "East": 0.4811948646388606,
+          "North": -0.7658253601218663,
+          "Up": -0.42657123676990044
+        }
+      },
+      "AstropyAzimuthDegrees": 147.85710661960093,
+      "AstropyZenithDegrees": 115.24974796178807,
+      "AngularErrorDegrees": 0.0004968324973808647
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 125.38473938121322,
+        "ZenithDegrees": 98.0554231731976,
+        "Direction": {
+          "East": 0.8072376536541892,
+          "North": -0.5733504081661769,
+          "Up": -0.14013093869148874
+        }
+      },
+      "AstropyAzimuthDegrees": 125.38459750594683,
+      "AstropyZenithDegrees": 98.05496108815703,
+      "AngularErrorDegrees": 0.0004829657749106179
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 108.9972512334731,
+        "ZenithDegrees": 75.92258850577795,
+        "Direction": {
+          "East": 0.9171378952577753,
+          "North": -0.3157466869575693,
+          "Up": 0.24323262683582703
+        }
+      },
+      "AstropyAzimuthDegrees": 108.99718405850291,
+      "AstropyZenithDegrees": 75.92214239301693,
+      "AngularErrorDegrees": 0.0004508459783982819
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2025-12-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 94.53545976206678,
+        "ZenithDegrees": 51.62020481279947,
+        "Direction": {
+          "East": 0.7814576954879355,
+          "North": -0.06198870987436651,
+          "Up": 0.6208713796035348
+        }
+      },
+      "AstropyAzimuthDegrees": 94.53539985568048,
+      "AstropyZenithDegrees": 51.61979721268502,
+      "AngularErrorDegrees": 0.0004102964908430675
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 29.808042060011676,
+        "ZenithDegrees": 61.91311389875055,
+        "Direction": {
+          "East": 0.43855509959146355,
+          "North": 0.7655112014462304,
+          "Up": 0.4708099670596091
+        }
+      },
+      "AstropyAzimuthDegrees": 29.808602634625913,
+      "AstropyZenithDegrees": 61.913224547477014,
+      "AngularErrorDegrees": 0.0005067853115791646
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 357.9887422740363,
+        "ZenithDegrees": 55.826033366007046,
+        "Direction": {
+          "East": -0.029036064867144197,
+          "North": 0.8268262017254451,
+          "Up": 0.5617075209371019
+        }
+      },
+      "AstropyAzimuthDegrees": 357.9893296114656,
+      "AstropyZenithDegrees": 55.82596098139918,
+      "AngularErrorDegrees": 0.0004912868359029878
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 326.89266965817774,
+        "ZenithDegrees": 63.48800034826335,
+        "Direction": {
+          "East": -0.4887702685612539,
+          "North": 0.7495624382122829,
+          "Up": 0.4463852324974667
+        }
+      },
+      "AstropyAzimuthDegrees": 326.89310365025347,
+      "AstropyZenithDegrees": 63.48775914324295,
+      "AngularErrorDegrees": 0.00045716327843604507
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 304.1482529729561,
+        "ZenithDegrees": 81.03994466778443,
+        "Direction": {
+          "East": -0.817488964414906,
+          "North": 0.5544862712627666,
+          "Up": 0.15574584437781375
+        }
+      },
+      "AstropyAzimuthDegrees": 304.14851426547716,
+      "AstropyZenithDegrees": 81.03962878238538,
+      "AngularErrorDegrees": 0.0004079230414058345
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 287.5893037182169,
+        "ZenithDegrees": 103.43524263663795,
+        "Direction": {
+          "East": -0.9271597250629805,
+          "North": 0.29392189610995545,
+          "Up": -0.23234621410358108
+        }
+      },
+      "AstropyAzimuthDegrees": 287.5894423745484,
+      "AstropyZenithDegrees": 103.43491036452173,
+      "AngularErrorDegrees": 0.00035859792858865074
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 272.73924508336574,
+        "ZenithDegrees": 127.87491035706742,
+        "Direction": {
+          "East": -0.7884510681097495,
+          "North": 0.03772368134995317,
+          "Up": -0.6139396037575702
+        }
+      },
+      "AstropyAzimuthDegrees": 272.73928331773004,
+      "AstropyZenithDegrees": 127.87457759997037,
+      "AngularErrorDegrees": 0.00033412295180560586
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 251.6530893590516,
+        "ZenithDegrees": 152.48007481052153,
+        "Direction": {
+          "East": -0.4385698050570898,
+          "North": -0.14544155426411848,
+          "Up": -0.8868502017733455
+        }
+      },
+      "AstropyAzimuthDegrees": 251.65306234464236,
+      "AstropyZenithDegrees": 152.47972457184105,
+      "AngularErrorDegrees": 0.0003504610397923151
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 172.07990699228162,
+        "ZenithDegrees": 167.96709210401792,
+        "Direction": {
+          "East": 0.028725953380810465,
+          "North": -0.20648487049136288,
+          "Up": -0.9780280250895311
+        }
+      },
+      "AstropyAzimuthDegrees": 172.0814860937108,
+      "AstropyZenithDegrees": 167.96687279793554,
+      "AngularErrorDegrees": 0.00039556317657037576
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 104.80372399228315,
+        "ZenithDegrees": 149.66773371623952,
+        "Direction": {
+          "East": 0.4882507362300802,
+          "North": -0.12903535918472686,
+          "Up": -0.8631112875237198
+        }
+      },
+      "AstropyAzimuthDegrees": 104.80456004597735,
+      "AstropyZenithDegrees": 149.667876792707,
+      "AngularErrorDegrees": 0.00044580116957651864
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 85.36830508058078,
+        "ZenithDegrees": 124.95550029387181,
+        "Direction": {
+          "East": 0.8169207662667509,
+          "North": 0.06618273472017436,
+          "Up": -0.5729400555617521
+        }
+      },
+      "AstropyAzimuthDegrees": 85.3688374913341,
+      "AstropyZenithDegrees": 124.95571564753153,
+      "AngularErrorDegrees": 0.0004866095403300161
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 70.56940514178744,
+        "ZenithDegrees": 100.6780950330233,
+        "Direction": {
+          "East": 0.9267151101198066,
+          "North": 0.3269042274661135,
+          "Up": -0.1852909353973321
+        }
+      },
+      "AstropyAzimuthDegrees": 70.56986701266004,
+      "AstropyZenithDegrees": 100.67833659173867,
+      "AngularErrorDegrees": 0.000514150885026681
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": -33.9,
+        "LongitudeDegrees": 151.2,
+        "ElevationMetres": 30
+      },
+      "Timestamp": "2026-05-31T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 53.49769895400585,
+        "ZenithDegrees": 78.69943926375817,
+        "Direction": {
+          "East": 0.7882488532508753,
+          "North": 0.5833224604248923,
+          "Up": 0.1959557412083908
+        }
+      },
+      "AstropyAzimuthDegrees": 53.49818745924747,
+      "AstropyZenithDegrees": 78.69966410898093,
+      "AngularErrorDegrees": 0.0005291782041492667
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 87.80130147159731,
+        "ZenithDegrees": 94.44866307720797,
+        "Direction": {
+          "East": 0.9962532389389754,
+          "North": 0.03824952570732134,
+          "Up": -0.0775658280866382
+        }
+      },
+      "AstropyAzimuthDegrees": 87.80155179171723,
+      "AstropyZenithDegrees": 94.44872084267531,
+      "AngularErrorDegrees": 0.0002561640383634537
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 102.47472269219263,
+        "ZenithDegrees": 68.10405585384595,
+        "Direction": {
+          "East": 0.9059571156780701,
+          "North": -0.20042657113783346,
+          "Up": 0.37292210196528053
+        }
+      },
+      "AstropyAzimuthDegrees": 102.47492453369041,
+      "AstropyZenithDegrees": 68.10413452644626,
+      "AngularErrorDegrees": 0.00020313453856707074
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 123.96574883564719,
+        "ZenithDegrees": 43.681206397732865,
+        "Direction": {
+          "East": 0.5728016163787482,
+          "North": -0.38586156395679233,
+          "Up": 0.7231937235172272
+        }
+      },
+      "AstropyAzimuthDegrees": 123.96592762171827,
+      "AstropyZenithDegrees": 43.681325766194675,
+      "AngularErrorDegrees": 0.0001717428808780766
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 169.58141326463075,
+        "ZenithDegrees": 28.428016018526158,
+        "Direction": {
+          "East": 0.08608880117310218,
+          "North": -0.468205501403375,
+          "Up": 0.8794159009070693
+        }
+      },
+      "AstropyAzimuthDegrees": 169.58143552552383,
+      "AstropyZenithDegrees": 28.428183472146912,
+      "AngularErrorDegrees": 0.0001677886183735858
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 224.89597401559269,
+        "ZenithDegrees": 36.891269519191866,
+        "Direction": {
+          "East": -0.4237036709010379,
+          "North": -0.42524502038805057,
+          "Up": 0.7997761386163952
+        }
+      },
+      "AstropyAzimuthDegrees": 224.89576737516455,
+      "AstropyZenithDegrees": 36.891412312087006,
+      "AngularErrorDegrees": 0.0001891487512853806
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 251.8763555652905,
+        "ZenithDegrees": 59.622250100200255,
+        "Direction": {
+          "East": -0.8199088611183265,
+          "North": -0.2683620759466578,
+          "Up": 0.5056987795647216
+        }
+      },
+      "AstropyAzimuthDegrees": 251.87614190587652,
+      "AstropyZenithDegrees": 59.62239282623064,
+      "AngularErrorDegrees": 0.00023312420390508658
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 267.73075073334644,
+        "ZenithDegrees": 85.63569354243594,
+        "Direction": {
+          "East": -0.996318416323337,
+          "North": -0.03948070455547471,
+          "Up": 0.07609787948925482
+        }
+      },
+      "AstropyAzimuthDegrees": 267.73052573130497,
+      "AstropyZenithDegrees": 85.6358804112655,
+      "AngularErrorDegrees": 0.00029198068713186476
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 282.46372988106464,
+        "ZenithDegrees": 111.949452731545,
+        "Direction": {
+          "East": -0.9056550934266394,
+          "North": 0.20017749785372116,
+          "Up": -0.3737884710680742
+        }
+      },
+      "AstropyAzimuthDegrees": 282.4634727298544,
+      "AstropyZenithDegrees": 111.94970991019656,
+      "AngularErrorDegrees": 0.0003507540678566621
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 304.03652901770124,
+        "ZenithDegrees": 136.32733100606907,
+        "Direction": {
+          "East": -0.5722352013589558,
+          "North": 0.3865085583352096,
+          "Up": -0.7232966256379972
+        }
+      },
+      "AstropyAzimuthDegrees": 304.03626938844144,
+      "AstropyZenithDegrees": 136.32768061870385,
+      "AngularErrorDegrees": 0.00039290131733531804
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 349.6909087505909,
+        "ZenithDegrees": 151.48331839594675,
+        "Direction": {
+          "East": -0.08543731982367463,
+          "North": 0.4697075377870047,
+          "Up": -0.8786781511608313
+        }
+      },
+      "AstropyAzimuthDegrees": 349.69109184085903,
+      "AstropyZenithDegrees": 151.48371526350633,
+      "AngularErrorDegrees": 0.00040637945938594845
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 44.7744241821169,
+        "ZenithDegrees": 142.960253938995,
+        "Direction": {
+          "East": 0.4242588914780917,
+          "North": 0.4276127622082689,
+          "Up": -0.7982178390629937
+        }
+      },
+      "AstropyAzimuthDegrees": 44.77498213703149,
+      "AstropyZenithDegrees": 142.96044655570026,
+      "AngularErrorDegrees": 0.0003873762100688829
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-03-20T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 71.67643315686676,
+        "ZenithDegrees": 120.22572215426996,
+        "Direction": {
+          "East": 0.8202383687810135,
+          "North": 0.2716422359494658,
+          "Up": -0.5034079002437651
+        }
+      },
+      "AstropyAzimuthDegrees": 71.67681867799205,
+      "AstropyZenithDegrees": 120.22579725375356,
+      "AngularErrorDegrees": 0.0003414696482784126
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 67.58803351034456,
+        "ZenithDegrees": 82.13313403672369,
+        "Direction": {
+          "East": 0.9157660696238085,
+          "North": 0.37767531001379606,
+          "Up": 0.13687171340983798
+        }
+      },
+      "AstropyAzimuthDegrees": 67.58804840289451,
+      "AstropyZenithDegrees": 82.13318392329337,
+      "AngularErrorDegrees": 5.2022139113180425e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 79.01934065755944,
+        "ZenithDegrees": 56.780758432480035,
+        "Direction": {
+          "East": 0.8212638776249714,
+          "North": 0.1593498464013271,
+          "Up": 0.547844202086934
+        }
+      },
+      "AstropyAzimuthDegrees": 79.01928708707763,
+      "AstropyZenithDegrees": 56.78080902050362,
+      "AngularErrorDegrees": 6.758420228457552e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 90.85599616073137,
+        "ZenithDegrees": 30.45210120033694,
+        "Direction": {
+          "East": 0.5067613104433912,
+          "North": -0.007571552681269951,
+          "Up": 0.8620531571937381
+        }
+      },
+      "AstropyAzimuthDegrees": 90.85582788706661,
+      "AstropyZenithDegrees": 30.45214847389056,
+      "AngularErrorDegrees": 9.750988090226887e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 144.20980328863388,
+        "ZenithDegrees": 5.5442796635759635,
+        "Direction": {
+          "East": 0.05650227262020053,
+          "North": -0.07837059289202458,
+          "Up": 0.9953218290374752
+        }
+      },
+      "AstropyAzimuthDegrees": 144.2088523915341,
+      "AstropyZenithDegrees": 5.544241370291303,
+      "AngularErrorDegrees": 9.953181728505022e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 265.2356864665578,
+        "ZenithDegrees": 24.224414682654697,
+        "Direction": {
+          "East": -0.40889395086356256,
+          "North": -0.03407932384236911,
+          "Up": 0.9119453583596078
+        }
+      },
+      "AstropyAzimuthDegrees": 265.23582213659745,
+      "AstropyZenithDegrees": 24.22437398746503,
+      "AngularErrorDegrees": 6.895584429033821e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 278.4371704584889,
+        "ZenithDegrees": 50.63479892719668,
+        "Direction": {
+          "East": -0.764751745567831,
+          "North": 0.11343571008667769,
+          "Up": 0.6342610719002757
+        }
+      },
+      "AstropyAzimuthDegrees": 278.43720073720397,
+      "AstropyZenithDegrees": 50.63480863159394,
+      "AngularErrorDegrees": 2.5340855019749766e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 289.5206468610787,
+        "ZenithDegrees": 76.31043470048617,
+        "Direction": {
+          "East": -0.9157462233278302,
+          "North": 0.32465416847773215,
+          "Up": 0.23666120372982172
+        }
+      },
+      "AstropyAzimuthDegrees": 289.52063237412847,
+      "AstropyZenithDegrees": 76.31050096521577,
+      "AngularErrorDegrees": 6.774312929938239e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 303.46577696322913,
+        "ZenithDegrees": 100.04050042178162,
+        "Direction": {
+          "East": -0.821439140442459,
+          "North": 0.5429933859503043,
+          "Up": -0.174344261056617
+        }
+      },
+      "AstropyAzimuthDegrees": 303.4657451705721,
+      "AstropyZenithDegrees": 100.040623387832,
+      "AngularErrorDegrees": 0.00012688852916356734
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 324.46328986468467,
+        "ZenithDegrees": 119.25281759242921,
+        "Direction": {
+          "East": -0.5071020458085724,
+          "North": 0.7099682151847937,
+          "Up": -0.48866414700086086
+        }
+      },
+      "AstropyAzimuthDegrees": 324.46328418304074,
+      "AstropyZenithDegrees": 119.25298081209803,
+      "AngularErrorDegrees": 0.00016329492597402277
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 355.8296206603107,
+        "ZenithDegrees": 128.47052962904758,
+        "Direction": {
+          "East": -0.05693657589960287,
+          "North": 0.7808552145017228,
+          "Up": -0.6221120158864457
+        }
+      },
+      "AstropyAzimuthDegrees": 355.8297013400608,
+      "AstropyZenithDegrees": 128.47068288158758,
+      "AngularErrorDegrees": 0.00016575986730510105
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 29.00834110516405,
+        "ZenithDegrees": 122.61199270321333,
+        "Direction": {
+          "East": 0.4084815933002918,
+          "North": 0.7366673617883903,
+          "Up": -0.5389471087320052
+        }
+      },
+      "AstropyAzimuthDegrees": 29.008456646131965,
+      "AstropyZenithDegrees": 122.61208424241744,
+      "AngularErrorDegrees": 0.00013360958035736346
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-06-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 52.37653008381919,
+        "ZenithDegrees": 105.15566157364727,
+        "Direction": {
+          "East": 0.7644917938785246,
+          "North": 0.5892369727256115,
+          "Up": -0.261442320724003
+        }
+      },
+      "AstropyAzimuthDegrees": 52.37659398052437,
+      "AstropyZenithDegrees": 105.15570842048403,
+      "AngularErrorDegrees": 7.744899651406943e-05
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 109.91044267641627,
+        "ZenithDegrees": 102.8786886318784,
+        "Direction": {
+          "East": 0.9165739025501397,
+          "North": -0.33198407799246565,
+          "Up": -0.2228875346974334
+        }
+      },
+      "AstropyAzimuthDegrees": 109.91071341986098,
+      "AstropyZenithDegrees": 102.87835368789152,
+      "AngularErrorDegrees": 0.000426436420097609
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 124.01018041470756,
+        "ZenithDegrees": 79.24814733864092,
+        "Direction": {
+          "East": 0.8143856653831687,
+          "North": -0.5495206276424668,
+          "Up": 0.1865558034847563
+        }
+      },
+      "AstropyAzimuthDegrees": 124.01045246417407,
+      "AstropyZenithDegrees": 79.24789069143009,
+      "AngularErrorDegrees": 0.0003705439724119766
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 145.3137112457151,
+        "ZenithDegrees": 60.259280687106774,
+        "Direction": {
+          "East": 0.4941227143810578,
+          "North": -0.7139688205612612,
+          "Up": 0.49607586758383765
+        }
+      },
+      "AstropyAzimuthDegrees": 145.31404908864386,
+      "AstropyZenithDegrees": 60.259145253227196,
+      "AngularErrorDegrees": 0.0003230971020472902
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 176.95648773818033,
+        "ZenithDegrees": 51.48034346948444,
+        "Direction": {
+          "East": 0.0415407160921952,
+          "North": -0.7812909773851766,
+          "Up": 0.6227830902995545
+        }
+      },
+      "AstropyAzimuthDegrees": 176.95686130305367,
+      "AstropyZenithDegrees": 51.48039406831663,
+      "AngularErrorDegrees": 0.0002966227349639797
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 209.9238519640352,
+        "ZenithDegrees": 57.80897205868359,
+        "Direction": {
+          "East": -0.42216388149567347,
+          "North": -0.7334587518675785,
+          "Up": 0.5327437624875218
+        }
+      },
+      "AstropyAzimuthDegrees": 209.92408473288663,
+      "AstropyZenithDegrees": 57.80920254805664,
+      "AngularErrorDegrees": 0.00030319838619363536
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 232.95628008917436,
+        "ZenithDegrees": 75.51822292574728,
+        "Direction": {
+          "East": -0.7728157902875727,
+          "North": -0.5832835614813189,
+          "Up": 0.2500720719869831
+        }
+      },
+      "AstropyAzimuthDegrees": 232.9563524617668,
+      "AstropyZenithDegrees": 75.51856021727197,
+      "AngularErrorDegrees": 0.0003444935724310977
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 247.9631948019944,
+        "ZenithDegrees": 98.59977199241865,
+        "Direction": {
+          "East": -0.9165213839519708,
+          "North": -0.37098370660983243,
+          "Up": -0.14953140870330206
+        }
+      },
+      "AstropyAzimuthDegrees": 247.9631596873137,
+      "AstropyZenithDegrees": 98.60017704217667,
+      "AngularErrorDegrees": 0.00040653508536961174
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 259.3373752356251,
+        "ZenithDegrees": 123.99082935353653,
+        "Direction": {
+          "East": -0.8148111099746724,
+          "North": -0.1534097302679949,
+          "Up": -0.5590602022331256
+        }
+      },
+      "AstropyAzimuthDegrees": 259.3372470547902,
+      "AstropyZenithDegrees": 123.99128633740887,
+      "AngularErrorDegrees": 0.0004691793414956977
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 271.2941974163483,
+        "ZenithDegrees": 150.32650174045799,
+        "Direction": {
+          "East": -0.4949305482527499,
+          "North": 0.011181395950704654,
+          "Up": -0.86886059226485
+        }
+      },
+      "AstropyAzimuthDegrees": 271.29394339016585,
+      "AstropyZenithDegrees": 150.32700138281746,
+      "AngularErrorDegrees": 0.0005152253570376268
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 331.6175932679467,
+        "ZenithDegrees": 174.86636467687993,
+        "Direction": {
+          "East": -0.04253421001754023,
+          "North": 0.07872314295412212,
+          "Up": -0.9959887086416235
+        }
+      },
+      "AstropyAzimuthDegrees": 331.6211516554628,
+      "AstropyZenithDegrees": 174.8667935855533,
+      "AngularErrorDegrees": 0.0005341660623229266
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 85.77312474344166,
+        "ZenithDegrees": 155.01381124661614,
+        "Direction": {
+          "East": 0.4212508610296382,
+          "North": 0.031133394599323697,
+          "Up": -0.9064096335666955
+        }
+      },
+      "AstropyAzimuthDegrees": 85.77388082906107,
+      "AstropyZenithDegrees": 155.01339657252265,
+      "AngularErrorDegrees": 0.0005234058090903665
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2025-12-21T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 98.74901946744416,
+        "ZenithDegrees": 128.61651108696847,
+        "Direction": {
+          "East": 0.7722490637928021,
+          "North": -0.11884697029576759,
+          "Up": -0.624104783768445
+        }
+      },
+      "AstropyAzimuthDegrees": 98.74936585099437,
+      "AstropyZenithDegrees": 128.61610541040972,
+      "AngularErrorDegrees": 0.0004876697814064649
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T00:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 69.42173650149519,
+        "ZenithDegrees": 81.99079654403266,
+        "Direction": {
+          "East": 0.9270610413825163,
+          "North": 0.3480580022376229,
+          "Up": 0.13933216652704156
+        }
+      },
+      "AstropyAzimuthDegrees": 69.4216656281879,
+      "AstropyZenithDegrees": 81.99123621005756,
+      "AngularErrorDegrees": 0.00044523222051297647
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T02:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 81.14072953463703,
+        "ZenithDegrees": 56.394618604871084,
+        "Direction": {
+          "East": 0.8229327925943017,
+          "North": 0.1282685638410003,
+          "Up": 0.5534697773168028
+        }
+      },
+      "AstropyAzimuthDegrees": 81.14064047551375,
+      "AstropyZenithDegrees": 56.39507080139952,
+      "AngularErrorDegrees": 0.0004582396767913802
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T04:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 94.31707166173473,
+        "ZenithDegrees": 29.985961434071612,
+        "Direction": {
+          "East": 0.49836976865428884,
+          "North": -0.03762194662076434,
+          "Up": 0.8661478873864065
+        }
+      },
+      "AstropyAzimuthDegrees": 94.31687847054492,
+      "AstropyZenithDegrees": 29.98641445194726,
+      "AngularErrorDegrees": 0.00046319338709042176
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T06:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 159.0034499141574,
+        "ZenithDegrees": 6.465852119499772,
+        "Direction": {
+          "East": 0.04034985430438499,
+          "North": -0.10513388492047701,
+          "Up": 0.9936391475274828
+        }
+      },
+      "AstropyAzimuthDegrees": 158.99982469672744,
+      "AstropyZenithDegrees": 6.466050006680334,
+      "AngularErrorDegrees": 0.0004536781728579357
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T08:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 262.5328471381953,
+        "ZenithDegrees": 25.598855055796136,
+        "Direction": {
+          "East": -0.4284035890467749,
+          "North": -0.05615056467520966,
+          "Up": 0.9018411606144937
+        }
+      },
+      "AstropyAzimuthDegrees": 262.53236338059503,
+      "AstropyZenithDegrees": 25.598476673846207,
+      "AngularErrorDegrees": 0.0004322730684391477
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T10:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 277.01257597273343,
+        "ZenithDegrees": 52.018346383908785,
+        "Direction": {
+          "East": -0.7823115662699808,
+          "North": 0.09623008681358984,
+          "Up": 0.6154091189380105
+        }
+      },
+      "AstropyAzimuthDegrees": 277.01226818115373,
+      "AstropyZenithDegrees": 52.018015089798475,
+      "AngularErrorDegrees": 0.0004106240327336199
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T12:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 288.56554490840756,
+        "ZenithDegrees": 77.81100323735981,
+        "Direction": {
+          "East": -0.926589670783677,
+          "North": 0.3112116844050466,
+          "Up": 0.2111370869524601
+        }
+      },
+      "AstropyAzimuthDegrees": 288.5652211496773,
+      "AstropyZenithDegrees": 77.81075564450276,
+      "AngularErrorDegrees": 0.00040180729255689994
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T14:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 302.8534242199677,
+        "ZenithDegrees": 101.69091621027634,
+        "Direction": {
+          "East": -0.8226340225887466,
+          "North": 0.5312377238944537,
+          "Up": -0.2026320448273117
+        }
+      },
+      "AstropyAzimuthDegrees": 302.85302859452304,
+      "AstropyZenithDegrees": 101.69078512382302,
+      "AngularErrorDegrees": 0.00040899458584280177
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T16:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 324.45202175479955,
+        "ZenithDegrees": 121.00011433793391,
+        "Direction": {
+          "East": -0.4983431633406375,
+          "North": 0.6974153073714304,
+          "Up": -0.515039785449299
+        }
+      },
+      "AstropyAzimuthDegrees": 324.45152920971265,
+      "AstropyZenithDegrees": 121.00014980212266,
+      "AngularErrorDegrees": 0.0004236798347551873
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T18:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 356.96147250802863,
+        "ZenithDegrees": 129.9713104199355,
+        "Direction": {
+          "East": -0.040623121858137046,
+          "North": 0.7652887870851872,
+          "Up": -0.6424039494992088
+        }
+      },
+      "AstropyAzimuthDegrees": 356.961004662664,
+      "AstropyZenithDegrees": 129.9715590656792,
+      "AngularErrorDegrees": 0.00043632075317749506
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T20:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 30.837738544781196,
+        "ZenithDegrees": 123.40955280743889,
+        "Direction": {
+          "East": 0.4279030724203952,
+          "North": 0.716740300887652,
+          "Up": -0.5506199248998025
+        }
+      },
+      "AstropyAzimuthDegrees": 30.837486634254947,
+      "AstropyZenithDegrees": 123.40994507921484,
+      "AngularErrorDegrees": 0.00044508003815829286
+    },
+    {
+      "Site": {
+        "LatitudeDegrees": 27.98,
+        "LongitudeDegrees": 86.92,
+        "ElevationMetres": 8849
+      },
+      "Timestamp": "2026-05-31T22:00:00+00:00",
+      "Position": {
+        "AzimuthDegrees": 54.150485670585326,
+        "ZenithDegrees": 105.32430454389848,
+        "Direction": {
+          "East": 0.7817389357478604,
+          "North": 0.5648355180995601,
+          "Up": -0.26428218598498865
+        }
+      },
+      "AstropyAzimuthDegrees": 54.15036553899498,
+      "AstropyZenithDegrees": 105.32474425735933,
+      "AngularErrorDegrees": 0.0004547213677993293
+    }
+  ]
+}

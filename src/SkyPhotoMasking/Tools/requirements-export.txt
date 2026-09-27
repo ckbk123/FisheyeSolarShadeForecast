@@ -1,0 +1,11 @@
+# Development only. Install CPU torch from its official index first:
+# uv pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1
+torchvision==0.20.1
+segmentation-models-pytorch==0.3.4
+efficientnet-pytorch==0.7.1
+onnx==1.17.0
+onnxruntime==1.24.4
+opencv-python-headless==4.13.0.92
+numpy==2.2.6
+PyYAML==6.0.3

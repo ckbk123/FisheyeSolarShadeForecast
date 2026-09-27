@@ -1,0 +1,117 @@
+# Compiled executables
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.vs/
+*.user
+*.suo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Debug and temporary files
+DebugData/*
+!DebugData/.gitignore
+*.log
+*.tmp
+status.yml
+
+# .NET build output
+**/bin/
+**/obj/
+
+# Local environments, credentials, and test output
+.venv/
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.key
+TestResults/
+test-results/
+*.trx
+*.dmp
+
+# Installed application packages and personal runtime state
+/Deliverable/
+/Deliverable-rewritten/
+/Deliverable.zip
+/Data/
+/Debug Data/
+/src/ApplicationFrontend/Data/
+/src/ApplicationFrontend/Debug Data/*
+!/src/ApplicationFrontend/Debug Data/Read me.txt
+
+# Working outputs and backup checkouts; retain existing regression fixtures
+/artifacts/*
+!/artifacts/calibration-validation/
+/artifacts/calibration-validation/*
+!/artifacts/calibration-validation/ponitz-22mm/
+!/artifacts/calibration-validation/ponitz-33mm/
+!/artifacts/calibration-validation/ready-to-run/
+/artifacts/calibration-validation/ponitz-22mm/*
+!/artifacts/calibration-validation/ponitz-22mm/observations.json
+!/artifacts/calibration-validation/ponitz-22mm/result.json
+/artifacts/calibration-validation/ponitz-33mm/*
+!/artifacts/calibration-validation/ponitz-33mm/observations.json
+/artifacts/calibration-validation/ready-to-run/*
+!/artifacts/calibration-validation/ready-to-run/calibration.yml
+
+# Repeatable validator outputs (fixed example/reference data is kept)
+/src/SkyPhotoMasking/Validator/Diagnostics/
+/src/SkyPhotoMasking/Validator/Cpu1024/
+/src/SkyPhotoMasking/Validator/Fast512/
+/src/IrradianceDataExtractor/SolarShade.Irradiance.Validation/results/*
+!/src/IrradianceDataExtractor/SolarShade.Irradiance.Validation/results/live-20260905/
+/src/IrradianceDataExtractor/SolarShade.Irradiance.Validation/results/live-20260905/*
+!/src/IrradianceDataExtractor/SolarShade.Irradiance.Validation/results/live-20260905/OpenMeteo_20250501_20250601_requested.xlsx
+!/src/IrradianceDataExtractor/SolarShade.Irradiance.Validation/results/live-20260905/NasaPower_20250501_20250601_requested.xlsx
+/src/IrradianceTransposition/Validator/results/
+/src/SolarPositionAndShading/Validator/results/*
+!/src/SolarPositionAndShading/Validator/results/solar-astropy-validation.json
+
+# Required native packaging inputs, covered by the bundled notices
+!/src/ApplicationFrontend/Packaging/Native/*.dll

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget><AssemblyName>APPLICATION</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.1.0</Version><DebugType>none</DebugType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <Content Include="Packaging/Native/*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <ProjectReference Include="../SkyPhotoMasking/SkyPhotoMasking.csproj" />
+    <ProjectReference Include="../OmnicalibFisheyeLensParameterExtractor/SolarShade.Calibration.Solver/SolarShade.Calibration.Solver.csproj" />
+    <ProjectReference Include="../OmnicalibFisheyeLensParameterExtractor/SolarShade.Calibration.Validation/SolarShade.Calibration.Validation.csproj" />
+    <ProjectReference Include="../SolarPositionAndShading/SolarShade.Shading/SolarShade.Shading.csproj" />
+    <ProjectReference Include="../IrradianceTransposition/SolarShade.Irradiance.Transposition/SolarShade.Irradiance.Transposition.csproj" />
+    <ProjectReference Include="../ShadingCorrectionApplication/SolarShade.ShadingCorrection/SolarShade.ShadingCorrection.csproj" />
+    <EmbeddedResource Include="ThirdPartyNotices.txt" LogicalName="Notices" />
+    <Content Include="Example/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="Debug Data/Read me.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <EmbeddedResource Include="../SkyPhotoMasking/Models/*.onnx" LogicalName="Models.%(Filename)%(Extension)" Condition="'$(BundleModels)' == 'true'" />
+  </ItemGroup>
+  <Target Name="RemoveDevelopmentPublishFiles" BeforeTargets="_ComputeFilesToBundle">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb' Or '%(Extension)' == '.lib' Or '%(Extension)' == '.onnx' Or '%(Extension)' == '.md' Or '%(Extension)' == '.xml' Or '%(Filename)' == 'DirectML.Debug' Or '%(Filename)' == 'opencv_videoio_ffmpeg4130_64' Or '%(Filename)' == 'concrt140'" />
+    </ItemGroup>
+  </Target>
+</Project>

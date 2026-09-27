@@ -1,0 +1,35 @@
+{
+  "Width": 3000,
+  "Height": 4000,
+  "Options": {
+    "SimplificationTolerancePixels": 0.35,
+    "StrokeWidthPixels": 3,
+    "Opacity": 0.5
+  },
+  "Timings": {
+    "ProjectionMilliseconds": 19.827399999999997,
+    "SimplificationMilliseconds": 5.557500000000002,
+    "RenderMilliseconds": 25.6558,
+    "EncodeMilliseconds": 330.9404,
+    "TotalMilliseconds": 383.9405
+  },
+  "SelectedSampleCount": 41760,
+  "ProjectedSampleCount": 15925,
+  "NightSampleCount": 19863,
+  "UnprojectedSampleCount": 5972,
+  "TrackCount": 29,
+  "RenderedVertexCount": 957,
+  "DisplayTimeZoneId": "SE Asia Standard Time",
+  "GeometryConvention": "Source interval labels and bounds preserved. Equal-weight midpoint quadrature; source interval and selected/clipped interval each have weights summing to one. Geometric NOAA/Meeus topocentric angles; apparent zenith uses the explicit standard-atmosphere NOAA refraction approximation. Azimuth clockwise from true north; zenith from vertical up. All rows, including diffuse-only and night, retain geometry.",
+  "DatasetFingerprint": "622BCC89D012955656465B97EAEFA0FFFDE8E9FE7255554938A3DE4100B2BEF0",
+  "Color": "Golden yellow (#FFD200), straight-alpha PNG",
+  "SelectedSamplesOnly": true,
+  "RasterCoordinateQuantizationMaximumPixels": 0.0027621358640099515,
+  "Breaks": "Display-local date, source interval gaps, missing selected samples, night, and invalid/outside calibrated projection.",
+  "Reference": "Source interval ID plus zero-based selected sample index refers to the existing solar timeline and its integration-sample diagnostic exports.",
+  "LineMeaning": "Display annotation only, not physical solar-disk size.",
+  "Artifacts": [
+    "sun-path-overlay.png",
+    "sun-path-projection.xlsx"
+  ]
+}

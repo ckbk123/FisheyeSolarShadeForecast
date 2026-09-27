@@ -1,0 +1,29 @@
+{
+  "Origin": "Reused in-memory mask",
+  "Mask": {
+    "Model": 1,
+    "Width": 3000,
+    "Height": 4000,
+    "InputSize": 1024,
+    "Disk": {
+      "CenterX": 1521.8750635782878,
+      "CenterY": 2003.1250317891438,
+      "Radius": 882.9166889190674,
+      "ImageWidth": 3000,
+      "ImageHeight": 4000
+    },
+    "Crop": {
+      "X": 639,
+      "Y": 1120,
+      "Width": 1767,
+      "Height": 1767
+    },
+    "DiskMethod": "Auto",
+    "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
+    "AccelerationFallback": null,
+    "SessionLoadMilliseconds": 998.0489,
+    "InferenceMilliseconds": 144.2845,
+    "TotalMilliseconds": 1325.5511
+  },
+  "PixelConvention": "255 = sky; 0 = obstruction or outside lens; EXIF-oriented image coordinates"
+}

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../SolarShade.Calibration.Solver/SolarShade.Calibration.Solver.csproj" />
+    <ProjectReference Include="../../SolarShade.Camera/SolarShade.Camera.csproj" />
+    <ProjectReference Include="..\..\SolarShade.Core\SolarShade.Core.csproj" />
+    <PackageReference Include="OpenCvSharp4.Windows" Version="4.13.0.20260627" />
+  </ItemGroup>
+</Project>

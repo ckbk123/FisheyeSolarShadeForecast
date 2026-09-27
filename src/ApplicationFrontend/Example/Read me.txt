@@ -1,0 +1,56 @@
+SOLARSHADE EXAMPLE
+
+Extract the complete package and open APPLICATION.exe. First launch calculates
+this example automatically from local files; no weather download is required.
+Load example restores its input settings and preserves your time-zone preference.
+
+Calib Images
+  Twelve checkerboard photographs (1.jpg through 12.jpg) and saved calibration.yml.
+  Inner corners: 6 columns x 9 rows. One square: 22 mm. The example uses fitted
+  incident half-angle 66.43 degrees; this coverage remains provisional.
+  Calibrate creates a new native YAML/profile/diagnostic run in the top-level
+  Debug Data folder. It does not overwrite the supplied calibration.
+
+Sky Photo
+  sky.jpg is the demonstration sky photograph. Personal calibration and sky
+  photographs need the same physical lens setup and oriented image geometry.
+
+Irradiance
+  horizontal-irradiance.xlsx is the original buffered Open-Meteo hourly input,
+  with 744 rows labelled in May 2025. Each label represents the PRECEDING hour.
+  Its first three columns are timestamp, direct horizontal BHI and diffuse
+  horizontal DHI in W/m2. Surrounding intervals support date/time-zone boundaries.
+
+Debug Data/reference-run
+  A fixed successful run generated through the current library pipeline.
+  run.json records its exact settings, source identifiers, library versions,
+  stage origins and artifact paths. Numbered folders contain native calibration
+  YAML, binary sky-mask PNG, horizontal irradiance, solar geometry, unshaded
+  panel irradiance, visibility, transmission factors and shaded panel results.
+  02-orientation contains the library-generated compass overlay PNG, numerical
+  marker workbook and metadata shown over the original colour photograph.
+  Read 06-shading/panel-results.json for its exact energy and loss summaries.
+  These are recorded calculated outputs, not manually populated sample values.
+
+The default study covers 2-30 May 2025. Example settings illustrate the workflow
+and do not establish the photograph's actual location or orientation. The
+current UI time zone can differ from the fixed reference run. Read its run.json
+before comparing complete-period values. Unknown sky is treated as blocked;
+no ground reflection or electrical PV model is added.
+
+Every new calculation and valid automatic edit saves its actual stage outputs
+in a new top-level Debug Data run. The fixed reference run remains unchanged.
+Export results copies a complete successful run into a new scenario folder.
+
+settings.json here contains default paths relative to APPLICATION.exe. Current
+settings are stored in Data/settings.json. Data also holds validated weather/
+mask caches and model weights extracted from the executable. Generated camera
+profiles stay in their Debug Data calibration runs; keep those folders in use.
+Move APPLICATION.exe, Example, Data and Debug Data together. External personal
+files do not move automatically with the package.
+
+Import raw horizontal BHI/DHI rather than panel or factor workbooks. Native
+exported input files contain their own interval metadata. For a three-column
+file, explicitly choose its interval duration and start/end/centre labels.
+Hourly inputs stay hourly; 15-minute inputs stay 15-minute. Include enough
+source intervals for both selected date boundaries; missing periods are reported.

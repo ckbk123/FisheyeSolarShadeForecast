@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../IrradianceTransposition/SolarShade.Irradiance.Transposition/SolarShade.Irradiance.Transposition.csproj" />
+    <ProjectReference Include="../../IrradianceDataExtractor/SolarShade.Irradiance/SolarShade.Irradiance.csproj" />
+    <ProjectReference Include="../../SolarPositionAndShading/SolarShade.Shading/SolarShade.Shading.csproj" />
+  </ItemGroup>
+</Project>

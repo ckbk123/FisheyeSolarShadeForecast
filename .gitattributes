@@ -1,0 +1,5 @@
+# Preserve existing source line endings and exact baseline bytes.
+* -text
+
+# Required pretrained models are stored in Git LFS, not ordinary Git blobs.
+src/SkyPhotoMasking/Models/*.onnx filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,15 @@
+{
+  "variant": "b7",
+  "architecture": "UnetPlusPlus",
+  "encoder": "efficientnet-b7",
+  "threshold": "0.6313725490196078",
+  "input": "RGB float32 NCHW /255",
+  "output": "obstacle_probability",
+  "source_sha256": "786ee769f08318bcb9930b4d7bfec5e42e575442dbc9c5407137838ed3e4d938",
+  "onnx_sha256": "55b4820ac8de0bc578865b51606c217df7dff206683c3ca898b4189539aca0e5",
+  "bytes": 265885168,
+  "torch": "2.5.1+cpu",
+  "smp": "0.3.4",
+  "onnx": "1.17.0",
+  "export_seconds": 5.878827600041404
+}
