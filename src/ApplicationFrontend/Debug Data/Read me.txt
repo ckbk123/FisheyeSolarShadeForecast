@@ -1,15 +1,24 @@
 AUTOMATIC LIBRARY OUTPUTS
 
-Update results creates a new calculation-<timestamp>-<id> run.
-Editing inputs and loading the example do not calculate or write diagnostics.
+Update results maintains one current dataset in the numbered folders here.
+Editing inputs removes affected stale files but never calculates replacements.
 Image orientation is prepared during the explicit update, before irradiance.
-Calibrate creates a calibration-<timestamp>-<id> run. No Export click is needed.
+Calibrate publishes into 01-calibration and saves durable Data/Profiles copies.
 This Debug Data folder is beside APPLICATION.exe.
 
-Each run contains run.json with settings, input fingerprints, library versions,
-stage origins, artifact paths and Running/Complete/Cancelled/Failed status.
-Unavailable stages are marked Skipped. Completed artifacts remain if a later
-stage fails. Required output failures prevent completion. Earlier runs remain.
+run.json records settings, fingerprints, library/software versions, artifact hashes,
+update identity, last successful update time and current status. Unavailable stages
+are Skipped; calibration/orientation alone is Partial. Only full calculations can
+be Complete. Valid independent files remain if later work fails or is cancelled.
+Unchanged files retain their bytes and modification times on subsequent updates.
+
+One sibling Debug Data.staging folder holds unpublished work and is removed when
+finished. Interrupted work remains incomplete and can be retried. Debug Data.lock
+prevents other instances from writing here at the same time; the empty file may
+remain after exit. Close another instance or any locked workbooks before retrying.
+Verified historical application run folders are migrated after selected inputs
+are copied into Data/Inputs and their saved paths updated. Unrecognized folders,
+extra user files, explicit exports and the bundled reference are preserved.
 
 NUMBERED STAGES
 
@@ -33,7 +42,7 @@ NUMBERED STAGES
   cardinal-directions.xlsx: numerical marker coordinates and availability.
   cardinal-directions-details.json: camera pose, geometry convention, rendering
     settings and timings. Source photo and binary mask remain unchanged.
-  Image/calibration/pose edits regenerate the overlay. Weather/date/panel edits
+  Image/calibration/pose edits invalidate the overlay until Update. Weather/date/panel edits
     reuse it; Show cardinal directions changes visibility only.
 
 03-irradiance
@@ -76,11 +85,11 @@ bounds link numerical outputs. Requested coverage gaps fail visibly. Solar
 integration does not interpolate or upsample weather. Energy uses actual duration.
 
 Large detail outputs are divided into numbered files or additional worksheets;
-read all parts. Cached results are exported as used and identified in run.json.
+read all parts. Reused artifacts are identified in run.json and remain unchanged.
 The owning libraries save these scientific artifacts from their return values;
 the frontend only sequences the calls and records run status.
 
 Export results copies a complete successful run to a new scenario folder.
 Example/Irradiance holds the bundled input workbook. Example/Debug Data/reference-run
 holds a fixed library-generated example. Current outputs are saved here.
-Keep calibration runs whose camera-profile.json is still used by your settings.
+Keep Data/Profiles and Data/Inputs when moving or backing up the application.

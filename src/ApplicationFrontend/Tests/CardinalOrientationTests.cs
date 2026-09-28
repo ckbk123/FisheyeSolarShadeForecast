@@ -48,7 +48,7 @@ public sealed class CardinalOrientationTests : IDisposable
         Assert.Equal(result.Cardinals.Png, File.ReadAllBytes(Path.Combine(result.DebugDirectory, "02-orientation", "cardinal-directions-overlay.png")));
         Assert.True(File.Exists(Path.Combine(result.DebugDirectory, "02-orientation", "cardinal-directions.xlsx")));
         using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(result.DebugDirectory, "run.json")));
-        Assert.Equal("Complete", manifest.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("Partial", manifest.RootElement.GetProperty("Status").GetString());
         Assert.False(manifest.RootElement.GetProperty("Stages").TryGetProperty("03-irradiance", out _));
     }
 
@@ -77,7 +77,7 @@ public sealed class CardinalOrientationTests : IDisposable
         await Assert.ThrowsAnyAsync<IOException>(() => service.Evaluate(settings, false, _ => { }, null,
             CancellationToken.None, onCardinals: result => shown = result));
         Assert.NotNull(shown); Assert.True(shown.HasMarkers); Assert.Equal(0, service.PreparationCount);
-        string run = Assert.Single(Directory.GetDirectories(Path.Combine(root, "Debug Data")));
+        string run = Path.Combine(root, "Debug Data");
         using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(run, "run.json")));
         Assert.Equal("Failed", manifest.RootElement.GetProperty("Status").GetString());
         Assert.Equal("Complete", manifest.RootElement.GetProperty("Stages").GetProperty("02-orientation").GetProperty("Status").GetString());

@@ -32,12 +32,18 @@ public sealed record Evaluation(PanelRun Run, IrradianceDataset Raw, UserSetting
 /// <summary>UI stage sequencing and cache coordination. All scientific work and artifacts are library-owned.</summary>
 public sealed class AppServices : IDisposable
 {
+    internal static string SoftwareFingerprint => AppData.Key(new[] { typeof(AppServices), typeof(CalibrationWorkflow), typeof(CameraProfileFiles),
+        typeof(IrradianceClient), typeof(TranspositionModule), typeof(SolarPositionModule), typeof(ShadingCorrectionModule), typeof(SkyPhotoMasker) }.Select(AppData.LibraryVersion).ToArray());
     public static readonly SemaphoreSlim NativeGate = new(1, 1);
     private readonly SemaphoreSlim evaluationGate = new(1, 1);
     private readonly object inputGate = new();
     private InputDependencies? currentInputs;
     private ArtifactGroup invalidDraft;
-    private TrackedRun? activeRun, lastRun;
+    private TrackedRun? activeRun;
+    private DebugDataStore? storage;
+    private DebugDataStore Storage => storage ??= new(debugRoot ?? DebugDataRun.DefaultRoot);
+    public UserSettings PrepareInputs(UserSettings settings) { lock (inputGate) { ObjectDisposedException.ThrowIf(disposeRequested, this); return Storage.PrepareInputs(settings); } }
+    private CurrentValueCache Values => new(debugRoot ?? DebugDataRun.DefaultRoot);
     private sealed class TrackedRun(DebugDataRun debug, InputDependencies inputs, CancellationTokenSource cancellation)
     {
         public DebugDataRun Debug { get; } = debug;
@@ -56,6 +62,10 @@ public sealed class AppServices : IDisposable
     private SolarTimeline? geometry;
     private SunPathOverlayResult? sunPath;
     private CardinalDirectionOverlayResult? cardinals;
+    private PreparedTranspositionResult? transposedCache;
+    private string? transposedKey, resultKey;
+    private PanelRun? resultCache;
+    private bool disposeRequested, disposed;
     public int CardinalGenerationCount { get; private set; }
     public int PreparationCount { get; private set; }
     public int SunPathGenerationCount { get; private set; }
@@ -77,17 +87,19 @@ public sealed class AppServices : IDisposable
             var changed = currentInputs == null ? ArtifactGroup.All : currentInputs.Difference(next);
             changed |= forced | invalidDraft;
             invalidDraft = forced; currentInputs = next;
-            foreach (var run in new[] { lastRun, activeRun }.OfType<TrackedRun>().Distinct())
+            if (activeRun is { } run)
             {
                 var dirty = run.Inputs.Difference(next) | forced | (refreshWeather ? InputDependencies.WeatherChain : ArtifactGroup.None);
-                if (run != activeRun && verifyArtifacts) dirty |= InputDependencies.WithDependents(run.Debug.ChangedArtifacts(checkContents: true));
                 changed |= dirty & ~run.Dirty;
                 run.Dirty |= dirty;
-                if (run == activeRun)
-                {
-                    if (run.Dirty != ArtifactGroup.None) run.Cancellation.Cancel();
-                }
-                else run.Debug.Invalidate(run.Dirty, run.Inputs.SourcePaths.Concat(next.SourcePaths));
+                if (run.Dirty != ArtifactGroup.None) run.Cancellation.Cancel();
+            }
+            else if (Storage.Current is { } debug)
+            {
+                var dirty = debug.Differences(next) | forced | (refreshWeather ? InputDependencies.WeatherChain : ArtifactGroup.None);
+                if (verifyArtifacts) dirty |= InputDependencies.WithDependents(debug.ChangedArtifacts(true));
+                changed |= dirty & ~debug.Invalidated;
+                debug.Invalidate(dirty, next.SourcePaths);
             }
             return changed;
         }
@@ -103,8 +115,6 @@ public sealed class AppServices : IDisposable
     public async Task<Evaluation> Evaluate(UserSettings s, bool refresh, Action<string> progress,
         Action<MaskAsset>? onMask, CancellationToken ct, Action<SunPathOverlayResult?>? onSunPath = null, Action<CardinalDirectionOverlayResult?>? onCardinals = null)
     {
-        var persisted = PortablePaths.Map(s, path => PortablePaths.Store(path));
-        s = PortablePaths.Map(s, path => PortablePaths.Resolve(path));
         await evaluationGate.WaitAsync(ct);
         DebugDataRun? debug = null;
         TrackedRun? tracked = null;
@@ -113,23 +123,33 @@ public sealed class AppServices : IDisposable
         try
         {
             ct.ThrowIfCancellationRequested();
-            ObserveInputs(s, refreshSources: true, verifyArtifacts: true, refreshWeather: refresh);
-            var dependencies = InputDependencies.Capture(s);
-            debug = new(persisted, root: debugRoot);
-            lock (inputGate) { tracked = new(debug, dependencies, linked); activeRun = tracked; }
+            s = PrepareInputs(s);
+            var persisted = PortablePaths.Map(s, path => PortablePaths.Store(path));
+            s = PortablePaths.Map(s, path => PortablePaths.Resolve(path));
+            InputDependencies dependencies;
+            lock (inputGate)
+            {
+                ObserveInputs(s, refreshSources: true, verifyArtifacts: true, refreshWeather: refresh);
+                dependencies = InputDependencies.Capture(s);
+                debug = new(Storage, persisted); tracked = new(debug, dependencies, linked); activeRun = tracked;
+            }
             var timer = Stopwatch.StartNew();
             var (activeMask, activeProfile, activeCardinals) = await PrepareImageStages(s, debug, progress, onMask, onCardinals, ct);
             var zone = TimeZoneSelection.Resolve(s.Zone);
-            string nextRaw = AppData.Key(new { s.ImportPath, File = string.IsNullOrEmpty(s.ImportPath) ? "" : AppData.FileKey(s.ImportPath),
-                s.ImportWindow, s.ImportIntervalMinutes, s.Zone, s.Start, s.End, s.Provider, s.Latitude, s.Longitude,
-                Library = AppData.LibraryVersion(typeof(IrradianceClient)) });
+            string nextRaw = dependencies.Keys[ArtifactGroup.Irradiance];
             debug.RecordInput("irradiance-request", new { Fingerprint = nextRaw });
             bool reuseRaw = raw != null && rawKey == nextRaw && !refresh;
             string rawDirectory = debug.BeginStage("03-irradiance", reuseRaw ? "Reused in-memory dataset" : string.IsNullOrEmpty(s.ImportPath) ? "Provider or validated disk cache" : "Imported", typeof(IrradianceClient));
             if (!reuseRaw)
             {
                 IrradianceDataset next;
-                if (string.IsNullOrEmpty(s.ImportPath))
+                if (!refresh && !debug.NeedsWrite(ArtifactGroup.Irradiance))
+                {
+                    next = await Task.Run(() => IrradianceDatasetFiles.Import(Path.Combine(debug.DirectoryPath, "03-irradiance", "horizontal-irradiance.xlsx"),
+                        TimeZoneInfo.Utc, TimeSpan.Zero, TimestampLabel.Explicit, ct), ct);
+                    debug.Origin("03-irradiance", "Reused published source dataset");
+                }
+                else if (string.IsNullOrEmpty(s.ImportPath))
                 {
                     progress("Retrieving irradiance and its source intervals");
                     var fetched = await FetchWithOrigin(s, refresh, ct);
@@ -144,15 +164,18 @@ public sealed class AppServices : IDisposable
                 }
                 ct.ThrowIfCancellationRequested(); raw = next; rawKey = nextRaw;
             }
-            var exportedRaw = await Task.Run(() => IrradianceDatasetFiles.Export(raw!, Path.Combine(rawDirectory, "horizontal-irradiance.xlsx"), ct), ct);
+            var rawArtifacts = debug.NeedsWrite(ArtifactGroup.Irradiance)
+                ? new[] { (await Task.Run(() => IrradianceDatasetFiles.Export(raw!, Path.Combine(rawDirectory, "horizontal-irradiance.xlsx"), ct), ct)).OutputPath! } : [];
             var selected = IrradianceDatasets.SelectCalendarRange(raw!, s.Start, s.End, zone);
             debug.RecordInput("source-dataset", new { Fingerprint = IrradianceDatasets.Fingerprint(raw!), raw!.Source, raw.FetchedUtc });
-            debug.CompleteStage("03-irradiance", [exportedRaw.OutputPath!]);
+            debug.CompleteStage("03-irradiance", rawArtifacts);
 
             var site = new SolarSite(s.Latitude, s.Longitude, s.Elevation);
             string nextGeometry = AppData.Key(new { Dataset = IrradianceDatasets.Fingerprint(selected), site, s.Substeps,
                 Library = AppData.LibraryVersion(typeof(SolarPositionModule)), IrradianceLibrary = AppData.LibraryVersion(typeof(IrradianceDatasets)),
                 AngleLibrary = AppData.LibraryVersion(typeof(SunPosition)) });
+            if (!refresh && (geometry == null || geometryKey != nextGeometry))
+            { geometry = await Task.Run(() => Values.Read<SolarTimeline>("solar", nextGeometry), ct); geometryKey = nextGeometry; }
             debug.RecordInput("solar-timeline", new { Fingerprint = nextGeometry });
             bool reuseGeometry = geometry != null && geometryKey == nextGeometry && !refresh;
             string solarDirectory = debug.BeginStage("04-solar-positions", reuseGeometry ? "Reused cached solar timeline" : "Computed", typeof(SolarPositionModule));
@@ -161,6 +184,7 @@ public sealed class AppServices : IDisposable
                 progress("Preparing solar positions for source intervals");
                 var next = await Task.Run(() => new SolarPositionModule(site).PrepareIntervals(selected, s.Substeps, ct), ct);
                 ct.ThrowIfCancellationRequested(); geometry = next; geometryKey = nextGeometry; PreparationCount++;
+                await Task.Run(() => Values.Write("solar", nextGeometry, next), ct);
             }
             SunPathOverlayResult? activeSunPath = null;
             if (activeMask != null && activeProfile != null)
@@ -169,6 +193,8 @@ public sealed class AppServices : IDisposable
                     activeMask.Result.Width, activeMask.Result.Height, activeMask.Disk,
                     s.BottomAzimuth, s.CameraTilt, s.CameraRoll, s.Zone,
                     Library = AppData.LibraryVersion(typeof(SunPathOverlayGenerator)) });
+                if (sunPath == null || sunPathKey != nextSunPath)
+                { sunPath = await Task.Run(() => Values.Read<SunPathOverlayResult>("sun-path", nextSunPath), ct); sunPathKey = nextSunPath; }
                 bool reused = sunPath != null && sunPathKey == nextSunPath;
                 debug.RecordInput("sun-path-overlay", new { Fingerprint = nextSunPath, Origin = reused ? "Reused in-memory overlay" : "Computed" });
                 if (!reused)
@@ -179,6 +205,7 @@ public sealed class AppServices : IDisposable
                             CameraPose.FromImageBottom(s.BottomAzimuth, s.CameraTilt, s.CameraRoll),
                             new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius)), zone, ct: ct), ct);
                     ct.ThrowIfCancellationRequested(); sunPath = next; sunPathKey = nextSunPath; SunPathGenerationCount++;
+                    await Task.Run(() => Values.Write("sun-path", nextSunPath, next), ct);
                 }
                 activeSunPath = sunPath;
             }
@@ -186,9 +213,9 @@ public sealed class AppServices : IDisposable
             onSunPath?.Invoke(activeSunPath);
             // Present the already-rendered debug image before writing large numerical diagnostics.
             var solarArtifacts = new List<string>();
-            if (activeSunPath != null)
+            if (activeSunPath != null && debug.NeedsWrite(ArtifactGroup.SunPath))
                 solarArtifacts.AddRange(await Task.Run(() => SunPathOverlayExporter.Export(activeSunPath, solarDirectory, ct), ct));
-            solarArtifacts.AddRange(await Task.Run(() => SolarIntervalWorkbook.Export(geometry!, site, solarDirectory, ct), ct));
+            if (debug.NeedsWrite(ArtifactGroup.Solar)) solarArtifacts.AddRange(await Task.Run(() => SolarIntervalWorkbook.Export(geometry!, site, solarDirectory, ct), ct));
             debug.CompleteStage("04-solar-positions", solarArtifacts);
 
             if (activeMask != null && activeProfile != null)
@@ -209,15 +236,34 @@ public sealed class AppServices : IDisposable
 
             string transpositionDirectory = debug.BeginStage("05-transposition", "Computed", typeof(TranspositionModule));
             progress("Calculating irradiance on the panel");
-            var transposed = await Task.Run(() => TranspositionModule.ComputePrepared(geometry!, new(s.PanelTilt, s.PanelAzimuth),
-                s.Isotropic ? DiffuseModel.Isotropic : DiffuseModel.HayDavies, ct: ct), ct);
-            var exportedPanel = await Task.Run(() => TranspositionModule.ExportPrepared(transposed, Path.Combine(transpositionDirectory, "panel-unshaded.xlsx"), ct), ct);
-            debug.CompleteStage("05-transposition", [exportedPanel.OutputPath!]);
+            string nextTransposed = AppData.Key(new { Solar = nextGeometry, s.PanelTilt, s.PanelAzimuth, s.Isotropic });
+            if (!refresh && (transposedCache == null || transposedKey != nextTransposed))
+            { transposedCache = await Task.Run(() => Values.Read<PreparedTranspositionResult>("panel", nextTransposed), ct); transposedKey = nextTransposed; }
+            if (transposedCache == null || transposedKey != nextTransposed || refresh)
+            {
+                var next = await Task.Run(() => TranspositionModule.ComputePrepared(geometry!, new(s.PanelTilt, s.PanelAzimuth),
+                    s.Isotropic ? DiffuseModel.Isotropic : DiffuseModel.HayDavies, ct: ct), ct);
+                ct.ThrowIfCancellationRequested(); transposedCache = next; transposedKey = nextTransposed;
+                await Task.Run(() => Values.Write("panel", nextTransposed, next), ct);
+            }
+            var panelArtifacts = debug.NeedsWrite(ArtifactGroup.Transposition)
+                ? new[] { (await Task.Run(() => TranspositionModule.ExportPrepared(transposedCache, Path.Combine(transpositionDirectory, "panel-unshaded.xlsx"), ct), ct)).OutputPath! } : [];
+            debug.CompleteStage("05-transposition", panelArtifacts);
 
             string correctionDirectory = debug.BeginStage("06-shading", scene == null ? "Shading unavailable; unshaded summary only" : "Computed", typeof(ShadingCorrectionModule));
             progress("Applying panel shading and saving library results");
-            var result = await Task.Run(() => correctPanel(transposed, scene, ct), ct);
-            debug.CompleteStage("06-shading", await Task.Run(() => ShadingCorrectionModule.ExportPanel(result, correctionDirectory, ct), ct), skipped: scene == null);
+            string nextResult = AppData.Key(new { Panel = nextTransposed, Camera = dependencies.Keys[ArtifactGroup.Orientation] });
+            if (!refresh && (resultCache == null || resultKey != nextResult))
+            { resultCache = await Task.Run(() => Values.Read<PanelRun>("shading", nextResult), ct); resultKey = nextResult; }
+            if (resultCache == null || resultKey != nextResult || refresh)
+            {
+                var next = await Task.Run(() => correctPanel(transposedCache, scene, ct), ct);
+                ct.ThrowIfCancellationRequested(); resultCache = next; resultKey = nextResult;
+                await Task.Run(() => Values.Write("shading", nextResult, next), ct);
+            }
+            var result = resultCache;
+            debug.CompleteStage("06-shading", debug.NeedsWrite(ArtifactGroup.Shading)
+                ? await Task.Run(() => ShadingCorrectionModule.ExportPanel(result, correctionDirectory, ct), ct) : [], skipped: scene == null);
             lock (inputGate)
             {
                 tracked.Dirty |= dependencies.Difference(InputDependencies.Capture(s));
@@ -243,13 +289,14 @@ public sealed class AppServices : IDisposable
                 {
                     if (tracked != null)
                     {
-                        activeRun = null; lastRun = tracked;
+                        activeRun = null;
                         // Native/export calls have finished: no obsolete writer can recreate removed files.
                         tracked.Debug.Invalidate(tracked.Dirty, tracked.Inputs.SourcePaths.Concat(currentInputs?.SourcePaths ?? []));
+                        tracked.Debug.Finish();
                     }
                 }
             }
-            finally { evaluationGate.Release(); }
+            finally { ReleaseOperation(); }
         }
     }
 
@@ -257,20 +304,30 @@ public sealed class AppServices : IDisposable
     public async Task<OrientationPreview> PrepareOrientation(UserSettings settings, Action<string> progress,
         Action<MaskAsset>? onMask, CancellationToken ct, Action<CardinalDirectionOverlayResult?>? onCardinals = null)
     {
-        var persisted = PortablePaths.Map(settings, path => PortablePaths.Store(path));
-        var resolved = PortablePaths.Map(settings, path => PortablePaths.Resolve(path));
         await evaluationGate.WaitAsync(ct);
         DebugDataRun? debug = null;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct); ct = linked.Token;
         try
         {
             ct.ThrowIfCancellationRequested();
-            debug = new(persisted, "orientation", debugRoot);
+            settings = PrepareInputs(settings);
+            var persisted = PortablePaths.Map(settings, path => PortablePaths.Store(path));
+            var resolved = PortablePaths.Map(settings, path => PortablePaths.Resolve(path));
+            lock (inputGate)
+            {
+                ObserveInputs(settings, refreshSources: true, verifyArtifacts: true);
+                debug = new(Storage, persisted, "orientation"); activeRun = new(debug, InputDependencies.Capture(settings), linked);
+            }
             var (activeMask, _, overlay) = await PrepareImageStages(resolved, debug, progress, onMask, onCardinals, ct);
             ct.ThrowIfCancellationRequested(); debug.Complete();
             return new(activeMask, overlay, debug.DirectoryPath);
         }
         catch (Exception ex) { debug?.Status(ex is OperationCanceledException ? "Cancelled" : "Failed", ex.Message); throw; }
-        finally { evaluationGate.Release(); }
+        finally
+        {
+            try { lock (inputGate) { if (activeRun != null) { debug!.Invalidate(activeRun.Dirty, activeRun.Inputs.SourcePaths); activeRun = null; } debug?.Finish(); } }
+            finally { ReleaseOperation(); }
+        }
     }
 
     private async Task<(MaskAsset? Mask, CalibrationProfile? Profile, CardinalDirectionOverlayResult? Cardinals)> PrepareImageStages(
@@ -323,7 +380,7 @@ public sealed class AppServices : IDisposable
                     finally { NativeGate.Release(); }
                 }
                 activeMask = mask!; debug.Origin("02-sky-mask", maskOrigin);
-                debug.CompleteStage("02-sky-mask", await Task.Run(() => SkyMaskExporter.Export(activeMask.Result, directory, maskOrigin, ct), ct));
+                debug.CompleteStage("02-sky-mask", debug.NeedsWrite(ArtifactGroup.Mask) ? await Task.Run(() => SkyMaskExporter.Export(activeMask.Result, directory, maskOrigin, ct), ct) : []);
                 onMask?.Invoke(activeMask);
             }
             else debug.Skip("02-sky-mask", "No sky photograph selected");
@@ -342,7 +399,7 @@ public sealed class AppServices : IDisposable
                     ct.ThrowIfCancellationRequested(); profile = next; profileKey = nextProfile;
                 }
                 activeProfile = profile;
-                debug.CompleteStage("01-calibration", await Task.Run(() => CameraProfileFiles.Export(activeProfile, directory, ct), ct));
+                debug.CompleteStage("01-calibration", debug.NeedsWrite(ArtifactGroup.Profile) ? await Task.Run(() => CameraProfileFiles.Export(activeProfile, directory, ct), ct) : []);
             }
             else debug.Skip("01-calibration", "Effective calibration requires a selected profile and sky photograph");
 
@@ -353,6 +410,8 @@ public sealed class AppServices : IDisposable
                     activeMask.Result.Width, activeMask.Result.Height, activeMask.Disk,
                     s.BottomAzimuth, s.CameraTilt, s.CameraRoll,
                     Library = AppData.LibraryVersion(typeof(CardinalDirectionOverlayGenerator)) });
+                if (cardinals == null || cardinalKey != nextCardinal)
+                { cardinals = await Task.Run(() => Values.Read<CardinalDirectionOverlayResult>("cardinals", nextCardinal), ct); cardinalKey = nextCardinal; }
                 bool reused = cardinals != null && cardinalKey == nextCardinal;
                 debug.RecordInput("cardinal-directions", new { Fingerprint = nextCardinal });
                 string directory = debug.BeginStage("02-orientation", reused ? "Reused in-memory orientation overlay" : "Computed", typeof(CardinalDirectionOverlayGenerator));
@@ -364,10 +423,11 @@ public sealed class AppServices : IDisposable
                             CameraPose.FromImageBottom(s.BottomAzimuth, s.CameraTilt, s.CameraRoll),
                             new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius)), ct: ct), ct);
                     ct.ThrowIfCancellationRequested(); cardinals = next; cardinalKey = nextCardinal; CardinalGenerationCount++;
+                    await Task.Run(() => Values.Write("cardinals", nextCardinal, next), ct);
                 }
                 activeCardinals = cardinals;
                 ct.ThrowIfCancellationRequested(); onCardinals?.Invoke(activeCardinals);
-                debug.CompleteStage("02-orientation", await Task.Run(() => CardinalDirectionOverlayExporter.Export(activeCardinals!, directory, ct), ct));
+                debug.CompleteStage("02-orientation", debug.NeedsWrite(ArtifactGroup.Orientation) ? await Task.Run(() => CardinalDirectionOverlayExporter.Export(activeCardinals!, directory, ct), ct) : []);
             }
             else
             {
@@ -397,14 +457,26 @@ public sealed class AppServices : IDisposable
         Cv2.ImEncode(".png", small, out var bytes); return bytes;
     }
 
-    public static async Task<(CalibrationProfile Profile, string Path, string Details)> Calibrate(UserSettings s)
+    public async Task<(CalibrationProfile Profile, string Path, string Details)> Calibrate(UserSettings s)
     {
-        await NativeGate.WaitAsync();
+        await evaluationGate.WaitAsync();
+        using var cancellation = new CancellationTokenSource();
+        DebugDataRun? debug = null;
         try
         {
+            s = PrepareInputs(s);
+            if (DebugDataStore.Within(Storage.Root, AppData.Root)) throw new IOException("Data must be outside Debug Data to preserve calibration profiles.");
+            await NativeGate.WaitAsync();
+            try
+            {
             return await Task.Run(() =>
             {
-                var debug = new DebugDataRun(PortablePaths.Map(s, path => PortablePaths.Store(path)), "calibration");
+                lock (inputGate)
+                {
+                    Storage.Current?.Invalidate(ArtifactGroup.Profile | InputDependencies.PoseChain, InputDependencies.Capture(s).SourcePaths);
+                    debug = new DebugDataRun(Storage, PortablePaths.Map(s, path => PortablePaths.Store(path)), "calibration");
+                    activeRun = new(debug, InputDependencies.Capture(s), cancellation);
+                }
                 try
                 {
                     string directory = debug.BeginStage("01-calibration", "Computed", typeof(CalibrationWorkflow));
@@ -412,16 +484,29 @@ public sealed class AppServices : IDisposable
                     debug.RecordInput("calibration-files", Directory.EnumerateFiles(sourceDirectory).OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                         .Select(path => new { File = Path.GetFileName(path), Fingerprint = AppData.FileKey(path) }).ToArray());
                     var stage = CalibrationWorkflow.Calibrate(sourceDirectory, directory,
-                        CheckerboardDetectionSettings.CreateFastDefault() with { InnerColumns = s.Columns, InnerRows = s.Rows, SquareSizeMillimetres = s.SquareMm });
-                    debug.CompleteStage("01-calibration", stage.Artifacts); debug.Complete();
+                        CheckerboardDetectionSettings.CreateFastDefault() with { InnerColumns = s.Columns, InnerRows = s.Rows, SquareSizeMillimetres = s.SquareMm }, cancellation.Token);
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    string durable = DebugDataStore.Preserve(directory, "Profiles");
+                    lock (inputGate)
+                    {
+                        cancellation.Token.ThrowIfCancellationRequested();
+                        debug.CompleteStage("01-calibration", stage.Artifacts);
+                        debug.SetCalibrationProfile(Path.Combine(durable, "camera-profile.json")); debug.Complete();
+                    }
                     var calibration = stage.Profile.Calibration;
-                    return (stage.Profile, Path.Combine(directory, "camera-profile.json"),
+                    return (stage.Profile, Path.Combine(durable, "camera-profile.json"),
                         $"{calibration.UsedImageCount} boards · RMSE {calibration.RmsError:F2} px · fitted coverage {calibration.MaximumIncidentAngleDegrees:F2}°");
                 }
-                catch (Exception ex) { debug.Status("Failed", ex.Message); throw; }
+                catch (Exception ex) { debug.Status(ex is OperationCanceledException ? "Cancelled" : "Failed", ex.Message); throw; }
             });
+            }
+            finally { NativeGate.Release(); }
         }
-        finally { NativeGate.Release(); }
+        finally
+        {
+            try { lock (inputGate) { if (activeRun != null) { debug!.Invalidate(activeRun.Dirty, activeRun.Inputs.SourcePaths); activeRun = null; } debug?.Finish(); } }
+            finally { ReleaseOperation(); }
+        }
     }
 
     public static void Export(Evaluation evaluation, string directory)
@@ -436,5 +521,14 @@ public sealed class AppServices : IDisposable
         }
         evaluation.ManagedDebugRun.CopyCurrent(Path.Combine(directory, $"scenario-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"));
     }
-    public void Dispose() { masker?.Dispose(); evaluationGate.Dispose(); }
+    private void ReleaseOperation()
+    {
+        lock (inputGate) { evaluationGate.Release(); if (disposeRequested) DisposeResources(); }
+    }
+    private void DisposeResources()
+    { if (disposed) return; disposed = true; masker?.Dispose(); storage?.Dispose(); }
+    public void Dispose()
+    {
+        lock (inputGate) { disposeRequested = true; activeRun?.Cancellation.Cancel(); if (evaluationGate.CurrentCount > 0) DisposeResources(); }
+    }
 }

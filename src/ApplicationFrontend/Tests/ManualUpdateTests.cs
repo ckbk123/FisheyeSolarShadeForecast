@@ -68,7 +68,7 @@ public sealed class ManualUpdateTests
         }
         public void WriteWeather() => File.WriteAllLines(Settings.ImportPath,
             new[] { "Timestamp,BHI,DHI" }.Concat(Enumerable.Range(0, 24).Select(hour => $"2025-05-15T{hour:00}:00:00+00:00,0,100")));
-        public int Runs => Directory.Exists(Debug) ? Directory.GetDirectories(Debug).Length : 0;
+        public int Runs => AppData.Read<DebugDataRun.Manifest>(Path.Combine(Debug, "run.json"))?.UpdateNumber ?? 0;
         public void Dispose() { AppData.Root = previousRoot; Directory.Delete(Root, true); }
     }
 

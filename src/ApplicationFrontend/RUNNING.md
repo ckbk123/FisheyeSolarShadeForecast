@@ -4,7 +4,7 @@ Extract the complete package, then launch `APPLICATION.exe`. Keep `Example`, `Da
 
 ## Workflow
 
-1. Select checkerboard photos, set inner-corner columns/rows and one square's side in millimetres, then **Calibrate**. The library saves native `calibration.yml`, reusable `camera-profile.json`, validation and solver diagnostics in a new calibration run under `Debug Data`.
+1. Select checkerboard photos, set inner-corner columns/rows and one square's side in millimetres, then **Calibrate**. The library saves native `calibration.yml`, reusable `camera-profile.json`, validation and solver diagnostics in `Debug Data/01-calibration`. A durable copy is retained in `Data/Profiles`; subsequent updates cannot delete the selected profile.
 2. Select a sky photo and segmentation model. The physical lens setup and oriented image dimensions must match calibration. **Load profile** accepts the profile JSON or native OmniCalib YAML. YAML requires an explicit maximum incident half-angle based on calibration evidence; fitted coverage is provisional.
 3. Set camera pose, site/elevation, time zone and dates. Dates include the complete end day. The editable example defaults are not GPS measurements.
 4. Use NASA POWER/Open-Meteo or **Import XLSX / CSV**, then **Update results**. An import remains selected until **Use API**. Loading the example or editing inputs does not start calculations or generate debug files.
@@ -59,9 +59,11 @@ The chart holds each interval mean over its actual start/end bounds, including t
 
 ## Automatic Debug Data
 
-Each explicit update creates `Debug Data/calculation-<timestamp>-<id>/`. Interface edits and startup create no diagnostic runs. Orientation is prepared within the explicit calculation. **Calibrate** creates `Debug Data/calibration-<timestamp>-<id>/`. No Export click is needed to save the update's diagnostics.
+There is one current dataset directly under `Debug Data`, with the stage folders below and one `run.json`. Update replaces only invalid artifacts; unchanged files retain their bytes and modification times. Orientation is prepared within the explicit calculation. Calibrate publishes into `01-calibration` and saves durable copies under `Data/Profiles`. No Export click is needed to save diagnostics.
 
-The active/latest run is invalidated as its inputs change; the manifest records stale groups and file fingerprints. Older run folders still exist in this milestone. Migration to one stable current dataset is the next milestone. Input files selected from inside a run are protected from cleanup; save them outside that run and select the saved copy before updating.
+Edits invalidate affected current files. Verified historical application run folders are removed after selected inputs are copied to `Data/Inputs` and their saved paths updated. User exports, bundled examples and unrecognized folders/files are preserved. Keep Data with the application: it now includes durable calibration/input files as well as disposable caches.
+
+Updates prepare files in the bounded sibling `Debug Data.staging` directory and remove it when finished. A held `Debug Data.lock` file prevents concurrent instances from changing the same dataset; a lock file left on disk after exit is normal. Close the other application instance if this dataset is already in use. A stopped or interrupted update remains incomplete and can be retried. Close locked diagnostic workbooks before retrying a failed write.
 
 | Stage folder | Actual library output |
 |---|---|
@@ -75,7 +77,7 @@ The active/latest run is invalidated as its inputs change; the manifest records 
 
 Native calibration and masking use YAML/PNG; generic flattened calibration/mask workbooks are no longer the normal output. Solar and shading detail files may have numbered parts; inspect all parts. Transmission means shaded/unshaded: 1 is unchanged, 0 fully blocked, and a blank means an undefined zero-baseline ratio. The main shaded result treats unobserved sky as blocked; the upper bound is retained in the results.
 
-`run.json` records settings, input fingerprints, owning library versions, stage origins, saved artifact paths and status. Runs are Running, Complete, Cancelled or Failed. Unavailable stages are Skipped. Reused results still export their actual artifacts into the current run without another retrieval, calibration or inference merely for debug output. A required write failure prevents completion. Completed files remain available when later work fails; earlier runs are retained.
+`run.json` records settings, input fingerprints, software/library versions, stage origins, artifact hashes, update identity and the last successful calculation time. Status can be Running, Complete, Partial, Stale, Cancelled, Failed or Interrupted. Unavailable stages are Skipped. Calibration/orientation alone produce a Partial dataset. A required write failure prevents completion; valid independent files remain available when later work fails. Old result objects cannot export a newer dataset just because it uses the same path.
 
 Low-level scalar/per-pixel functions remain in memory. Library stage wrappers/exporters own the scientific file schemas and write the returned values. The frontend sequences those operations and records their artifacts. Manual Export copies completed artifacts without recalculation.
 
@@ -94,12 +96,12 @@ A compatible library change needs no frontend source rewrite. The self-contained
 - `Example/Irradiance/horizontal-irradiance.xlsx`: original buffered hourly Open-Meteo input workbook.
 - `Example/Debug Data/reference-run`: fixed native library outputs from the verified example run, with its own `run.json`.
 - `Example/settings.json`: executable-relative default input paths. First launch and **Load example** load the inputs without calculating; click **Update results** when ready.
-- `Data`: current settings, validated weather/mask caches and extracted model weights.
-- Top-level `Debug Data`: all new calculation/calibration runs and reusable profiles generated by Calibrate.
+- `Data`: settings, durable Profiles/Inputs, weather/mask/current-value caches and extracted model weights.
+- Top-level `Debug Data`: the one current set of published diagnostic files.
 
-The example settings illustrate a workflow; they do not establish the true site/pose of the photograph. Read the reference run's settings and results for its exact parameters and totals. Source input data is separate from calculated Debug Data. Reference output is fixed; changing settings creates a current run rather than overwriting it.
+The example settings illustrate a workflow; they do not establish the true site/pose of the photograph. Read the reference run's settings and results for its exact parameters and totals. Source input data is separate from calculated Debug Data. The bundled reference output is fixed; user updates affect only the top-level current dataset.
 
-Use a writable extracted folder. Package-relative input/profile settings continue to work when the entire folder is moved; external personal input files do not move automatically. Keep generated calibration runs if their profiles are in use. Only the selected model is extracted into `Data/models-v1` on first use. Native DLLs use the .NET bundle extraction cache. `Packaging/Publish.ps1` records package files/sizes/hashes in `artifacts/application-package.json` and creates clean example settings for the ZIP.
+Use a writable extracted folder. Package-relative input/profile settings continue to work when the entire folder is moved; external personal input files do not move automatically. Keep Data/Profiles and Data/Inputs when moving or backing up the application. Only the selected model is extracted into `Data/models-v1` on first use. Native DLLs use the .NET bundle extraction cache. `Packaging/Publish.ps1` records package files/sizes/hashes in `artifacts/application-package.json` and creates clean example settings for the ZIP.
 
 ## Build and verify
 

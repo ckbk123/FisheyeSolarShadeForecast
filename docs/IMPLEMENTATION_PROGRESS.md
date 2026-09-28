@@ -17,7 +17,7 @@ Validation on Windows x64: **313 tests passed** (306 existing plus 7 UI tests). 
 
 Accepted by the user and merged through [PR #1](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/1), main commit `8586084`. Existing service-level orientation and baseline APIs remain available; the interface no longer invokes them automatically.
 
-## 2. Dependency invalidation — ready for review
+## 2. Dependency invalidation — accepted and merged
 
 - Added one artifact dependency model used by interface previews, managed debug output and result validity. Numerical solar workbooks are distinguished from camera-dependent sun-path files in the same stage folder.
 - Camera pose edits remove orientation, projected sun paths and shading while preserving the mask, raw irradiance, numerical solar positions and unshaded panel data. Panel/diffuse edits remove only transposition and shading. Image/profile, date/site, zone, weather and integration settings follow their respective dependency chains.
@@ -32,11 +32,25 @@ Validation on Windows x64: **357 tests passed** (313 previous plus 44 dependency
 
 Local verification: `artifacts/dependency-final-tests` and `artifacts/dependency-smoke`. Branch: `codex/dependency-invalidation`.
 
-Scope boundary: this milestone manages the active and most recent calculation runs during the session. Historical run folders and legacy standalone orientation/calibration APIs remain until milestone 3 introduces one stable store and shared ownership. Complete export rules at every service entry point, frozen snapshot publication, and the PDF remain milestone 4. The distributed package is verified at the final milestone.
+Accepted by the user and merged through [PR #2](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/2), main commit `f72e17b`. This milestone managed the active/latest calculation runs; the stable store follows below.
 
-## 3. One current debug dataset — pending
+## 3. One current debug dataset — ready for review
 
-Replace historical debug folders with stable stage paths; protect durable calibration inputs and implement migration, consistent publication and cancellation/recovery rules.
+- Replaced generated run directories with stable numbered stage folders directly under Debug Data and a single run.json. Each update has a result identity; an old evaluation cannot export a later dataset through the shared path.
+- Valid files retain their exact bytes and modification times across updates. Solar numerical workbooks and camera-dependent sun-path files can be reused independently. Compressed current-value caches under Data allow restart reuse without recomputing unchanged scientific results.
+- Library exporters write into one bounded sibling staging folder. Only finished stage artifacts are published, and Complete is written last. Cancellation, failed publication and interrupted processes leave an incomplete manifest; retries discard partial files and preserve valid independent groups.
+- Calculation, standalone orientation, calibration, invalidation and export share storage ownership. A held file lock excludes other instances/processes; closing during work retains ownership until the worker finishes. Calibration/orientation alone mark the set Partial, never a complete calculation.
+- New calibrations retain durable profiles and their associated files under Data/Profiles. Inputs selected from managed diagnostics are copied under Data/Inputs and their settings are saved before cleanup.
+- Migration removes only verified application-owned historical run folders. User exports, bundled reference data, unknown folders and folders containing extra unrecognized files are preserved. Redirected paths and unrecognized stage/staging folders are refused rather than overwritten.
+- The manifest records current settings, dependency keys, file hashes, stage library versions, combined software identity, status, update identity and last successful calculation time. Export copies registered artifacts only.
+
+Validation on Windows x64: **377 tests passed** (357 previous plus 20 storage tests), no failures or skips. Release build: zero warnings/errors. Tests cover 20 updates without growth, byte/time preservation, restart cache reuse, camera-only replacement, independent process locking, ownership retained during closing/native work, interrupted publication, cancellation at every major stage, locked publication/retry, interrupted refresh, migration and selected-profile survival. Migration additionally passed focused review checks for unregistered files inside stage folders.
+
+The real-image WPF smoke test passed with segmentation, overlays, explicit updates, exports, actual calibration from 12 checkerboard photographs, and a subsequent complete update using the durable new profile. The final store has seven stage folders and one manifest, with no staging directory. The example remains 696 hourly rows with 149.33192161721075 kWh/m² before shading and 120.82722381119314 kWh/m² after shading; the completed-state screenshot was inspected. Scientific library source has no diff from the baseline.
+
+Local evidence: `artifacts/current-store-reviewed-tests`, `artifacts/current-store-migration-reviewed-tests`, and `artifacts/current-store-reviewed-smoke`. Branch: `codex/current-debug-dataset`.
+
+Scope boundary: PDF generation, complete-dataset enforcement at every export entry point and atomic destination publication remain milestone 4, together with final packaged-Windows acceptance. Internal caches and durable profiles in Data are separate from the one published debug set. Unverified old folders intentionally require manual review and are never deleted automatically.
 
 ## 4. Complete export and PDF — pending
 

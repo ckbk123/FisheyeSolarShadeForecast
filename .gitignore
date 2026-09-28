@@ -81,8 +81,12 @@ test-results/
 /Deliverable.zip
 /Data/
 /Debug Data/
+/Debug Data.lock
+/Debug Data.staging/
 /src/ApplicationFrontend/Data/
 /src/ApplicationFrontend/Debug Data/*
+/src/ApplicationFrontend/Debug Data.lock
+/src/ApplicationFrontend/Debug Data.staging/
 !/src/ApplicationFrontend/Debug Data/Read me.txt
 
 # Working outputs and backup checkouts; retain existing regression fixtures
