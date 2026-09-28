@@ -227,8 +227,12 @@ public static class SmokeTest
                 string[] dependencies = Process.GetCurrentProcess().Modules.Cast<ProcessModule>().Where(m => new[] { "coreclr.dll", "onnxruntime.dll", "DirectML.dll", "OpenCvSharpExtern.dll", "msvcp140.dll", "msvcp140_1.dll", "vcruntime140.dll", "vcruntime140_1.dll" }.Contains(m.ModuleName, StringComparer.OrdinalIgnoreCase)).Select(m => m.FileName).ToArray();
                 if (Environment.GetEnvironmentVariable("SOLARSHADE_CALIBRATION_IMAGES") is { Length: > 0 } calibrationImages)
                 {
-                    var calibration = await AppServices.Calibrate(new UserSettings { CalibrationFolder = calibrationImages });
+                    var calibration = await window.CalibrateForTest(new UserSettings { CalibrationFolder = calibrationImages });
                     if (calibration.Profile.Calibration.UsedImageCount < 3 || !File.Exists(calibration.Path)) throw new InvalidOperationException("Calibration integration failed.");
+                    var beforeCalibrationUpdate = window.Completed;
+                    window.SetProfileForTest(calibration.Path); window.Calculate();
+                    await Until(() => window.Completed != beforeCalibrationUpdate, 120);
+                    if (!window.ExportEnabledForTest || !File.Exists(calibration.Path)) throw new InvalidOperationException("Durable calibration did not survive the next update.");
                     AppData.Write(Path.Combine(output, "calibration-result.json"), new { calibration.Details, calibration.Profile, calibration.Path });
                 }
                 if (Environment.GetEnvironmentVariable("SOLARSHADE_TEST_LIVE") == "1")

@@ -9,13 +9,13 @@ public sealed class DebugDataTests : IDisposable
     [Fact]
     public void CannotMarkAnUnfinishedRunComplete()
     {
-        var run=new DebugDataRun(new(),root:root);
+        using var run=new DebugDataRun(new(),root:root);
         Assert.Throws<InvalidOperationException>(()=>run.Complete());
     }
     [Fact]
     public void FailedRunPreservesStageStatusArtifactsAndInputFingerprint()
     {
-        var run=new DebugDataRun(new(),root:root);
+        using var run=new DebugDataRun(new(),root:root);
         run.RecordInput("weather",new { Sha256="test-fingerprint" });
         string first=run.BeginStage("03-irradiance","Imported",typeof(DebugDataTests));
         string output=Path.Combine(first,"output.txt");File.WriteAllText(output,"actual library artifact");
@@ -28,12 +28,12 @@ public sealed class DebugDataTests : IDisposable
         Assert.Equal("Failed",stages.GetProperty("04-solar-positions").GetProperty("Status").GetString());
         Assert.Equal("Pending",stages.GetProperty("05-transposition").GetProperty("Status").GetString());
         Assert.Equal("test-fingerprint",json.RootElement.GetProperty("Inputs").GetProperty("weather").GetProperty("Sha256").GetString());
-        Assert.Equal("actual library artifact",File.ReadAllText(output));
+        Assert.Equal("actual library artifact",File.ReadAllText(Path.Combine(run.DirectoryPath,"03-irradiance","output.txt")));
     }
     [Fact]
     public void StageCannotReportMissingOrExternalArtifacts()
     {
-        var run=new DebugDataRun(new(),root:root);
+        using var run=new DebugDataRun(new(),root:root);
         string stage=run.BeginStage("03-irradiance","Imported",typeof(DebugDataTests));
         Assert.Throws<IOException>(()=>run.CompleteStage("03-irradiance",[Path.Combine(stage,"missing.xlsx")]));
         string outside=Path.Combine(root,"outside.txt");File.WriteAllText(outside,"outside");
@@ -42,7 +42,7 @@ public sealed class DebugDataTests : IDisposable
     [Fact]
     public void ExportRejectsDestinationInsideSourceRunBeforeCreatingIt()
     {
-        var run=new DebugDataRun(new(),"calibration",root);
+        using var run=new DebugDataRun(new(),"calibration",root);
         run.Skip("01-calibration","Test fixture");run.Complete();
         string destination=Path.Combine(run.DirectoryPath,"nested-export");
         Assert.Throws<ArgumentException>(()=>DebugDataRun.CopyCompleted(run.DirectoryPath,destination));

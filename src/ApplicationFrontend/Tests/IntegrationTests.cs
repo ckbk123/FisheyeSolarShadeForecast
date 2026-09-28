@@ -55,8 +55,8 @@ public sealed class IntegrationTests : IDisposable
         var second = await service.Evaluate(settings with { PanelTilt = 60 }, false, _ => { }, null, CancellationToken.None);
         Assert.Equal(first.PreparationCount, second.PreparationCount);
         Assert.NotEqual(first.Run.BeforeEnergy, second.Run.BeforeEnergy);
-        Assert.NotEqual(first.DebugDirectory, second.DebugDirectory);
-        Assert.Contains("Reused cached solar timeline", File.ReadAllText(Path.Combine(second.DebugDirectory!, "run.json")));
+        Assert.Equal(first.DebugDirectory, second.DebugDirectory);
+        Assert.Contains("Reused published artifacts", File.ReadAllText(Path.Combine(second.DebugDirectory!, "run.json")));
         var originalTime = File.GetLastWriteTimeUtc(settings.ImportPath);
         File.WriteAllText(settings.ImportPath, File.ReadAllText(settings.ImportPath).Replace("100.123456789", "200.123456789"));
         File.SetLastWriteTimeUtc(settings.ImportPath, originalTime);
@@ -124,13 +124,13 @@ public sealed class IntegrationTests : IDisposable
         var settings=Input(); using var service=new AppServices(Debug); using var cts=new CancellationTokenSource();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(()=>service.Evaluate(settings,false,
             message=> { if(message.StartsWith("Preparing solar positions"))cts.Cancel(); },null,cts.Token));
-        string cancelled=Assert.Single(Directory.GetDirectories(Debug));
+        string cancelled=Debug;
         using var state=JsonDocument.Parse(File.ReadAllText(Path.Combine(cancelled,"run.json")));
         Assert.Equal("Cancelled",state.RootElement.GetProperty("Status").GetString());
         Assert.True(File.Exists(Path.Combine(cancelled,"03-irradiance","horizontal-irradiance.xlsx")));
         var next=await service.Evaluate(settings,false,_=>{},null,CancellationToken.None);
         Assert.Equal(24,next.Run.Rows.Count);
-        Assert.NotEqual(cancelled,next.DebugDirectory);
+        Assert.Equal(cancelled,next.DebugDirectory);
     }
 
     [Fact]
@@ -139,7 +139,7 @@ public sealed class IntegrationTests : IDisposable
         var settings=Input(15); File.WriteAllLines(settings.ImportPath,File.ReadAllLines(settings.ImportPath).Where((_,i)=>i!=7).ToArray());
         using var service=new AppServices(Debug);
         await Assert.ThrowsAsync<InvalidDataException>(()=>service.Evaluate(settings,false,_=>{},null,CancellationToken.None));
-        string run=Assert.Single(Directory.GetDirectories(Debug));
+        string run=Debug;
         using var state=JsonDocument.Parse(File.ReadAllText(Path.Combine(run,"run.json")));
         Assert.Equal("Failed",state.RootElement.GetProperty("Status").GetString());
         Assert.False(File.Exists(Path.Combine(run,"05-transposition","panel-unshaded.xlsx")));

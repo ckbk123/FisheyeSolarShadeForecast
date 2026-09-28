@@ -216,10 +216,11 @@ public sealed class DependencyTests
     [Fact]
     public void CleanupNeverDeletesASelectedInputInsideItsRun()
     {
-        using var fixture = new Fixture(); var run = new DebugDataRun(fixture.Settings, "calibration", fixture.Debug);
+        using var fixture = new Fixture(); using var run = new DebugDataRun(fixture.Settings, "calibration", fixture.Debug);
         string stage = run.BeginStage("01-calibration", "Fixture", typeof(AppServices));
         string input = Path.Combine(stage, "camera-profile.json"); File.WriteAllText(input, "selected profile");
         run.CompleteStage("01-calibration", [input]); run.Complete();
+        input = Path.Combine(run.DirectoryPath, "01-calibration", "camera-profile.json");
         Assert.Throws<IOException>(() => run.Invalidate(ArtifactGroup.Profile, [input]));
         Assert.Equal("selected profile", File.ReadAllText(input)); Assert.False(run.IsCurrent);
         string durable = Path.Combine(fixture.Root, "saved-profile.json"); File.Copy(input, durable);
@@ -241,12 +242,12 @@ public sealed class DependencyTests
         try
         {
             window.Calculate(); await Until(() => Volatile.Read(ref entered) == 1);
-            string debug = Assert.Single(Directory.GetDirectories(fixture.Debug));
+            string debug = fixture.Debug;
             var before = Artifacts(debug);
             window.EditFieldForTest("PanelTilt", "45"); release.Set();
             await Until(() => !window.UpdatingForTest);
             AssertRemovedOnly(debug, before, InputDependencies.PanelChain);
-            Assert.Empty(Directory.GetFiles(Path.Combine(debug, "06-shading")));
+            Assert.False(Directory.Exists(Path.Combine(debug, "06-shading")) && Directory.GetFiles(Path.Combine(debug, "06-shading")).Length > 0);
             Assert.Null(window.Completed); Assert.False(window.ExportEnabledForTest);
         }
         finally { release.Set(); window.Close(); }
