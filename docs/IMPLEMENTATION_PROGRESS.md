@@ -34,7 +34,7 @@ Local verification: `artifacts/dependency-final-tests` and `artifacts/dependency
 
 Accepted by the user and merged through [PR #2](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/2), main commit `f72e17b`. This milestone managed the active/latest calculation runs; the stable store follows below.
 
-## 3. One current debug dataset — ready for review
+## 3. One current debug dataset — accepted and merged
 
 - Replaced generated run directories with stable numbered stage folders directly under Debug Data and a single run.json. Each update has a result identity; an old evaluation cannot export a later dataset through the shared path.
 - Valid files retain their exact bytes and modification times across updates. Solar numerical workbooks and camera-dependent sun-path files can be reused independently. Compressed current-value caches under Data allow restart reuse without recomputing unchanged scientific results.
@@ -52,8 +52,25 @@ Local evidence: `artifacts/current-store-reviewed-tests`, `artifacts/current-sto
 
 Scope boundary: PDF generation, complete-dataset enforcement at every export entry point and atomic destination publication remain milestone 4, together with final packaged-Windows acceptance. Internal caches and durable profiles in Data are separate from the one published debug set. Unverified old folders intentionally require manual review and are never deleted automatically.
 
-## 4. Complete export and PDF — pending
+Accepted by the user and merged through [PR #3](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/3), main commit `8f0c9bf`.
 
-Validate complete current artifacts at the service boundary, freeze one export snapshot, copy its debug files and add a one-page settings/results recap. Finish with full acceptance and packaged-Windows verification.
+## 4. Complete export and PDF — ready for review
+
+- Every export entry point requires a current calculation with all seven stages complete, all 18 required artifacts registered and present, matching input/artifact fingerprints, nonempty rows and finite shaded totals. Baseline-only or skipped-stage results cannot bypass the disabled interface button. Zero baseline energy and zero loss remain valid.
+- Export copies registered diagnostics and run.json byte-for-byte. It does not invoke the scientific pipeline or regenerate workbooks. The summary reads the stored successful-update settings and published library totals/metadata, even if the caller changes a public evaluation object afterward.
+- A one-page Summary.pdf includes update/export times, result/build identity, site, calendar and resolved zone, source/cadence/label metadata, effective profile coverage, image/mask/disk/pose settings, panel/model/integration settings, energy/loss and a stage-folder guide. It distinguishes source metadata from fallback settings and future checkerboard setup from active calibration. Long fields wrap and may shorten; run.json retains full values.
+- Files are copied into a unique sibling `.partial` folder and checked against their recorded hashes. PDF generation and page validation must succeed before publication. Source changes, artifact changes, interface edits or a superseding update detected during export reject publication. A same-volume directory rename exposes the finished scenario, with export.json recording identity, time and integrity hashes. Errors clean up this operation's temporary folder; an OS-locked or interrupted temporary folder stays clearly named `.partial` and is never reported as success.
+- Export remains disabled while another export is running. A destination/PDF error leaves an otherwise valid calculation usable and explains the failure. Help and usage documentation describe the complete workflow.
+- PDFsharp-WPF 6.2.4 is confined to the frontend. PDF generation is bundled and uses Windows fonts without a printer, Python or Office. Its [upstream MIT license](https://github.com/empira/PDFsharp/blob/v6.2.4/LICENSE) and new Microsoft dependency notices are included. Package restore now precedes notice collection.
+
+Validation on Windows x64: **395 tests passed** (377 previous plus 18 export cases), no failures or skips. Release build and package publication succeeded. New cases cover skipped stages and direct service calls, missing/locked artifacts, a blocked/existing destination, PDF failure/missing/multiple pages, source/artifact/UI changes and newer updates during export, saved-setting isolation, byte fidelity, zero energy/loss, and long Vietnamese filenames. Scientific library source has no diff from `baseline-2026-09-27`.
+
+The actual ZIP was extracted into an isolated folder and passed first launch, explicit Update, Stop/retry, export and camera/panel edits. Moving that folder preserved settings and allowed another successful update/export. Real calibration used 12 checkerboard photographs (RMSE about 1.72 px); update/export succeeded with its durable profile, and a further restart restored that profile and exported successfully. The current debug root retained seven stage folders with no staging directory. All four model hashes match the baseline.
+
+The packaged example remains **696 hourly intervals**, **149.33192161721075 kWh/m²** before shading and **120.82722381119314 kWh/m²** after shading. All 18 exported diagnostic hashes matched. The PDF's result ID, interval count, zone and rounded energy/loss values were independently checked against its copied JSON. Packaged and long-filename PDFs were rendered and visually inspected; the completed application screen was inspected too.
+
+Local evidence: `artifacts/export-final-tests`, `artifacts/export-pdf-qa`, `artifacts/export-packaged-first`, `artifacts/export-packaged-relocated`, `artifacts/export-packaged-calibration-restart`, and `artifacts/application-package.json`. Branch: `codex/complete-export-pdf`. The refreshed local `Deliverable/APPLICATION.exe` and clean `Deliverable.zip` are generated outputs, not committed binaries. Executable SHA-256: `C1975C8D718528483B1F198AB3B33A0D690ABEEEBEA93FB402ED8F37230631B2`.
+
+The four milestones' automated and packaged acceptance checks are complete on this Windows machine. User review/acceptance of milestone 4 remains before merging. This does not establish independent field accuracy or compatibility on an untested older computer.
 
 Each milestone has a focused branch and pull request. User acceptance is required before merging and advancing to the next milestone.

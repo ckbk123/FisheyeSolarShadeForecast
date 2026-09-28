@@ -81,9 +81,8 @@ public sealed class IntegrationTests : IDisposable
         Assert.Equal(1,calls); Assert.Same(sentinel,actual.Run);
         using var saved = JsonDocument.Parse(File.ReadAllText(Path.Combine(actual.DebugDirectory!, "06-shading", "panel-results.json")));
         Assert.Equal(sentinel!.BeforeEnergy,saved.RootElement.GetProperty("BeforeEnergy").GetDouble());
-        AppServices.Export(actual,Path.Combine(root,"exports"));
-        string copy = Assert.Single(Directory.GetDirectories(Path.Combine(root,"exports")));
-        Assert.Equal(File.ReadAllBytes(Path.Combine(actual.DebugDirectory!, "06-shading", "panel-results.json")), File.ReadAllBytes(Path.Combine(copy,"06-shading","panel-results.json")));
+        Assert.Throws<InvalidOperationException>(() => AppServices.Export(actual,Path.Combine(root,"exports")));
+        Assert.False(Directory.Exists(Path.Combine(root,"exports")));
     }
 
     [Fact]

@@ -4,7 +4,7 @@ Windows desktop application and C# scientific libraries for estimating solar irr
 
 ## Source baseline — 27 September 2026
 
-The tag `baseline-2026-09-27` preserves the application and libraries before the planned improvements. Milestones 1 and 2 (manual updates and dependency invalidation) are accepted and merged. This development branch implements **milestone 3: one current debug dataset**, durable calibration profiles, safe migration and recovery. Complete export packaging and the PDF recap remain pending. See [milestone progress](docs/IMPLEMENTATION_PROGRESS.md) and [the full specification](docs/MANUAL_UPDATE_AND_EXPORT_PLAN.md).
+The tag `baseline-2026-09-27` preserves the application and libraries before the planned improvements. Milestones 1-3 (manual updates, dependency invalidation and one current debug dataset) are accepted and merged. This development branch implements **milestone 4: complete snapshot exports and a one-page PDF recap**, with final Windows package verification. See [milestone progress](docs/IMPLEMENTATION_PROGRESS.md) and [the full specification](docs/MANUAL_UPDATE_AND_EXPORT_PLAN.md).
 
 Requires Windows x64, the .NET 10 SDK (the libraries also target .NET 8), and Git LFS. Install the .NET 8 runtime to run the .NET 8 test projects. Clone with Git rather than downloading the source ZIP so the four ONNX model files are retrieved correctly (about 643 MB in total):
 
@@ -25,7 +25,7 @@ See [baseline scope and versioning workflow](docs/BASELINE.md) for what is prese
 
 ## Existing library and application documentation
 
-The Windows test application is now in **`Deliverable/APPLICATION.exe`**, with a matching **`Deliverable.zip`** for sharing. The folder contains only the executable; all four segmentation models and the runtime are bundled. Start with **Load example** or select your own inputs. See [application usage, imports, validation and packaging](src/ApplicationFrontend/RUNNING.md). Source and integration tests are under `src/ApplicationFrontend`.
+The Windows test application is now in **`Deliverable/APPLICATION.exe`**, with a matching **`Deliverable.zip`** for sharing. Keep the executable alongside its Example, Data and Debug Data folders; all four segmentation models and the runtime are bundled. Start with **Load example** or select your own inputs. See [application usage, imports, validation and packaging](src/ApplicationFrontend/RUNNING.md). Source and integration tests are under `src/ApplicationFrontend`.
 
 The solar-position and fisheye shading library is in **`src/SolarPositionAndShading`**. It exports timestamp/zenith/azimuth XLSX data, computes direct and constant-isotropic diffuse shading from the existing mask/calibration contracts, and writes a separate shading workbook. See [API, defaults and integration](src/SolarPositionAndShading/README.md), [validation and performance](src/SolarPositionAndShading/VALIDATION.md), and [the 0.25° solar-radius overlay](src/SolarPositionAndShading/Validator/results/noon-20260531-radius-0.25-detail.png).
 

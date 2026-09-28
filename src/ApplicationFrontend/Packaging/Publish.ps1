@@ -7,11 +7,11 @@ $publishRoot = if ($ExistingStage) { [IO.Path]::GetFullPath($ExistingStage) } el
 if ([IO.Path]::GetFileName($DeliveryName) -ne $DeliveryName -or $DeliveryName -in @('.', '..')) { throw 'DeliveryName must be a directory name.' }
 $deliveryRoot = Join-Path $repoRoot $DeliveryName
 if (-not $ExistingStage) {
-& (Join-Path $PSScriptRoot 'Collect-Notices.ps1')
 if (-not $SkipRestore) {
   dotnet restore $project -r win-x64 --configfile (Join-Path $sourceRoot 'NuGet.Config') -p:SelfContained=true -p:PublishSingleFile=true -p:NuGetAudit=false
   if ($LASTEXITCODE -ne 0) { throw 'Restore failed.' }
 }
+& (Join-Path $PSScriptRoot 'Collect-Notices.ps1')
 dotnet publish $project -c Release -r win-x64 --self-contained true --no-restore -p:BundleModels=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=false -p:DebugSymbols=false -p:DebugType=None -o $publishRoot
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
 }

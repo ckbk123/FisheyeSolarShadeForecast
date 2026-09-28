@@ -509,17 +509,13 @@ public sealed class AppServices : IDisposable
         }
     }
 
-    public static void Export(Evaluation evaluation, string directory)
+    public static string Export(Evaluation evaluation, string directory)
     {
         if (evaluation.DebugDirectory == null) throw new InvalidOperationException("The result has no completed library artifacts.");
         if (evaluation.Dependencies == null || evaluation.ManagedDebugRun == null) throw new InvalidOperationException("Result provenance is unavailable; update results before exporting.");
-        var sourceChanges = evaluation.Dependencies.Difference(InputDependencies.Capture(evaluation.Settings));
-        if (sourceChanges != ArtifactGroup.None)
-        {
-            evaluation.ManagedDebugRun.Invalidate(sourceChanges, evaluation.Dependencies.SourcePaths);
-            throw new InvalidOperationException("A source file changed. Update results before exporting.");
-        }
-        evaluation.ManagedDebugRun.CopyCurrent(Path.Combine(directory, $"scenario-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"));
+        string destination = Path.Combine(directory, $"scenario-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}");
+        evaluation.ManagedDebugRun.CopyCurrent(destination);
+        return destination;
     }
     private void ReleaseOperation()
     {

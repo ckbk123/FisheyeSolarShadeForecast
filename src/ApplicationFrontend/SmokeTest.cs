@@ -94,12 +94,22 @@ public static class SmokeTest
                 chart.Day(TimeZoneInfo.ConvertTime(first.Run.Rows[0].Start, TimeZoneSelection.Resolve(first.Settings.Zone)).Date);
                 Capture(window, Path.Combine(output, "example-day.png"));
                 chart.Reset();
-                AppServices.Export(first, output);
+                string firstExport = AppServices.Export(first, output);
+                using (var summary = PdfSharp.Pdf.IO.PdfReader.Open(Path.Combine(firstExport, "Summary.pdf"), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import))
+                    if (summary.PageCount != 1) throw new InvalidOperationException("Packaged PDF was not one page.");
+                var exportedState = AppData.Read<DebugDataRun.Manifest>(Path.Combine(firstExport, "run.json"))!;
+                foreach (var (file, hash) in exportedState.ArtifactHashes)
+                    if (AppData.FileKey(Path.Combine(firstExport, file)) != hash) throw new InvalidOperationException("Export altered a debug artifact.");
+                AppData.Write(Path.Combine(output, "export-result.json"), new { Passed = true, Folder = firstExport, OnePagePdf = true, ByteIdenticalArtifacts = exportedState.ArtifactHashes.Count });
                 int beforeCount = first.PreparationCount;
                 timer.Restart(); window.SetPanelForTest(first.Settings.PanelTilt == 55 ? 30 : 55, first.Settings.PanelAzimuth == 180 ? 0 : 180);
                 if (!window.SunPathVisibleForTest) throw new InvalidOperationException("A valid sun path disappeared during a panel-only edit.");
                 if (!window.CardinalsVisibleForTest || !ReferenceEquals(first.Cardinals, window.CardinalsForTest))
                     throw new InvalidOperationException("A panel-only edit cleared current cardinals.");
+                window.Calculate();
+                window.StopUpdate();
+                await Until(() => !window.UpdatingForTest, 30);
+                if (window.ExportEnabledForTest || window.Completed != first) throw new InvalidOperationException("Stop accepted results or left export enabled.");
                 window.Calculate();
                 await Until(() => window.Completed != first, 30);
                 var second = window.Completed!;
@@ -233,6 +243,7 @@ public static class SmokeTest
                     window.SetProfileForTest(calibration.Path); window.Calculate();
                     await Until(() => window.Completed != beforeCalibrationUpdate, 120);
                     if (!window.ExportEnabledForTest || !File.Exists(calibration.Path)) throw new InvalidOperationException("Durable calibration did not survive the next update.");
+                    AppServices.Export(window.Completed!, Path.Combine(output, "calibrated-export"));
                     AppData.Write(Path.Combine(output, "calibration-result.json"), new { calibration.Details, calibration.Profile, calibration.Path });
                 }
                 if (Environment.GetEnvironmentVariable("SOLARSHADE_TEST_LIVE") == "1")
