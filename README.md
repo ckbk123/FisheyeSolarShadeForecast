@@ -4,7 +4,7 @@ Windows desktop application and C# scientific libraries for estimating solar irr
 
 ## Source baseline — 27 September 2026
 
-The tag `baseline-2026-09-27` preserves the application and libraries before the planned improvements. This development branch implements **milestone 1: manual updates and a status indicator**. Dependency-based file cleanup, a single current debug set, and the PDF recap remain pending. See [milestone progress](docs/IMPLEMENTATION_PROGRESS.md) and [the full specification](docs/MANUAL_UPDATE_AND_EXPORT_PLAN.md).
+The tag `baseline-2026-09-27` preserves the application and libraries before the planned improvements. Milestone 1 (manual updates and a status indicator) is accepted and merged. This development branch implements **milestone 2: dependency-based invalidation** of previews, diagnostic files and export eligibility. A single current debug set and the PDF recap remain pending. See [milestone progress](docs/IMPLEMENTATION_PROGRESS.md) and [the full specification](docs/MANUAL_UPDATE_AND_EXPORT_PLAN.md).
 
 Requires Windows x64, the .NET 10 SDK (the libraries also target .NET 8), and Git LFS. Install the .NET 8 runtime to run the .NET 8 test projects. Clone with Git rather than downloading the source ZIP so the four ONNX model files are retrieved correctly (about 643 MB in total):
 

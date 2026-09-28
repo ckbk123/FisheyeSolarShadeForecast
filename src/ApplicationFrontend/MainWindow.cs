@@ -17,6 +17,8 @@ public sealed class MainWindow : Window
     private UserSettings settings;
     private readonly Func<TimeZoneInfo> systemZone;
     private readonly AppServices services;
+    private readonly SourceFileWatch sourceWatch;
+    private int sourceCheckQueued;
     private CancellationTokenSource? pending;
     private long revision;
     private bool loading, closing, calibrating, updating;
@@ -35,7 +37,6 @@ public sealed class MainWindow : Window
     private readonly CheckBox showCardinals = new() { Content = "Show cardinal directions", VerticalAlignment = VerticalAlignment.Center, Margin = new(8, 0, 8, 0) };
     private readonly TextBlock cardinalInfo = Label("Cardinal directions unavailable · add a calibrated sky photo", 11);
     private long orientationRevision;
-    private string? orientationInputKey;
     private byte[]? displayedPhoto, displayedCardinals;
     private CardinalDirectionOverlayResult? currentCardinals;
     private readonly MaskOverlayPreview maskPreview = new();
@@ -53,6 +54,11 @@ public sealed class MainWindow : Window
     public MainWindow(Func<TimeZoneInfo>? systemZoneProvider = null, bool loadExampleOnFirstRun = true, AppServices? applicationServices = null)
     {
         services = applicationServices ?? new();
+        sourceWatch = new(() =>
+        {
+            if (Interlocked.Exchange(ref sourceCheckQueued, 1) != 0 || Dispatcher.HasShutdownStarted) return;
+            Dispatcher.BeginInvoke(() => { Interlocked.Exchange(ref sourceCheckQueued, 0); if (!closing) RecheckSources(); });
+        });
         systemZone = systemZoneProvider ?? TimeZoneSelection.CurrentSystemZone;
         settings = AppData.ReadSettings() ?? PortablePaths.Example();
         TimeZoneSelection.ApplySystemZone(settings, systemZone());
@@ -70,9 +76,11 @@ public sealed class MainWindow : Window
         actions.Children.Add(Button("Help", ShowHelp));
         export.Click += async (_, _) =>
         {
+            RecheckSources();
             var snapshot = completed; if (snapshot == null || !export.IsEnabled) return;
             var pick = new OpenFolderDialog { Title = "Choose a folder for a new scenario export" };
             if (pick.ShowDialog(this) != true) return;
+            RecheckSources(); if (!export.IsEnabled || completed != snapshot) return;
             try { await Task.Run(() => AppServices.Export(snapshot, pick.FolderName)); status.Text = "Exported a new scenario folder"; detail.Text = pick.FolderName; } catch (Exception ex) { ShowError(ex); }
         };
         actions.Children.Add(export);
@@ -128,7 +136,7 @@ public sealed class MainWindow : Window
         var advanced = new StackPanel { Margin = new(0, 8, 0, 0) }; Field(advanced, "Camera roll, °", "CameraRoll"); Field(advanced, "Maximum incident angle, ° (0 = profile)", "CoverageAngle");
         centered = new() { Content = "Use a centered image disk", Margin = new(0, 8, 0, 8) }; centered.Checked += (_, _) => { if (!loading) { settings.CenteredDisk = true; Changed(); } }; centered.Unchecked += (_, _) => { if (!loading) { settings.CenteredDisk = false; Changed(); } }; advanced.Children.Add(centered);
         quality = Combo(advanced, "Integration within each source interval", ["60 samples · accurate", "15 samples · quick preview"]); quality.SelectionChanged += (_, _) => { if (!loading) { settings.Substeps = quality.SelectedIndex == 1 ? 15 : 60; Changed(); } };
-        isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(preserveSunPath: true); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(preserveSunPath: true); } }; advanced.Children.Add(isotropic);
+        isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; advanced.Children.Add(isotropic);
         inputs.Children.Add(new Expander { Header = "Advanced settings", Content = advanced, Margin = new(0, 12, 0, 12) });
         update.Background = accent; update.Foreground = Brushes.White;
         update.Click += (_, _) => Calculate(); refreshData.Click += (_, _) => Begin(true); stop.Click += (_, _) => StopUpdate();
@@ -163,14 +171,15 @@ public sealed class MainWindow : Window
         provenance.Margin = new(18, 0, 14, 0); provenance.TextWrapping = TextWrapping.Wrap; Grid.SetRow(provenance, 4); graph.Children.Add(provenance);
         Closing += (_, _) => { closing = true; revision++; pending?.Cancel(); try { AppData.SaveSettings(settings); } catch { } };
         LoadFields();
-        orientationInputKey = OrientationInputKey(settings);
+        services.ObserveInputs(settings, refreshSources: true);
+        WatchSources();
         RefreshInputState();
         bool firstRun = loadExampleOnFirstRun && settings.FirstRun;
         ContentRendered += async (_, _) => { if (firstRun) { firstRun = false; try { await LoadExample(); } catch (Exception ex) { ShowError(ex); } } };
-        Activated += (_, _) => RefreshSystemTimeZone();
+        Activated += (_, _) => { RefreshSystemTimeZone(); RecheckSources(); };
         SystemEvents.TimeChanged += SystemTimeChanged;
         SystemEvents.UserPreferenceChanged += SystemPreferenceChanged;
-        Closed += (_, _) => { SystemEvents.TimeChanged -= SystemTimeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged; };
+        Closed += (_, _) => { sourceWatch.Dispose(); SystemEvents.TimeChanged -= SystemTimeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged; };
     }
     private void AddStyles()
     {
@@ -199,16 +208,12 @@ public sealed class MainWindow : Window
                 if (value is double number && !double.IsFinite(number)) throw new FormatException();
                 bool changed = !Equals(p.GetValue(settings), value) || invalidFields.Contains(property);
                 p.SetValue(settings, value); invalidFields.Remove(property); t.ClearValue(Control.BorderBrushProperty);
-                if (changed) Changed(preserveSunPath: property is "PanelTilt" or "PanelAzimuth", saveSettings: false);
+                if (changed) Changed(saveSettings: false);
             }
             catch
             {
                 invalidFields.Add(property); t.BorderBrush = Brushes.Firebrick;
-                if (IsOrientationField(property)) InvalidateOrientation("Cardinal directions unavailable · correct " + property);
-                // Reject callbacks already queued for the previous valid input revision as well as cancelling ongoing work.
-                revision++; pending?.Cancel(); export.IsEnabled = false;
-                if (property is not ("PanelTilt" or "PanelAzimuth")) ClearSunPath("Sun path unavailable · correct " + property);
-                MarkPreviousResults(); RefreshInputState();
+                Changed(saveSettings: false);
             }
         }
         t.TextChanged += (_, _) => ReadText();
@@ -224,7 +229,7 @@ public sealed class MainWindow : Window
         var row = new DockPanel(); var number = MakeField(property); number.Width = 66; DockPanel.SetDock(number, Dock.Right); row.Children.Add(number); var caption = Label(label, 12); caption.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(caption); p.Children.Add(row);
         var slider = new Slider { Minimum = 0, Maximum = max, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new(0, 0, 8, 7), Tag = property }; p.Children.Add(slider);
         slider.Value = (double)typeof(UserSettings).GetProperty(property)!.GetValue(settings)!;
-        slider.ValueChanged += (_, _) => { if (loading) return; typeof(UserSettings).GetProperty(property)!.SetValue(settings, slider.Value); invalidFields.Remove(property); fields[property].ClearValue(Control.BorderBrushProperty); fields[property].Text = slider.Value.ToString("0", CultureInfo.InvariantCulture); Changed(preserveSunPath: true); };
+        slider.ValueChanged += (_, _) => { if (loading) return; typeof(UserSettings).GetProperty(property)!.SetValue(settings, slider.Value); invalidFields.Remove(property); fields[property].ClearValue(Control.BorderBrushProperty); fields[property].Text = slider.Value.ToString("0", CultureInfo.InvariantCulture); Changed(); };
         fields[property].TextChanged += (_, _) => { if (double.TryParse(fields[property].Text, out double value) && value >= 0 && value <= max) { bool prior = loading; loading = true; slider.Value = value; loading = prior; } };
     }
     private void LoadFields()
@@ -245,18 +250,35 @@ public sealed class MainWindow : Window
         images.ItemsSource = files; images.SelectedItem = Path.GetFileName(settings.SkyImage);
         if (files.Length == 1 && images.SelectedIndex < 0) { images.SelectedIndex = 0; settings.SkyImage = Path.Combine(settings.SkyFolder, files[0]!); }
     }
-    private void Changed(bool preserveSunPath = false, bool saveSettings = true)
+    private void Changed(bool saveSettings = true, bool refreshSources = false, bool verifyArtifacts = false)
     {
-        if (loading) return; revision++; pending?.Cancel(); export.IsEnabled = false;
-        string key = OrientationInputKey(settings);
-        if (orientationInputKey != key)
+        if (loading || closing) return;
+        try
         {
-            InvalidateOrientation("Cardinal directions waiting for Update results");
-            orientationInputKey = key;
+            var changed = services.ObserveInputs(settings, invalidFields, refreshSources, verifyArtifacts);
+            if (changed != ArtifactGroup.None)
+            {
+                revision++; pending?.Cancel(); export.IsEnabled = false;
+                ApplyInvalidation(changed); RefreshInputState();
+            }
+            WatchSources();
         }
-        if (!preserveSunPath) ClearSunPath("Sun path waiting for Update results");
-        MarkPreviousResults(); RefreshInputState();
+        catch (Exception ex)
+        { revision++; pending?.Cancel(); ApplyInvalidation(ArtifactGroup.All); ShowError(ex); }
         if (saveSettings) SaveInputs();
+    }
+    private void WatchSources() => sourceWatch.SetFiles([settings.SkyImage, settings.ProfilePath, settings.ImportPath]);
+    public void RecheckSources() => Changed(saveSettings: false, refreshSources: true, verifyArtifacts: true);
+    private void ApplyInvalidation(ArtifactGroup groups)
+    {
+        if ((groups & ArtifactGroup.Mask) != 0)
+        {
+            photo.ClearImage(); maskPreview.ClearImage(); displayedPhoto = displayedMaskPng = null;
+            maskInfo.Text = "Sky inputs changed · click Update results";
+        }
+        if ((groups & ArtifactGroup.Orientation) != 0) InvalidateOrientation("Cardinal directions waiting for Update results");
+        if ((groups & ArtifactGroup.SunPath) != 0) ClearSunPath("Sun path waiting for Update results");
+        MarkPreviousResults();
     }
     private void SaveInputs()
     { if (!loading) try { AppData.SaveSettings(settings); } catch (Exception ex) { detail.Text = "Could not save settings: " + ex.Message; } }
@@ -266,8 +288,8 @@ public sealed class MainWindow : Window
         chart.Opacity = .5; beforeEnergy.Opacity = afterEnergy.Opacity = reduction.Opacity = .5;
         provenance.Text = "Previous results — update required";
     }
-    private string? InputProblem() => invalidFields.Count > 0
-        ? "Correct the highlighted fields: " + string.Join(", ", invalidFields.Order()) : UpdateInputs.Problem(settings);
+    private string? InputProblem() => invalidFields.Any(f => InputDependencies.ForField(f, settings) != ArtifactGroup.None)
+        ? "Correct the highlighted calculation fields: " + string.Join(", ", invalidFields.Where(f => InputDependencies.ForField(f, settings) != ArtifactGroup.None).Order()) : UpdateInputs.Problem(settings);
     private void RefreshInputState()
     {
         string? problem = InputProblem();
@@ -294,7 +316,7 @@ public sealed class MainWindow : Window
     {
         update.IsEnabled = refreshData.IsEnabled = !updating && !calibrating && InputProblem() == null;
         stop.IsEnabled = updating && pending?.IsCancellationRequested == false;
-        export.IsEnabled = !updating && !calibrating && updateState == UpdateState.UpToDate;
+        export.IsEnabled = !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null && services.IsCurrent(completed);
     }
     public void StopUpdate()
     {
@@ -332,6 +354,7 @@ public sealed class MainWindow : Window
     public async void Begin(bool refresh)
     {
         if (closing || updating || calibrating) return;
+        RecheckSources();
         if (TimeZoneSelection.ApplySystemZone(settings, systemZone())) { UpdateTimeZoneControls(); Changed(); }
         if (InputProblem() is { } problem) { SetUpdateState(UpdateState.NeedsAttention, problem); return; }
         settings.FirstRun = false; SaveInputs();
@@ -339,7 +362,6 @@ public sealed class MainWindow : Window
         SetUpdateState(UpdateState.Updating, "Preparing the current inputs…");
         if (refresh || !sunPathIsCurrent) ClearSunPath("Preparing sun path…"); sunPathPublishedEarly = false;
         var snapshot = settings with { };
-        orientationInputKey = OrientationInputKey(snapshot);
         long imageRevision = orientationRevision;
         try
         {
@@ -355,7 +377,7 @@ public sealed class MainWindow : Window
             beforeEnergy.Text = result.Run.BeforeEnergy.ToString("F2"); afterEnergy.Text = result.Run.AfterEnergy?.ToString("F2") ?? "—";
             reduction.Text = result.Run.LossPercent is { } loss ? loss.ToString("F1") + "%" : "—";
             provenance.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1} for this panel. Unobserved sky assumed blocked. No ground reflection." : "Baseline ready. Add a compatible camera profile and sky photo for the shaded curve.";
-            bool complete = result.Mask != null && result.Run.Rows.Count > 0 && result.Run.AfterEnergy != null
+            bool complete = services.IsCurrent(result) && result.Mask != null && result.Run.Rows.Count > 0 && result.Run.AfterEnergy != null
                 && result.Run.Rows.All(row => row.AfterTotal != null);
             SetUpdateState(complete ? UpdateState.UpToDate : UpdateState.NeedsAttention,
                 complete ? $"{result.Run.Rows.Count:N0} intervals · {result.TotalMilliseconds / 1000:F2} s · Debug Data saved · {result.Raw.Source} · {snapshot.Zone}"
@@ -363,7 +385,7 @@ public sealed class MainWindow : Window
         }
         catch (OperationCanceledException) { if (current == revision && !closing) SetUpdateState(UpdateState.Stopped, "Update stopped. Click Update results to retry."); }
         catch (Exception ex) { if (current == revision) ShowError(ex); }
-        finally { updating = false; if (!closing) RefreshButtons(); }
+        finally { updating = false; if (!closing) { RecheckSources(); RefreshButtons(); } }
     }
     public void ShowMask(MaskAsset asset)
     {
@@ -380,12 +402,11 @@ public sealed class MainWindow : Window
         }
         maskInfo.Text = asset.Description;
     }
-    private static bool IsOrientationField(string property) => property is "BottomAzimuth" or "CameraTilt" or "CameraRoll" or "CoverageAngle" or "SkyImage" or "ProfilePath";
     public static string OrientationInputKey(UserSettings s) => AppData.Key(new
     { s.SkyImage, s.ProfilePath, s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle, s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
     private void InvalidateOrientation(string message)
     {
-        orientationRevision++; orientationInputKey = null;
+        orientationRevision++;
         photo.ClearOverlay(); displayedCardinals = null; currentCardinals = null; cardinalInfo.Text = message;
     }
     private void ShowCardinals(CardinalDirectionOverlayResult? result)
@@ -464,7 +485,7 @@ public sealed class MainWindow : Window
     }
     private void ShowHelp()
     {
-        var text = "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. The calibration run saves native calibration.yml, a reusable camera-profile.json and its diagnostics in Debug Data.\n\n2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading.\n\n3. Set camera pose, panel angles, site, dates and time zone. Dates include the complete end day. Positive camera tilt points toward the image top; bottom south = bearing 180°.\n\n4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the advanced isotropic option. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional.\n\nEach explicit update saves a new Debug Data run beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files and Complete, Cancelled or Failed status. Unavailable stages are marked skipped. Cached results are saved into the current run too.\n\nExport results copies the complete successful run to a new scenario folder. Example/Irradiance holds the bundled input workbook; Example/Debug Data/reference-run holds a fixed library-generated reference run. Your current runs go to the top-level Debug Data folder.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches and model weights extracted on first use; calibration profiles remain in their Debug Data calibration runs. Your own inputs may be anywhere. Data location:\n" + AppData.Root + "\n\nThis build estimates historical direct + sky-diffuse irradiance, not electrical PV power. First model use is slower; later panel edits reuse expensive work.";
+        var text = "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. The calibration run saves native calibration.yml, a reusable camera-profile.json and its diagnostics in Debug Data.\n\n2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading.\n\n3. Set camera pose, panel angles, site, dates and time zone. Dates include the complete end day. Positive camera tilt points toward the image top; bottom south = bearing 180°.\n\n4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the advanced isotropic option. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional.\n\nEach explicit update saves a new Debug Data run beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files and Complete, Cancelled or Failed status. Unavailable stages are marked skipped. Edits remove affected files from the latest run, hide stale overlays and disable export. Camera rotation preserves the mask and numerical solar positions; panel edits preserve upstream files. Source-file changes are checked without recalculating. Close any locked diagnostic workbook and retry Update. Cached results are saved into the current run too.\n\nExport results copies the complete successful run to a new scenario folder. Example/Irradiance holds the bundled input workbook; Example/Debug Data/reference-run holds a fixed library-generated reference run. Your current runs go to the top-level Debug Data folder.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches and model weights extracted on first use; calibration profiles remain in their Debug Data calibration runs. Your own inputs may be anywhere. Data location:\n" + AppData.Root + "\n\nThis build estimates historical direct + sky-diffuse irradiance, not electrical PV power. First model use is slower; later panel edits reuse expensive work.";
         var dialog = new Window { Owner = this, Title = "Using SolarShade · test build 0.1", Width = 740, Height = 700, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         var panel = new StackPanel { Margin = new(22) }; panel.Children.Add(Label(text, 14)); panel.Children.Add(Button("Third-party notices", () => { using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Notices")!; using var reader = new StreamReader(stream); var notice = new Window { Owner = dialog, Title = "Third-party notices", Width = 720, Height = 540, Content = new TextBox { Text = reader.ReadToEnd(), IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } }; notice.ShowDialog(); })); dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; dialog.ShowDialog();
     }
@@ -472,7 +493,7 @@ public sealed class MainWindow : Window
     public void Calculate() => Begin(false);
     public void SetTimeZoneForTest(bool automatic, string zoneId)
     { useSystemZone.IsChecked = automatic; if (!automatic) zone.SelectedValue = zoneId; }
-    public void SetPanelForTest(double tilt, double azimuth) { settings.PanelTilt = tilt; settings.PanelAzimuth = azimuth; LoadFields(); Changed(preserveSunPath: true); }
+    public void SetPanelForTest(double tilt, double azimuth) { settings.PanelTilt = tilt; settings.PanelAzimuth = azimuth; LoadFields(); Changed(); }
     public void SetDiffuseModelForTest(bool useIsotropic) => isotropic.IsChecked = useIsotropic;
     public void CommitFieldForTest(string property, string value)
     {
@@ -527,6 +548,7 @@ public class ImageOverlayPreview : Viewbox
         overlay.Source = bitmap; ShowOverlay = showOverlay;
     }
     public void ClearOverlay() { overlay.Source = null; overlay.Visibility = Visibility.Collapsed; }
+    public void ClearImage() { mask.Source = null; ClearOverlay(); }
 }
 
 public sealed class MaskOverlayPreview : ImageOverlayPreview { }

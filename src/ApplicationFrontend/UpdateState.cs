@@ -17,7 +17,7 @@ public static class UpdateInputs
         if (!double.IsFinite(s.CoverageAngle) || s.CoverageAngle < 0 || s.CoverageAngle > 180) return "Coverage must be 0 (use profile) or at most 180 degrees.";
         if (s.Start > s.End) return "Start date must not be after end date.";
         if (s.Start.Year < 1900 || s.End.Year > 2100) return "Choose dates in the supported 1900–2100 range.";
-        if (!double.IsFinite(s.ImportIntervalMinutes) || s.ImportIntervalMinutes <= 0) return "Import interval must be greater than zero.";
+        if (s.ImportPath.Length > 0 && (!double.IsFinite(s.ImportIntervalMinutes) || s.ImportIntervalMinutes <= 0)) return "Import interval must be greater than zero.";
         if (s.Substeps <= 0) return "Choose a positive number of integration samples.";
         try
         {

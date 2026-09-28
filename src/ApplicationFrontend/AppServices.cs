@@ -25,6 +25,8 @@ public sealed record Evaluation(PanelRun Run, IrradianceDataset Raw, UserSetting
     public CardinalDirectionOverlayResult? Cardinals { get; init; }
     public int CardinalGenerationCount { get; init; }
     public int SunPathGenerationCount { get; init; }
+    public InputDependencies? Dependencies { get; init; }
+    internal DebugDataRun? ManagedDebugRun { get; init; }
 }
 
 /// <summary>UI stage sequencing and cache coordination. All scientific work and artifacts are library-owned.</summary>
@@ -32,6 +34,17 @@ public sealed class AppServices : IDisposable
 {
     public static readonly SemaphoreSlim NativeGate = new(1, 1);
     private readonly SemaphoreSlim evaluationGate = new(1, 1);
+    private readonly object inputGate = new();
+    private InputDependencies? currentInputs;
+    private ArtifactGroup invalidDraft;
+    private TrackedRun? activeRun, lastRun;
+    private sealed class TrackedRun(DebugDataRun debug, InputDependencies inputs, CancellationTokenSource cancellation)
+    {
+        public DebugDataRun Debug { get; } = debug;
+        public InputDependencies Inputs { get; } = inputs;
+        public CancellationTokenSource Cancellation { get; } = cancellation;
+        public ArtifactGroup Dirty { get; set; }
+    }
     private readonly string? debugRoot;
     private readonly Func<PreparedTranspositionResult, PanelSkyScene?, CancellationToken, PanelRun> correctPanel;
     private SkyPhotoMasker? masker;
@@ -54,6 +67,39 @@ public sealed class AppServices : IDisposable
         this.correctPanel = correctPanel ?? ShadingCorrectionModule.ApplyToPanel;
     }
 
+    public ArtifactGroup ObserveInputs(UserSettings settings, IEnumerable<string>? invalidFields = null,
+        bool refreshSources = false, bool verifyArtifacts = false, bool refreshWeather = false)
+    {
+        lock (inputGate)
+        {
+            var next = InputDependencies.Capture(settings, currentInputs, refreshSources);
+            var forced = (invalidFields ?? []).Aggregate(ArtifactGroup.None, (a, f) => a | InputDependencies.ForField(f, settings));
+            var changed = currentInputs == null ? ArtifactGroup.All : currentInputs.Difference(next);
+            changed |= forced | invalidDraft;
+            invalidDraft = forced; currentInputs = next;
+            foreach (var run in new[] { lastRun, activeRun }.OfType<TrackedRun>().Distinct())
+            {
+                var dirty = run.Inputs.Difference(next) | forced | (refreshWeather ? InputDependencies.WeatherChain : ArtifactGroup.None);
+                if (run != activeRun && verifyArtifacts) dirty |= InputDependencies.WithDependents(run.Debug.ChangedArtifacts(checkContents: true));
+                changed |= dirty & ~run.Dirty;
+                run.Dirty |= dirty;
+                if (run == activeRun)
+                {
+                    if (run.Dirty != ArtifactGroup.None) run.Cancellation.Cancel();
+                }
+                else run.Debug.Invalidate(run.Dirty, run.Inputs.SourcePaths.Concat(next.SourcePaths));
+            }
+            return changed;
+        }
+    }
+
+    public bool IsCurrent(Evaluation evaluation)
+    {
+        lock (inputGate) return invalidDraft == ArtifactGroup.None && evaluation.Dependencies != null && currentInputs != null
+            && evaluation.Dependencies.Difference(currentInputs) == ArtifactGroup.None
+            && evaluation.ManagedDebugRun?.IsCurrent == true;
+    }
+
     public async Task<Evaluation> Evaluate(UserSettings s, bool refresh, Action<string> progress,
         Action<MaskAsset>? onMask, CancellationToken ct, Action<SunPathOverlayResult?>? onSunPath = null, Action<CardinalDirectionOverlayResult?>? onCardinals = null)
     {
@@ -61,10 +107,16 @@ public sealed class AppServices : IDisposable
         s = PortablePaths.Map(s, path => PortablePaths.Resolve(path));
         await evaluationGate.WaitAsync(ct);
         DebugDataRun? debug = null;
+        TrackedRun? tracked = null;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        ct = linked.Token;
         try
         {
             ct.ThrowIfCancellationRequested();
+            ObserveInputs(s, refreshSources: true, verifyArtifacts: true, refreshWeather: refresh);
+            var dependencies = InputDependencies.Capture(s);
             debug = new(persisted, root: debugRoot);
+            lock (inputGate) { tracked = new(debug, dependencies, linked); activeRun = tracked; }
             var timer = Stopwatch.StartNew();
             var (activeMask, activeProfile, activeCardinals) = await PrepareImageStages(s, debug, progress, onMask, onCardinals, ct);
             var zone = TimeZoneSelection.Resolve(s.Zone);
@@ -166,10 +218,16 @@ public sealed class AppServices : IDisposable
             progress("Applying panel shading and saving library results");
             var result = await Task.Run(() => correctPanel(transposed, scene, ct), ct);
             debug.CompleteStage("06-shading", await Task.Run(() => ShadingCorrectionModule.ExportPanel(result, correctionDirectory, ct), ct), skipped: scene == null);
-            ct.ThrowIfCancellationRequested(); debug.Complete();
+            lock (inputGate)
+            {
+                tracked.Dirty |= dependencies.Difference(InputDependencies.Capture(s));
+                if (tracked.Dirty != ArtifactGroup.None) throw new OperationCanceledException("Inputs changed during the update.", ct);
+                ct.ThrowIfCancellationRequested(); debug.Complete();
+            }
             string note = scene == null ? "Add a calibrated camera profile and sky photo for shading." : "Unknown sky is treated as blocked. No ground reflection. Camera coverage may be provisional.";
             return new(result, raw!, persisted, activeMask, note, timer.Elapsed.TotalMilliseconds, PreparationCount)
-                { DebugDirectory = debug.DirectoryPath, SunPath = activeSunPath, SunPathGenerationCount = SunPathGenerationCount, Cardinals = activeCardinals, CardinalGenerationCount = CardinalGenerationCount };
+                { DebugDirectory = debug.DirectoryPath, SunPath = activeSunPath, SunPathGenerationCount = SunPathGenerationCount, Cardinals = activeCardinals, CardinalGenerationCount = CardinalGenerationCount,
+                    Dependencies = dependencies, ManagedDebugRun = debug };
         }
         catch (Exception ex)
         {
@@ -177,7 +235,22 @@ public sealed class AppServices : IDisposable
             catch (Exception writeError) { throw new AggregateException("Calculation and Debug Data status write failed.", ex, writeError); }
             throw;
         }
-        finally { evaluationGate.Release(); }
+        finally
+        {
+            try
+            {
+                lock (inputGate)
+                {
+                    if (tracked != null)
+                    {
+                        activeRun = null; lastRun = tracked;
+                        // Native/export calls have finished: no obsolete writer can recreate removed files.
+                        tracked.Debug.Invalidate(tracked.Dirty, tracked.Inputs.SourcePaths.Concat(currentInputs?.SourcePaths ?? []));
+                    }
+                }
+            }
+            finally { evaluationGate.Release(); }
+        }
     }
 
     /// <summary>Image orientation is independent of the irradiance source, dates, site and panel.</summary>
@@ -354,7 +427,14 @@ public sealed class AppServices : IDisposable
     public static void Export(Evaluation evaluation, string directory)
     {
         if (evaluation.DebugDirectory == null) throw new InvalidOperationException("The result has no completed library artifacts.");
-        DebugDataRun.CopyCompleted(evaluation.DebugDirectory, Path.Combine(directory, $"scenario-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"));
+        if (evaluation.Dependencies == null || evaluation.ManagedDebugRun == null) throw new InvalidOperationException("Result provenance is unavailable; update results before exporting.");
+        var sourceChanges = evaluation.Dependencies.Difference(InputDependencies.Capture(evaluation.Settings));
+        if (sourceChanges != ArtifactGroup.None)
+        {
+            evaluation.ManagedDebugRun.Invalidate(sourceChanges, evaluation.Dependencies.SourcePaths);
+            throw new InvalidOperationException("A source file changed. Update results before exporting.");
+        }
+        evaluation.ManagedDebugRun.CopyCurrent(Path.Combine(directory, $"scenario-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"));
     }
     public void Dispose() { masker?.Dispose(); evaluationGate.Dispose(); }
 }
