@@ -12,6 +12,8 @@
     <Compile Include="Shell/**/*.cs;State/**/*.cs;Services/**/*.cs;Storage/**/*.cs;Workspaces/**/*.cs;Charts/**/*.cs" />
     <Content Include="Packaging/Native/*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <ProjectReference Include="../SkyPhotoMasking/SkyPhotoMasking.csproj" />
+    <ProjectReference Include="../PvBatterySimulation/SolarShade.PvBattery.Integration/SolarShade.PvBattery.Integration.csproj" />
+    <ProjectReference Include="../PvBatterySimulation/SolarShade.PvBattery.IO/SolarShade.PvBattery.IO.csproj" />
     <ProjectReference Include="../OmnicalibFisheyeLensParameterExtractor/SolarShade.Calibration.Solver/SolarShade.Calibration.Solver.csproj" />
     <ProjectReference Include="../OmnicalibFisheyeLensParameterExtractor/SolarShade.Calibration.Validation/SolarShade.Calibration.Validation.csproj" />
     <ProjectReference Include="../SolarPositionAndShading/SolarShade.Shading/SolarShade.Shading.csproj" />

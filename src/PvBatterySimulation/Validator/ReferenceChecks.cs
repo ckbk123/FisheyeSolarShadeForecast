@@ -9,7 +9,7 @@ public static class ReferenceChecks
     public static void Verify(BatterySimulationResult result)
     {
         var settings = result.Input.Settings;
-        var zone = TimeZoneInfo.FindSystemTimeZoneById(result.Input.Irradiance.TimeZoneId);
+        var zone = BatterySimulator.ResolveTimeZone(result.Input.Irradiance.TimeZoneId);
         var sources = result.Input.Irradiance.Intervals.ToDictionary(i => i.Id);
         decimal capacity = (decimal)settings.BatteryCapacityWh;
         decimal stored = capacity * (decimal)settings.InitialSoc, minimum = stored;

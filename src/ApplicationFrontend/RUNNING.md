@@ -21,6 +21,18 @@ Debug Data holds one current set. Explicit exports are separate snapshots that l
 
 Both curves show irradiance received by the selected panel before/after obstruction shading, in W/m². Summary cards integrate the actual represented durations in kWh/m². Electrical PV power, ground reflection and rear-side irradiance are outside this calculation.
 
+## PV Autonomy
+
+The application has two independent tabs: **Solar Irradiance** and **PV Autonomy**. Complete an explicit irradiance update first. The PV tab unlocks only for a current, complete shaded dataset covering the selected study dates. If source inputs or files change, PV evaluation/export is blocked until the source is updated and the system is explicitly evaluated again.
+
+In PV Autonomy, enter the 24 hourly consumption values on the left in **Wh per nominal hour**. The profile repeats by study-local hour; DST days can contain 23 or 25 actual hours. Paste exactly 24 tab/newline-separated values or fill every slot with a constant. Blank/invalid inputs remain visible and block calculation. **Example system** deliberately loads illustrative values; it does not calculate.
+
+Enter panel area (m²), panel efficiency (%), conversion efficiency (%), battery capacity (Wh) and initial charge (%). Initial charge applies at the start of the entire study. The existing backend computes the full interval; navigation does not reset charge. Battery charging/discharging is ideal, all supplied capacity is accessible, and the model omits power limits, ageing and temperature effects.
+
+Click **Evaluate system**. The shared chart shows load demand and available PV energy on the same Wh axis, with end-of-hour battery charge on the fixed 0–100% axis. Available PV is after panel/conversion efficiencies and before curtailment. Red marks identify intervals containing unmet load, even when their end charge recovered. Hover or open **Hourly values** for explicit interval bounds, offsets, partial-hour flags and values. **Model & totals** shows full energy totals, assumptions and the first shortfall interval. “No unmet load during this study” does not guarantee supply in unseen weather.
+
+**Export PV results** copies verified CSV, JSON and XLSX files plus a scoped manifest to a new scenario folder. JSON includes the full irradiance input, system settings and substeps. The existing irradiance export and PDF remain independent. PV settings persist in `Data/pv-settings.json`; restart restores drafts, not accepted results. Optional managed outputs occupy `Debug Data/07-battery` under the same storage lease as irradiance; altering them blocks PV export without damaging the irradiance study.
+
 ## Cardinal-direction preview
 
 **Show cardinal directions** places magenta N/E/S/W labels and short ticks over the original colour photograph. The shading library projects the four constant compass bearings through the same calibration and camera pose used for sun paths and shading. The ticks identify the visible ends of these bearing lines, not necessarily the horizon: the horizon can be outside the calibrated lens coverage. Labels remain upright.

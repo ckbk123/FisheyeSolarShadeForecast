@@ -14,6 +14,7 @@ public sealed class MainWindow : Window
     private readonly WorkspaceHost host = new();
     private readonly ContentControl actions = new();
     public IrradianceWorkspace Irradiance { get; }
+    public PvAutonomyWorkspace PvAutonomy { get; }
     public IrradianceWorkspaceController IrradianceController => Irradiance.Controller;
     public WorkspaceHost Workspaces => host;
 
@@ -36,6 +37,18 @@ public sealed class MainWindow : Window
         root.Children.Add(host);
         Irradiance = new(this, new(applicationServices ?? new()), systemZoneProvider, loadExampleOnFirstRun);
         host.Register(new("irradiance", "Solar Irradiance", Irradiance, Irradiance.Actions));
+        var pvService = new PvEvaluationService(IrradianceController);
+        PvAutonomy = new(this, IrradianceController, new(IrradianceController, pvService), Irradiance.RecheckSources, () => host.Select("irradiance"));
+        host.Register(new("pv", "PV Autonomy", PvAutonomy, PvAutonomy.Actions));
+        var availability = Label("", 11); availability.Margin = new(20, 3, 0, 3); DockPanel.SetDock(availability, Dock.Top);
+        root.Children.Insert(1, availability);
+        void RefreshAvailability()
+        {
+            var state = IrradianceController.Source; host.SetAvailability("pv", state.IsReady, state.Reason);
+            availability.Text = state.IsReady ? "" : "PV Autonomy · " + state.Reason;
+            availability.Visibility = state.IsReady ? Visibility.Collapsed : Visibility.Visible;
+        }
+        IrradianceController.SourceChanged += (_, _) => RefreshAvailability(); RefreshAvailability();
         host.ActiveChanged += (_, _) => actions.Content = host.Active?.Actions;
         actions.Content = Irradiance.Actions;
         Closed += (_, _) => host.Dispose();

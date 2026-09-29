@@ -29,7 +29,8 @@ public sealed class DependentResultStore
         {
             store.Check();
             // Only an explicitly owned interrupted staging area is recoverable.
-            if (Directory.Exists(Staging)) RemoveOwned(Staging);
+            if (Directory.Exists(Staging) && File.Exists(Path.Combine(Staging, ".owner")) &&
+                File.ReadAllText(Path.Combine(Staging, ".owner")) == Owner) RemoveOwned(Staging);
         }
     }
 
