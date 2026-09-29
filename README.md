@@ -25,6 +25,8 @@ See [baseline scope and versioning workflow](docs/BASELINE.md) for what is prese
 
 ## Existing library and application documentation
 
+The standalone **PV–battery backend** is in `src/PvBatterySimulation`. It consumes the final shaded panel irradiance and six system/load settings to return hourly battery SoC, unmet load and curtailment. It includes in-memory/XLSX adapters, CSV/JSON/XLSX exports, analytical fixtures and an offline validator. See [model, API and validation](src/PvBatterySimulation/README.md). Application UI integration is deferred.
+
 The Windows test application is now in **`Deliverable/APPLICATION.exe`**, with a matching **`Deliverable.zip`** for sharing. Keep the executable alongside its Example, Data and Debug Data folders; all four segmentation models and the runtime are bundled. Start with **Load example** or select your own inputs. See [application usage, imports, validation and packaging](src/ApplicationFrontend/RUNNING.md). Source and integration tests are under `src/ApplicationFrontend`.
 
 The solar-position and fisheye shading library is in **`src/SolarPositionAndShading`**. It exports timestamp/zenith/azimuth XLSX data, computes direct and constant-isotropic diffuse shading from the existing mask/calibration contracts, and writes a separate shading workbook. See [API, defaults and integration](src/SolarPositionAndShading/README.md), [validation and performance](src/SolarPositionAndShading/VALIDATION.md), and [the 0.25° solar-radius overlay](src/SolarPositionAndShading/Validator/results/noon-20260531-radius-0.25-detail.png).
