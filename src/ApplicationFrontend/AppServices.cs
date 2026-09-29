@@ -30,10 +30,12 @@ public sealed record Evaluation(PanelRun Run, IrradianceDataset Raw, UserSetting
 }
 
 /// <summary>UI stage sequencing and cache coordination. All scientific work and artifacts are library-owned.</summary>
-public sealed class AppServices : IDisposable
+public sealed class AppServices : IIrradianceService
 {
-    internal static string SoftwareFingerprint => AppData.Key(new[] { typeof(AppServices), typeof(CalibrationWorkflow), typeof(CameraProfileFiles),
-        typeof(IrradianceClient), typeof(TranspositionModule), typeof(SolarPositionModule), typeof(ShadingCorrectionModule), typeof(SkyPhotoMasker) }.Select(AppData.LibraryVersion).ToArray());
+    internal const string MaskCacheSchema = "mask-orchestration-v1";
+    // Bump the orchestration schema when scientific sequencing changes. UI/PV builds must not evict upstream caches.
+    internal static string SoftwareFingerprint => AppData.Key(new { Schema = "irradiance-orchestration-v1", Libraries = new[] { typeof(CalibrationWorkflow), typeof(CameraProfileFiles),
+        typeof(IrradianceClient), typeof(TranspositionModule), typeof(SolarPositionModule), typeof(ShadingCorrectionModule), typeof(SkyPhotoMasker) }.Select(AppData.LibraryVersion).ToArray() });
     public static readonly SemaphoreSlim NativeGate = new(1, 1);
     private readonly SemaphoreSlim evaluationGate = new(1, 1);
     private readonly object inputGate = new();
@@ -110,6 +112,37 @@ public sealed class AppServices : IDisposable
         lock (inputGate) return invalidDraft == ArtifactGroup.None && evaluation.Dependencies != null && currentInputs != null
             && evaluation.Dependencies.Difference(currentInputs) == ArtifactGroup.None
             && evaluation.ManagedDebugRun?.IsCurrent == true;
+    }
+
+    private readonly Dictionary<string, DependentResultStore> dependentStores = new(StringComparer.Ordinal);
+    public DependentResultStore CreateDependentStore(string folder, string software, params string[] requiredFiles)
+    {
+        lock (inputGate)
+        {
+            ObjectDisposedException.ThrowIf(disposeRequested, this);
+            if (!dependentStores.TryGetValue(folder, out var dependent))
+            {
+                dependent = new(Storage, folder, software, requiredFiles, WithCurrentSource);
+                dependentStores.Add(folder, dependent);
+            }
+            return dependent;
+        }
+    }
+    private void WithCurrentSource(IrradianceSnapshot source, Action action)
+    {
+        // Maintain the established input -> storage lock order. Optional publication cannot race upstream invalidation.
+        lock (inputGate)
+        {
+            ObjectDisposedException.ThrowIf(disposeRequested, this);
+            lock (Storage.Gate)
+            {
+                if (!IsCurrent(source.Evaluation) || source.Evaluation.ManagedDebugRun?.HasCompleteDataset != true)
+                    throw new InvalidOperationException("Solar Irradiance changed. Update it before using dependent results.");
+                using var inputs = SnapshotExport.LockInputs(source.Settings);
+                source.Evaluation.ManagedDebugRun.ExportState();
+                action();
+            }
+        }
     }
 
     public async Task<Evaluation> Evaluate(UserSettings s, bool refresh, Action<string> progress,
@@ -338,7 +371,7 @@ public sealed class AppServices : IDisposable
             if (!string.IsNullOrEmpty(s.SkyImage))
             {
                 string nextMask = AppData.Key(new { Image = AppData.FileKey(s.SkyImage), s.Model, s.Resolution, s.CenteredDisk,
-                    Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = AppData.LibraryVersion(typeof(Program)) });
+                    Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = AppServices.MaskCacheSchema });
                 debug.RecordInput("sky-mask", new { Fingerprint = nextMask });
                 bool reusedMask = mask != null && maskKey == nextMask;
                 string maskOrigin = reusedMask ? "Reused in-memory mask" : "Computed or loaded validated mask cache";

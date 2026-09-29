@@ -62,7 +62,7 @@ public sealed class ManualUpdateTests
             var mask = new SkyMaskResult(png, Settings.Model, 201, 303, Settings.Resolution,
                 new(100, 151, 95, 201, 303), new(5, 56, 190, 190), "Synthetic", "Synthetic", null, 0, 0, 0, null, null);
             string key = AppData.Key(new { Image = AppData.FileKey(imagePath), Settings.Model, Settings.Resolution, Settings.CenteredDisk,
-                Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = AppData.LibraryVersion(typeof(Program)) });
+                Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = AppServices.MaskCacheSchema });
             SkyMaskExporter.Export(mask, AppData.PathFor(Path.Combine("mask-stages", key)), "Synthetic fixture");
             WriteWeather(); AppData.SaveSettings(Settings);
         }
