@@ -106,7 +106,7 @@ public static class BatterySimulator
         ct.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(series);
         if (string.IsNullOrWhiteSpace(series.TimeZoneId)) throw new ArgumentException("An explicit study time zone is required.");
-        var zone = TimeZoneInfo.FindSystemTimeZoneById(series.TimeZoneId);
+        var zone = ResolveTimeZone(series.TimeZoneId);
         if (series.Intervals.Count == 0) throw new InvalidDataException("No shaded irradiance intervals supplied.");
         var ids = new HashSet<string>(StringComparer.Ordinal);
         ShadedIrradianceInterval? previous = null;
@@ -128,6 +128,17 @@ public static class BatterySimulator
             previous = row;
         }
         return zone;
+    }
+
+    /// <summary>System zone or explicit fixed offset used by the desktop study selector.</summary>
+    public static TimeZoneInfo ResolveTimeZone(string id)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(id, @"^Fixed/UTC([+-])(\d{2}):(\d{2})$");
+        if (!match.Success) return TimeZoneInfo.FindSystemTimeZoneById(id);
+        int hours = int.Parse(match.Groups[2].Value), minutes = int.Parse(match.Groups[3].Value);
+        if (minutes > 59 || hours * 60 + minutes > 840) throw new ArgumentException("Fixed UTC offset must be within 14 hours.");
+        var offset = TimeSpan.FromMinutes((hours * 60 + minutes) * (match.Groups[1].Value == "-" ? -1 : 1));
+        return TimeZoneInfo.CreateCustomTimeZone(id, offset, id, id);
     }
 
     private static bool Fraction(double value, bool allowZero) => double.IsFinite(value) && value <= 1 && (allowZero ? value >= 0 : value > 0);

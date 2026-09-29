@@ -1,0 +1,92 @@
+using SolarShade.PvBattery;
+
+namespace SolarShade.Desktop;
+
+public sealed class PvWorkspaceController : IDisposable
+{
+    private readonly IrradianceWorkspaceController source;
+    private readonly PvEvaluationService service;
+    private readonly string settingsPath;
+    private PvSettingsDraft draft;
+    private CancellationTokenSource? pending;
+    private long revision;
+    private bool disposed;
+    private IrradianceSnapshot? acceptedSource;
+    private string? acceptedKey;
+    public PvSettingsDraft Draft => draft.Copy();
+    public BatterySimulationResult? Result { get; private set; }
+    public bool IsBusy { get; private set; }
+    public bool IsCurrent { get; private set; }
+    public bool CanEvaluate => !disposed && !IsBusy && source.Source.IsReady && !source.IsBusy && Problem == null;
+    public bool CanExport => IsCurrent && !IsBusy && source.Source.IsReady;
+    public string Status { get; private set; } = "Enter your system settings, then evaluate.";
+    public string? Problem { get { try { draft.Parse(); return null; } catch (ArgumentException ex) { return ex.Message; } } }
+    public event EventHandler? Changed;
+    public PvWorkspaceController(IrradianceWorkspaceController source, PvEvaluationService service, string? settingsPath = null)
+    {
+        this.source = source; this.service = service; this.settingsPath = settingsPath ?? AppData.PathFor("pv-settings.json");
+        draft = PvSettingsDraft.Restore(this.settingsPath); source.SourceChanged += SourceChanged;
+    }
+    public void SetDraft(PvSettingsDraft value)
+    {
+        draft = value.Copy(); Invalidate("Settings changed. Evaluate system to update results.");
+        try { AppData.Write(settingsPath, draft); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Status = "Settings could not be saved: " + ex.Message; }
+        Notify();
+    }
+    private void SourceChanged(object? sender, EventArgs e)
+    {
+        Invalidate(source.Source.IsReady ? "Irradiance is ready. Evaluate system." : source.Source.Reason); Notify();
+    }
+    private void Invalidate(string message)
+    {
+        revision++; pending?.Cancel(); IsCurrent = false; Status = message;
+        try { service.Store.Invalidate(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ObjectDisposedException)
+        { Status += " Saved PV output could not be cleared: " + ex.Message; }
+    }
+    public async Task EvaluateAsync()
+    {
+        if (!CanEvaluate) return;
+        Invalidate("Evaluating system…");
+        var snapshot = source.Source.Snapshot!; var settings = draft.Parse(); long current = ++revision;
+        pending?.Dispose(); pending = new(); var ct = pending.Token;
+        IsBusy = true; IsCurrent = false; source.DependentBusy = true; Status = "Evaluating system…"; Notify();
+        try
+        {
+            var result = await service.Evaluate(snapshot, settings, ct);
+            if (disposed || current != revision || !source.IsCurrent(snapshot)) return;
+            Result = result; acceptedSource = snapshot; acceptedKey = AppData.Key(settings); IsCurrent = true;
+            Status = result.Summary.UnmetLoadWh > 0 ? "Unmet load detected during this study." : "No unmet load during this study.";
+        }
+        catch (OperationCanceledException) { if (current == revision) Status = "Stopped. Evaluate system to retry."; }
+        catch (Exception ex) { if (!disposed && current == revision) Status = "Evaluation failed: " + ex.Message; }
+        finally { pending?.Dispose(); pending = null; IsBusy = false; source.DependentBusy = false; if (!disposed) Notify(); }
+    }
+    public void Stop() { if (IsBusy) { Invalidate("Stopped. Evaluate system to retry."); Notify(); } }
+    public void VerifyPublication()
+    {
+        if (IsCurrent && (acceptedSource == null || !source.IsCurrent(acceptedSource) || !service.Store.IsCurrent(acceptedSource, acceptedKey!)))
+        { Invalidate("Source or PV output changed. Update the source if needed, then evaluate system again."); Notify(); }
+    }
+    public async Task<string?> ExportAsync(string parent)
+    {
+        VerifyPublication(); if (!CanExport) return null;
+        var snapshot = acceptedSource!; string key = acceptedKey!; long current = revision;
+        pending?.Dispose(); pending = new(); var ct = pending.Token;
+        IsBusy = true; source.DependentBusy = true; Notify();
+        try
+        {
+            var path = await Task.Run(() => service.Store.Export(snapshot, key, parent, ct), ct);
+            if (!disposed && current == revision) Status = "Exported PV results: " + path;
+            return path;
+        }
+        catch (OperationCanceledException) { return null; }
+        catch (Exception ex) { if (!disposed && current == revision) Status = "Export failed: " + ex.Message; return null; }
+        finally { pending?.Dispose(); pending = null; IsBusy = false; source.DependentBusy = false; if (!disposed) Notify(); }
+    }
+    private void Notify() => Changed?.Invoke(this, EventArgs.Empty);
+    public void Dispose()
+    {
+        if (disposed) return; disposed = true; revision++; pending?.Cancel();
+        source.SourceChanged -= SourceChanged; Changed = null;
+    }
+}

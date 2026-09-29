@@ -94,6 +94,7 @@ public static class SmokeTest
                 chart.Day(TimeZoneInfo.ConvertTime(first.Run.Rows[0].Start, TimeZoneSelection.Resolve(first.Settings.Zone)).Date);
                 Capture(window, Path.Combine(output, "example-day.png"));
                 chart.Reset();
+                await VerifyPv(window, output);
                 string firstExport = AppServices.Export(first, output);
                 using (var summary = PdfSharp.Pdf.IO.PdfReader.Open(Path.Combine(firstExport, "Summary.pdf"), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import))
                     if (summary.PageCount != 1) throw new InvalidOperationException("Packaged PDF was not one page.");
@@ -285,10 +286,35 @@ public static class SmokeTest
     }
     private static async Task Until(Func<bool> ready, int seconds)
     { var end = DateTime.UtcNow.AddSeconds(seconds); while (!ready()) { if (DateTime.UtcNow > end) throw new TimeoutException("Application calculation did not complete. See app-data/errors.log."); await Task.Delay(100); } }
-    private static void Capture(FrameworkElement window, string path)
+    private static async Task VerifyPv(MainWindow window, string output)
+    {
+        if (!window.Workspaces.Select("pv")) throw new InvalidOperationException("Completed irradiance did not unlock PV Autonomy.");
+        var pv = window.PvAutonomy.Controller;
+        if (pv.Result != null) throw new InvalidOperationException("Tab selection calculated PV automatically.");
+        pv.SetDraft(PvSettingsDraft.Example()); await pv.EvaluateAsync();
+        if (!pv.IsCurrent || pv.Result == null) throw new InvalidOperationException("PV evaluation failed: " + pv.Status);
+        var direct = SolarShade.PvBattery.Integration.PanelBatterySimulation.Compute(window.Completed!.Run, pv.Draft.Parse(), window.Completed.Settings.Zone);
+        if (!pv.Result.Hours.SequenceEqual(direct.Hours)) throw new InvalidOperationException("UI results differ from direct backend.");
+        Capture(window, Path.Combine(output, "pv-full-period.png"));
+        window.PvAutonomy.Chart.Day(pv.Result.Hours[0].Start.Date);
+        Capture(window, Path.Combine(output, "pv-day.png"));
+        double width = window.Width, height = window.Height;
+        window.Width = 1080; window.Height = 720; window.UpdateLayout();
+        foreach (double scale in new[] { 1d, 1.25, 1.5 }) Capture(window, Path.Combine(output, $"pv-minimum-{scale:0.00}.png"), scale);
+        window.Width = width; window.Height = height; window.UpdateLayout();
+        var export = await pv.ExportAsync(output);
+        if (export == null) throw new InvalidOperationException("PV export failed: " + pv.Status);
+        AppData.Write(Path.Combine(output, "pv-ui-result.json"), new { Passed = true, HourCount = pv.Result.Hours.Count, DirectBackendMatch = true,
+            Export = export, pv.Result.Summary, SettingsRestored = AppData.Key(PvSettingsDraft.Restore(AppData.PathFor("pv-settings.json")).Parse()) == AppData.Key(pv.Draft.Parse()) });
+        pv.SetDraft(pv.Draft with { Capacity = "" });
+        if (pv.CanEvaluate || pv.CanExport || !window.ExportEnabledForTest) throw new InvalidOperationException("Invalid PV input affected upstream export or remained current.");
+        window.Workspaces.Select("irradiance");
+    }
+
+    private static void Capture(FrameworkElement window, string path, double scale = 1)
     {
         window.UpdateLayout();
-        var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32); bitmap.Render(window);
+        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(window.ActualWidth * scale), (int)Math.Ceiling(window.ActualHeight * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32); bitmap.Render(window);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using var file = File.Create(path); encoder.Save(file);
     }
 }

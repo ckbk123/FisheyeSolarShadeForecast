@@ -1,6 +1,6 @@
 # PV–battery module frontend implementation plan
 
-**Status: approved for implementation in two PRs. Part I establishes the workspace foundation; Part II adds PV Autonomy. The first tab is named Solar Irradiance.**
+**Status: implemented in two separate PRs. Part I establishes the workspace foundation; Part II adds PV Autonomy. The first tab is named Solar Irradiance. See [the validation record](FRONTEND_WORKSPACES_VALIDATION.md) for delivered behavior and checks.**
 
 Prepared 29 September 2026 against main commit `d4e021c`, after [backend PR #5](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/5). The document is maintained in [draft planning PR #6](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/6).
 

@@ -12,6 +12,13 @@ public sealed class IrradianceWorkspaceController : IDisposable
     internal bool Updating { get; set; }
     internal bool Calibrating { get; set; }
     public bool IsBusy => Updating || Calibrating;
+    private bool dependentBusy;
+    public bool DependentBusy
+    {
+        get => dependentBusy;
+        internal set { if (dependentBusy == value) return; dependentBusy = value; if (!disposed) CommandsChanged?.Invoke(this, EventArgs.Empty); }
+    }
+    public event EventHandler? CommandsChanged;
     public SourceReadiness Source { get; private set; } = new(null, "Complete and update Solar Irradiance first.");
     public event EventHandler? SourceChanged;
     private bool disposed;
@@ -35,6 +42,6 @@ public sealed class IrradianceWorkspaceController : IDisposable
     public void Dispose()
     {
         if (disposed) return; disposed = true;
-        Pending?.Cancel(); Pending?.Dispose(); Service.Dispose(); SourceChanged = null;
+        Pending?.Cancel(); Pending?.Dispose(); Service.Dispose(); SourceChanged = null; CommandsChanged = null;
     }
 }

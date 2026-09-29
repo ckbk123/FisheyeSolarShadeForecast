@@ -1,6 +1,8 @@
 # PV–battery simulation
 
-Standalone backend stage consuming **final shaded plane-of-panel interval-mean irradiance**. It returns stored energy and end-of-hour state of charge (SoC) for the complete supplied period. The stage is available through C# and an offline command line; application controls and pipeline caching are a later integration step.
+Standalone backend stage consuming **final shaded plane-of-panel interval-mean irradiance**. It returns stored energy and end-of-hour state of charge (SoC) for the complete supplied period. The stage is available through C#, an offline command line and the desktop application's **PV Autonomy** workspace. The desktop consumes the accepted shaded result directly and publishes a separate optional result scope.
+
+Study time zones support system IDs and the desktop's explicit `Fixed/UTC±HH:mm` convention (offset within ±14 hours). Fixed zones have no DST; named zones retain their local-hour transition semantics. This compatibility extension does not change the energy model.
 
 ## Inputs and units
 
