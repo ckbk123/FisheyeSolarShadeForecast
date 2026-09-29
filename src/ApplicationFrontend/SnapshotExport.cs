@@ -71,7 +71,7 @@ internal static class SnapshotExport
         internal readonly List<FileStream> Handles = [];
         public void Dispose() { foreach (var handle in Handles) handle.Dispose(); }
     }
-    private static InputLocks LockInputs(UserSettings settings)
+    internal static IDisposable LockInputs(UserSettings settings)
     {
         var result = new InputLocks();
         try

@@ -28,7 +28,7 @@ public sealed class CardinalOrientationTests : IDisposable
         var result = new SkyMaskResult(png, settings.Model, 201, 303, settings.Resolution,
             new(100, 151, 95, 201, 303), new(5, 56, 190, 190), "Synthetic", "Synthetic", null, 0, 0, 0, null, null);
         string key = AppData.Key(new { Image = AppData.FileKey(imagePath), settings.Model, settings.Resolution, settings.CenteredDisk,
-            Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = AppData.LibraryVersion(typeof(Program)) });
+            Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = AppServices.MaskCacheSchema });
         maskCache = AppData.PathFor(Path.Combine("mask-stages", key));
         SkyMaskExporter.Export(result, maskCache, "Synthetic fixture");
         return settings;
