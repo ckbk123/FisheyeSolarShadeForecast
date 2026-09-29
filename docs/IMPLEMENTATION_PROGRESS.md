@@ -54,7 +54,7 @@ Scope boundary: PDF generation, complete-dataset enforcement at every export ent
 
 Accepted by the user and merged through [PR #3](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/3), main commit `8f0c9bf`.
 
-## 4. Complete export and PDF — ready for review
+## 4. Complete export and PDF — accepted
 
 - Every export entry point requires a current calculation with all seven stages complete, all 18 required artifacts registered and present, matching input/artifact fingerprints, nonempty rows and finite shaded totals. Baseline-only or skipped-stage results cannot bypass the disabled interface button. Zero baseline energy and zero loss remain valid.
 - Export copies registered diagnostics and run.json byte-for-byte. It does not invoke the scientific pipeline or regenerate workbooks. The summary reads the stored successful-update settings and published library totals/metadata, even if the caller changes a public evaluation object afterward.
@@ -71,6 +71,6 @@ The packaged example remains **696 hourly intervals**, **149.33192161721075 kWh/
 
 Local evidence: `artifacts/export-final-tests`, `artifacts/export-pdf-qa`, `artifacts/export-packaged-first`, `artifacts/export-packaged-relocated`, `artifacts/export-packaged-calibration-restart`, and `artifacts/application-package.json`. Branch: `codex/complete-export-pdf`. The refreshed local `Deliverable/APPLICATION.exe` and clean `Deliverable.zip` are generated outputs, not committed binaries. Executable SHA-256: `C1975C8D718528483B1F198AB3B33A0D690ABEEEBEA93FB402ED8F37230631B2`.
 
-The four milestones' automated and packaged acceptance checks are complete on this Windows machine. User review/acceptance of milestone 4 remains before merging. This does not establish independent field accuracy or compatibility on an untested older computer.
+The user accepted milestone 4 through [PR #4](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/4) on 29 September 2026. All four milestones and their automated and packaged acceptance checks are complete on this Windows machine. This does not establish independent field accuracy or compatibility on an untested older computer.
 
-Each milestone has a focused branch and pull request. User acceptance is required before merging and advancing to the next milestone.
+Each milestone was implemented on a focused branch and pull request, with user acceptance before merging and advancing. The overall improvement goal is complete.
