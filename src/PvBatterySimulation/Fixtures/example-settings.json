@@ -1,0 +1,33 @@
+{
+  "PanelAreaM2": 1,
+  "PanelEfficiency": 0.2,
+  "ConversionEfficiency": 1,
+  "HourlyLoadWh": [
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5
+  ],
+  "BatteryCapacityWh": 100,
+  "InitialSoc": 1
+}

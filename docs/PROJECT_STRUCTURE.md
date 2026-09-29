@@ -29,6 +29,9 @@ All maintained C# source remains under `src`. `artifacts/calibration-validation/
 | `SolarShade.Shading` (.NET 10 Windows) | Solar geometry for those intervals, solar export, camera pose and receiver-plane visibility. |
 | `SolarShade.Irradiance.Transposition` (.NET 8) | Horizontal-to-panel conversion, whole-source DNI inference, per-substep diffuse components, unshaded integration and export. |
 | `SolarShade.ShadingCorrection` (.NET 10 Windows) | Panel shading, uncertainty bounds, transmission/loss and energy summaries, and shaded/visibility exports. Preserves the original horizontal correction API. |
+| `SolarShade.PvBattery` (.NET 8) | Standalone PV/load/battery energy balance and hourly end-of-hour SoC, with unmet load and curtailment. |
+| `SolarShade.PvBattery.IO` (.NET 8) | Final shaded-panel XLSX import, validated JSON input and CSV/JSON/XLSX result exports; reuses Irradiance workbook transport. |
+| `SolarShade.PvBattery.Integration` (.NET 10 Windows) | Adapter from the existing final `PanelRun`; no shading recomputation. Tests and offline validator live under `src/PvBatterySimulation`. UI wiring is deferred. |
 | `ApplicationFrontend` | Input controls, stage sequencing, caching, progress/cancellation, run manifests and display of returned values. No scientific calculation engine or workbook schemas. |
 
 See [application architecture](APPLICATION_ARCHITECTURE.md) for the dependency direction, stable source-interval contract, stage APIs and Debug Data lifecycle. A library implementation change requires republishing the self-contained executable, but no frontend calculation rewrite when its public interface is unchanged.
