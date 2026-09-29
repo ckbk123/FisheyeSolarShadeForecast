@@ -16,6 +16,9 @@ public sealed class DebugDataRun : IDisposable
     internal object SyncRoot => store.Gate;
     internal ArtifactGroup Invalidated => state.Invalidated;
     public bool IsCurrent { get { lock (SyncRoot) return store.Current == this && state.Status == "Complete" && state.Invalidated == ArtifactGroup.None; } }
+    public bool HasCompleteDataset { get { lock (SyncRoot) return IsCurrent && state.Kind == "calculation" &&
+        AllStages.All(s => state.Stages.TryGetValue(s, out var stage) && stage.Status == "Complete") &&
+        SnapshotExport.RequiredArtifacts.All(state.ArtifactHashes.ContainsKey) && ChangedArtifacts(false) == ArtifactGroup.None; } }
     public sealed record StageRecord(string Status, string Origin, string LibraryVersion, string[] Artifacts);
     public sealed class Manifest
     {
@@ -225,12 +228,27 @@ public sealed class DebugDataRun : IDisposable
     }
     public void CopyCurrent(string destination)
     {
-        lock (SyncRoot)
+        SnapshotExport.Publish(this, destination);
+    }
+    internal Manifest ExportState()
+    {
+        Check();
+        if (IsCurrent)
         {
-            Check();
-            if (!IsCurrent || ChangedArtifacts(true) != ArtifactGroup.None) throw new InvalidOperationException("Debug data is stale or incomplete. Update results before exporting.");
-            CopyFiles(DirectoryPath, destination);
+            var inputs = InputDependencies.Capture(state.Settings);
+            var changes = Differences(inputs);
+            if (changes != ArtifactGroup.None)
+            {
+                Invalidate(changes, inputs.SourcePaths);
+                throw new InvalidOperationException("Inputs or debug files changed. Update results before exporting.");
+            }
+            // The normal artifact observer applies cleanup and tells the UI which previews to clear.
+            if (ChangedArtifacts(true) != ArtifactGroup.None)
+                throw new InvalidOperationException("Debug files are missing, changed or locked. Close them and update results before exporting.");
         }
+        if (!HasCompleteDataset)
+            throw new InvalidOperationException("A complete shaded dataset is required. Update results before exporting.");
+        return JsonSerializer.Deserialize<Manifest>(JsonSerializer.Serialize(state))!;
     }
     public static void CopyCompleted(string source, string destination)
     {
@@ -238,21 +256,6 @@ public sealed class DebugDataRun : IDisposable
         using var storage = new DebugDataStore(source);
         if (storage.Current == null) throw new InvalidOperationException("No current dataset exists.");
         storage.Current.CopyCurrent(destination);
-    }
-    private static void CopyFiles(string source, string destination)
-    {
-        source = Path.GetFullPath(source); destination = Path.GetFullPath(destination);
-        if (DebugDataStore.Within(source, destination)) throw new ArgumentException("Choose an export destination outside Debug Data.");
-        using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(source, "run.json")));
-        if (manifest.RootElement.GetProperty("Status").GetString() != "Complete") throw new InvalidOperationException("Only a completed calculation can be exported.");
-        Directory.CreateDirectory(destination);
-        foreach (var entry in manifest.RootElement.GetProperty("ArtifactHashes").EnumerateObject())
-        {
-            string file = Path.Combine(source, entry.Name); DebugDataStore.SafePath(file);
-            if (!DebugDataStore.Within(source, file)) throw new IOException("Invalid export source path.");
-            string target = Path.Combine(destination, Path.GetRelativePath(source, file)); Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(file, target, false);
-        }
-        File.Copy(Path.Combine(source, "run.json"), Path.Combine(destination, "run.json"), false);
     }
     public void Dispose() { if (ownsStore) { try { Finish(); } finally { store.Dispose(); } } }
 }

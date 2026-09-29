@@ -9,6 +9,8 @@ $items = @(
   @('ONNX Runtime', (Join-Path $packageRoot 'microsoft.ml.onnxruntime.directml/1.24.4/LICENSE')),
   @('ONNX Runtime third-party notices', (Join-Path $packageRoot 'microsoft.ml.onnxruntime.directml/1.24.4/ThirdPartyNotices.txt')),
   @('Microsoft DirectML', (Join-Path $packageRoot 'microsoft.ai.directml/1.15.4/LICENSE.txt')),
+  @('Microsoft.Extensions.Logging.Abstractions 8.0.3', (Join-Path $packageRoot 'microsoft.extensions.logging.abstractions/8.0.3/LICENSE.TXT')),
+  @('Microsoft.Extensions.DependencyInjection.Abstractions 8.0.2', (Join-Path $packageRoot 'microsoft.extensions.dependencyinjection.abstractions/8.0.2/LICENSE.TXT')),
   @('DirectML code licence', (Join-Path $packageRoot 'microsoft.ai.directml/1.15.4/LICENSE-CODE.txt')),
   @('DirectML third-party notices', (Join-Path $packageRoot 'microsoft.ai.directml/1.15.4/ThirdPartyNotices.txt')),
   @('.NET runtime', (Join-Path $packageRoot 'microsoft.netcore.app.runtime.win-x64/10.0.8/LICENSE.TXT')),

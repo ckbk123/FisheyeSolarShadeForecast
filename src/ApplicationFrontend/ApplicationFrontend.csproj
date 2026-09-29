@@ -21,6 +21,9 @@
     <Content Include="Debug Data/Read me.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <EmbeddedResource Include="../SkyPhotoMasking/Models/*.onnx" LogicalName="Models.%(Filename)%(Extension)" Condition="'$(BundleModels)' == 'true'" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="PDFsharp-WPF" Version="6.2.4" />
+  </ItemGroup>
   <Target Name="RemoveDevelopmentPublishFiles" BeforeTargets="_ComputeFilesToBundle">
     <ItemGroup>
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb' Or '%(Extension)' == '.lib' Or '%(Extension)' == '.onnx' Or '%(Extension)' == '.md' Or '%(Extension)' == '.xml' Or '%(Filename)' == 'DirectML.Debug' Or '%(Filename)' == 'opencv_videoio_ffmpeg4130_64' Or '%(Filename)' == 'concrt140'" />
