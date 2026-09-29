@@ -1,414 +1,509 @@
-# PV–battery module frontend plan
+# PV–battery module frontend implementation plan
 
-**Status: initial brainstorm for discussion, not an approved implementation specification.**
+**Status: revised plan for discussion. The user-directed two-part structure and layout below replace the initial brainstorm. Implementation has not started.**
 
-Prepared 29 September 2026 against main commit `d4e021c`, after [backend PR #5](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/5).
+Prepared 29 September 2026 against main commit `d4e021c`, after [backend PR #5](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/5). The document is maintained in [draft planning PR #6](https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/6).
 
-This document considers how to add a battery-system workspace to the existing Windows application. Recommendations are provisional. Creating this document does not authorize implementing its proposed changes or settle the open decisions below.
+## Scope and decisions carried forward
 
-**Suggested reading:** sections 3–5 describe the user experience, section 7 compares refactoring approaches, sections 10–11 explain storage/export consequences, and section 14 collects the decisions for discussion. The provisional direction is two full-workspace tabs, separate source/battery validity, focused extraction from the window class and an optional battery output stage.
+This is now explicitly **two separate implementation parts**:
 
-## 1. What we are trying to achieve
+1. **Reorganize the frontend for extensions.** Reevaluate responsibilities, introduce a tabbed application shell, separate workspace state, and establish service, dependency and storage boundaries.
+2. **Build the PV-system evaluation workspace.** Connect the existing battery backend, implement the 24-hour consumption editor and system settings, and display consumption, PV production and battery SoC together.
 
-The user should be able to complete an irradiance/shading study, describe a PV-powered load and battery, and inspect the battery's hourly state of charge over that same period.
+Part I has its own working deliverable and regression checks. Part II builds on those boundaries. This is more than placing another chart inside the current window.
 
-The existing irradiance screen is already busy. A separate full-workspace tab is the leading option. Battery calculation must depend on a complete, current final shaded irradiance dataset; importing weather alone is insufficient.
+The user's selected layout is:
 
-The backend already exists. This work would connect it to input controls, readiness checks, charts, settings persistence and reliable exports. It would not add another numerical battery model.
+- Tabs across the top of the workspace.
+- A left-hand column dedicated to the editable 24-hour consumption list.
+- System settings across the top of the larger right-hand area.
+- One large chart in the lower right, overlaying consumption, PV energy and SoC.
+- The PV workspace becomes operational only when the complete selected irradiance/shading study is valid and current.
 
-### Established requirements versus open choices
+These replace the earlier proposal for a separate load-editor dialog and an optional separate energy subplot. Naming and the implementation details below are recommendations for discussion.
 
-| Established from the discussion and existing behavior | Still to decide |
-|---|---|
-| Use the implemented six-input battery model and final shaded panel irradiance. | Exact tab titles and battery-page arrangement. |
-| Return end-of-hour SoC over the supplied irradiance period. | Inline, expandable or separate daily-load editor. |
-| A stale, incomplete or invalid irradiance study cannot support a current battery estimate. | Whether an unavailable tab is disabled or opens an explanatory page. |
-| Preserve the existing explicit-update workflow; edits must not launch calculations. | How much UI extraction to undertake in this feature. |
-| Preserve valid upstream work when only system/load settings change. | Optional-stage storage, battery export and PDF presentation. |
-| Discuss this brainstorm before implementation. | Default values, first-run behavior and result restoration on restart. |
+The first release supports one current irradiance study, one PV/battery configuration and one repeating daily load profile. Direction optimization is an architectural extension to prepare for, not a solver to implement in these two parts.
 
-**Suggested first-release boundary:** one current irradiance study, one battery/system configuration and one repeating 24-hour profile. Defer saved scenario comparisons, automatic sizing, multi-panel arrays, tariffs, grid import/export, alternative battery physics and research-tool benchmarking.
+**Reading guide:** Part I defines the changes to the existing application; Part II specifies the PV workspace. The final sections map delivery checkpoints, tests and remaining decisions.
 
-## 2. What the existing frontend actually separates
+## Naming recommendation
 
-The frontend is native WPF, built programmatically in C# rather than XAML. It is not one undivided application, but its window class combines many responsibilities.
+Use **PV Autonomy** for the tab and **PV System Autonomy** for its page heading.
 
-| Existing component | Current responsibility | Likely consequence of this feature |
+Supporting text: **“Evaluate energy supply and battery charge over the study period.”**
+
+The shorter tab name is easier to scan beside **Irradiance & shading**. “Autonomy” expresses the actual question—whether the PV/battery system can supply the load—rather than describing just a battery graph.
+
+| Candidate | Strength | Limitation |
 |---|---|---|
-| [MainWindow.cs](../src/ApplicationFrontend/MainWindow.cs) | Builds the entire screen; owns editable fields, events, active evaluation, revisions, cancellation, status and button eligibility. | Tab construction and independent battery interaction need a new boundary. |
-| [AppServices.cs](../src/ApplicationFrontend/AppServices.cs) | Sequences the scientific pipeline, coordinates caches and publication, returns an `Evaluation` containing `PanelRun`. | Supply a stable completed irradiance snapshot to a battery coordinator. |
-| [AppData.cs](../src/ApplicationFrontend/AppData.cs) | Mutable `UserSettings`, JSON persistence and input/library identity helpers. | Persist battery draft settings without changing irradiance identity. |
-| [InputDependencies.cs](../src/ApplicationFrontend/InputDependencies.cs) | Stage flags, dependency keys, relevant field mapping and downstream invalidation. | Propagate shaded-source changes to battery work, never the reverse. |
-| [UpdateState.cs](../src/ApplicationFrontend/UpdateState.cs) | Current update states and inexpensive input validation. | Battery needs its own state and explicit source-unavailable reasons. |
-| [DebugDataRun.cs](../src/ApplicationFrontend/DebugDataRun.cs) / [DebugDataStore.cs](../src/ApplicationFrontend/DebugDataStore.cs) | One managed current dataset, locking, staging, manifests, recovery and invalidation. | Optional battery artifacts must coexist with a complete irradiance study. |
-| [CurrentValueCache.cs](../src/ApplicationFrontend/CurrentValueCache.cs) | Recoverable stage values keyed by inputs and application software identity. | Decide whether battery results need disk restoration in the first release. |
-| [SnapshotExport.cs](../src/ApplicationFrontend/SnapshotExport.cs) / [SummaryPdf.cs](../src/ApplicationFrontend/SummaryPdf.cs) | Verified snapshot export with a one-page irradiance recap. | Add battery export without breaking irradiance-only export or the existing one-page promise. |
-| [ChartControl.cs](../src/ApplicationFrontend/ChartControl.cs) / [ChartLayout.cs](../src/ApplicationFrontend/ChartLayout.cs) | Irradiance rendering, navigation and timezone-aware axes. | Reuse suitable time-axis helpers, but give battery values their own rendering semantics. |
+| **PV Autonomy** — recommended tab label | Short; covers generation, consumption and battery behavior. | Explain autonomy in the page subtitle/help. |
+| **PV System Autonomy** — recommended page heading | More explicit without being excessively technical. | Slightly long as a tab caption. |
+| **Autonomous PV Evaluator** | Closest to the user's initial wording. | Longer; “autonomous” can also suggest automated operation. |
+| **Solar & Battery** | Familiar wording for less technical users. | Does not convey assessment of load supply. |
+| **Off-grid PV** | Immediately identifies a standalone system. | Describes a system category rather than the evaluation task. |
 
-The current window starts at 1440 × 960 with a 1080 × 720 minimum. Its left input column is 348 units wide; its right side reserves 310 units for image previews before the graph. Keeping those previews and the existing sidebar on the battery screen would waste much of the newly available space.
+Proposed action labels: **Evaluate system**, **Stop**, **Export PV results**. Result wording should be **“No unmet load during this study”** or **“Unmet load detected”**, not a permanent reliability guarantee.
 
-The present complete-result check includes a current evaluation, a complete managed diagnostic set, nonempty panel rows, a mask and available shaded totals. This is a useful foundation, not a sufficient reason to attach battery validity to one global boolean.
+Names of internal classes can retain `PvBattery` even if the public workspace is called PV Autonomy.
 
-## 3. Navigation and layout options
+# Part I — Reorganize the frontend for extensions
 
-### Option A — Add a battery section to the existing screen
+## I.1. Review the current boundaries before moving code
 
-Put controls below the panel settings and add a chart selector for irradiance/SoC.
+The frontend is programmatic WPF C#, not XAML. WPF supplies a standard `TabControl`; the current `MainWindow` does not use a tabbed workspace. We need to introduce and style the container, then organize the views and their ownership around it.
 
-- Smallest initial layout change.
-- Adds more scrolling and mixes upstream image/weather configuration with system sizing.
-- One status indicator and export button become ambiguous.
-- Poor fit for a readable 24-hour editor.
+Several modules already exist. The main problem is that presentation and operation state are concentrated in the window, while `AppServices` and the diagnostic store assume one primary calculation.
 
-**Assessment:** feasible as a prototype; not recommended for the intended application.
+| Existing component | Current responsibility | Planned treatment |
+|---|---|---|
+| [MainWindow.cs](../src/ApplicationFrontend/MainWindow.cs) | Constructs the screen; owns fields/events, active evaluation, status, revisions and cancellation. | Reduce to application shell, tab host and lifetime; move workspace-specific responsibilities out. |
+| [AppServices.cs](../src/ApplicationFrontend/AppServices.cs) | Irradiance pipeline, caches, native-work coordination, diagnostics and current-evaluation checks. | Preserve its scientific orchestration behind an irradiance service boundary; expose an accepted result handoff. |
+| [AppData.cs](../src/ApplicationFrontend/AppData.cs) | Mutable `UserSettings`, JSON persistence and identity helpers. | Separate irradiance settings, PV settings and view preferences; migrate saved settings deliberately. |
+| [InputDependencies.cs](../src/ApplicationFrontend/InputDependencies.cs) | Scientific-stage keys, relevant-field mapping and invalidation. | Retain fine-grained upstream rules; add workspace-level downstream dependencies. |
+| [UpdateState.cs](../src/ApplicationFrontend/UpdateState.cs) | Current update state and lightweight validation. | Give each workspace its own state, readiness and export eligibility. |
+| [DebugDataRun.cs](../src/ApplicationFrontend/DebugDataRun.cs) / [DebugDataStore.cs](../src/ApplicationFrontend/DebugDataStore.cs) | Current dataset, locking, staging, manifests and recovery. | Support optional dependent results without invalidating a complete upstream dataset. |
+| [CurrentValueCache.cs](../src/ApplicationFrontend/CurrentValueCache.cs) | Recoverable stage values with application-wide software identity. | Keep useful caches; separate identities where a PV-only change must not invalidate irradiance. |
+| [SnapshotExport.cs](../src/ApplicationFrontend/SnapshotExport.cs) / [SummaryPdf.cs](../src/ApplicationFrontend/SummaryPdf.cs) | Verified export with a one-page irradiance recap. | Introduce explicit export scopes and preserve the existing irradiance contract. |
+| [ChartControl.cs](../src/ApplicationFrontend/ChartControl.cs) / [ChartLayout.cs](../src/ApplicationFrontend/ChartLayout.cs) | Irradiance rendering and timezone-aware navigation. | Reuse general time-axis helpers; isolate the PV chart's series and scale semantics. |
+| [ApplicationFrontend.csproj](../src/ApplicationFrontend/ApplicationFrontend.csproj) | Frontend compilation, project references and packaging. | Update compile paths and PV references as new folders/components are introduced. |
 
-### Option B — Two full-workspace tabs: recommended direction
+The project currently disables default compile items and includes only `*.cs` at its root. Moving classes into subfolders requires explicit compile includes or a carefully scoped replacement. Do not accidentally compile `Tests`, `obj` or generated files into the application.
 
-Place tabs below the application header:
+First inventory event subscriptions, source watchers, system-timezone callbacks, ownership of cancellation/disposal, test-access methods, and storage locks. These must move with their responsible component.
 
-1. **Irradiance & shading** — the existing workflow.
-2. **Battery & load** — system settings, daily load and SoC.
+## I.2. Target organization
 
-The tab boundary should contain the entire body, including the sidebar. Switching only the graph would leave the crowded irradiance controls occupying the battery workspace.
+Choose a modest workspace architecture with concrete services. Do not put a second large block of controls and lifecycle logic into `MainWindow`.
 
-Proposed arrangement, not a fixed mockup:
+Provisional organization inside the existing frontend project:
 
 ```text
-Application header                        Help   Export for this workspace
-[Irradiance & shading] [Battery & load]
+Shell/
+  MainWindow / workspace tab host
+  application composition and lifetime
 
-Source: current shaded study | selected period | time zone | View irradiance
+Workspaces/
+  Irradiance/
+    view, controller/state, existing settings editor
+  PvAutonomy/
+    view, controller/state, daily-load editor, system settings
 
-System settings              Minimum SoC | Final SoC | Unmet energy
-  Panel area                 ------------------------------------
-  Panel efficiency           Large SoC chart, fixed 0–100% axis
-  Conversion efficiency      Shortfall intervals clearly marked
-  Battery capacity           ------------------------------------
-  Initial SoC                Full period / chosen day / first shortfall
+Services/
+  irradiance evaluation adapter around existing AppServices
+  PV evaluation service calling the existing backend
 
-Daily load summary           Expandable hourly values and energy details
-  profile preview
-  Edit 24-hour profile
-  Calculate battery
-  Battery status
+State/
+  accepted irradiance snapshot / source readiness
+  workspace state and downstream invalidation
+
+Storage/
+  shared publication owner, scoped manifests and exports
+
+Charts/
+  shared time-axis helpers, existing irradiance chart, PV system chart
 ```
 
-Advantages: clear dependency direction, separate workspaces and room for the new chart. Cost: window construction and status/action ownership need modest restructuring.
+The directory names are provisional; responsibility boundaries are the requirement.
 
-The source strip should be read-only. Dates, time zone, panel tilt and azimuth remain owned by the irradiance study. A link returns the user to the first tab to change them.
-
-### Option C — A separate battery window
-
-Useful if simultaneous side-by-side comparison is important, but introduces window lifetime, stale-source synchronization, placement and multiple export contexts.
-
-**Assessment:** defer unless side-by-side viewing is a real requirement.
-
-### Daily-load editor choices
-
-| Choice | Benefit | Cost / concern |
+| Owner | Owns | Must not own |
 |---|---|---|
-| Always-visible 24-hour table | Immediate inspection and editing. | Uses substantial vertical space, especially at minimum window size. |
-| Expandable editor inside the battery tab | Keeps editing near the chart, with no extra window. | Expansion competes with chart height; scrolling/focus needs care. |
-| Dedicated editor dialog with profile preview on the tab | Leaves the main chart uncluttered; easy Apply/Cancel semantics. | Adds a step to inspect individual hourly values. |
+| Shell | Navigation, common header, active workspace, application shutdown. | PV equations, scientific-stage orchestration or a universal result-valid flag. |
+| Workspace view | Controls, bindings/events, chart display, accessible messages. | Scientific calculations or direct access to another workspace's controls. |
+| Workspace controller/state | Draft inputs, validation messages, operation revision, cancellation and accepted-result presentation. | Reimplementation of backend numerical rules. |
+| Irradiance service | Existing pipeline and caches; accepted source publication/readiness. | PV load editing or a forced battery stage on every irradiance update. |
+| PV evaluation service | Validated request construction, backend invocation and returned result handoff. | Re-running weather, masking or transposition for battery-only edits. |
+| Shared storage/export owner | Writer lock, staging, verified publication, recovery and scoped export. | Treating an optional PV failure as a failed upstream study. |
 
-**Initial preference:** a dedicated editor with a persistent profile preview and nominal daily consumption total. An expandable editor is a close alternative. This choice should be discussed before coding.
+A small workspace descriptor can expose ID, title, view, availability/reason and local status to the tab host. The shell should not need to know how an individual workspace computes its result.
 
-The editor should support labelled slots from 00:00–01:00 through 23:00–24:00, keyboard navigation, paste of 24 spreadsheet values, and filling all slots with a constant value. Bad paste must not partially replace a valid profile. Blank, invalid and zero values must remain distinguishable.
+Use straightforward construction/event subscriptions and typed requests/results. Dynamic plugin discovery, a universal event bus, a generic workflow engine and a full new dependency-injection framework are not required. A later workspace should be addable without reopening every event handler in `MainWindow`.
 
-Use **“Consumption per hour (Wh)”**, with a note that each entry is numerically equal to average watts during that one-hour slot. The displayed daily total is for the nominal 24-hour pattern; an actual DST day can contain 23 or 25 elapsed hours.
+### Refactoring approach
 
-## 4. When is battery estimation available?
+Recommended: extract programmatic WPF views plus controllers/state objects, retaining existing libraries and introducing bindings where they simplify state display. Full MVVM/XAML conversion remains an alternative only if separately justified during the inventory.
 
-“Complete” means the entire **selected study interval**, not every date that happens to exist in a larger imported file.
+Partial classes alone are insufficient: they split files while leaving shared mutable state and global lifecycle ownership intact.
 
-A central readiness check should verify:
+Keep compatibility wrappers/test entry points temporarily where helpful. Extract the irradiance view first, then move its state and orchestration calls in small behavior-preserving steps.
 
-1. A successful completed irradiance evaluation exists.
-2. It matches current committed inputs and has no relevant invalid draft edits.
-3. The existing required upstream artifacts remain available and verified.
-4. The final shaded panel series is nonempty and covers both requested boundaries.
-5. Every selected interval has a finite, nonnegative shaded total, a unique ID and valid bounds.
-6. Intervals are ordered and contiguous, with no gaps or overlaps.
-7. The study time zone is explicit and valid.
+## I.3. Tab host and workspace lifecycle
 
-Use the existing period-selection validation and the battery adapter/core validation together. Contiguous rows alone do not prove that the requested first and last dates are covered.
+Use one full-body tab host below the application header:
 
-**Do not require positive irradiance in every hour.** Zero nighttime irradiance and fully shaded intervals are legitimate values.
+- **Irradiance & shading**
+- **PV Autonomy**
+- Future modules, such as **Orientation optimization**, can be registered later; do not show an unfinished optimizer tab now.
 
-**Do not confuse numerical completeness with physical certainty.** The existing shading model can produce a valid conservative estimate when some sky is unobserved. Surface its coverage/assumption message; do not invent a new 100% observed-sky threshold. If stricter research-quality requirements are wanted later, define them separately.
+Each tab owns its entire body. The irradiance sidebar and image previews belong only to the first tab.
 
-### Unavailable-tab options
+Create each workspace once for the application session. Switching tabs preserves draft inputs, accepted results and chart navigation; it does not reconstruct services, reload data or calculate anything.
 
-- **Disabled tab:** matches “available only after irradiance is ready” literally. Keep an adjacent visible explanation; a disabled tab's tooltip alone is inadequate for keyboard users.
-- **Accessible explanatory page:** the tab opens to “Complete and update irradiance results first”; calculation and export are disabled. Optionally allow system inputs to be prepared in advance.
+Keep Help and common navigation in the shell. Calculation, Stop, status and export operate on the relevant workspace. A status badge on an inactive tab can show that its results need an update, without replacing another workspace's status message.
 
-**Initial preference:** the explanatory page is easier to discover and understand, but the user's preference for a strictly disabled tab remains open. Both must enforce the same service-level calculation gate.
+The source-readiness service controls PV availability; no click handler should infer readiness from a green label or an enabled export button.
 
-If an external source change invalidates results while the battery page is open, keep the user's configuration and explain the blockage there. Do not unexpectedly switch tabs or discard their work.
+Part I may use a nonfunctional PV placeholder to verify navigation and readiness. Part II replaces it with the actual evaluator.
 
-## 5. Two independent result states
+## I.4. AppServices changes and the source-to-PV handoff
 
-Keep an irradiance state and a battery state. Do not turn a valid irradiance result stale just because the battery is not configured.
+Yes, `AppServices` needs changes, but it should not become a larger service containing all future modules. Treat its existing implementation as the irradiance evaluator, with a narrower interface/adaptor and a clear output boundary.
 
-Suggested battery states:
+Suggested contract responsibilities:
 
-| State | Display and allowed action |
+| Contract / operation | Purpose |
 |---|---|
-| Source unavailable | Show the reason and route to irradiance; no calculation or result export. |
-| Inputs need attention | Highlight system/profile errors; no calculation or result export. |
-| Ready / update required | Source and inputs valid; Calculate battery enabled. Previous result visibly stale. |
-| Calculating | Progress/Stop; prevent duplicate calculation and result export. |
-| Current | Chart, summary and export correspond to the accepted source and settings. |
-| Stopped / failed | Explain outcome; preserve editable configuration; no current-result export. |
+| Irradiance evaluate request | Immutable snapshot of relevant settings plus explicit refresh mode. |
+| Accepted irradiance snapshot | Final `PanelRun`, selected bounds, effective timezone, source/scientific identity, upstream settings/provenance and artifact identity. |
+| Source readiness result | Ready/not ready plus an actionable reason; same rule used by tab state, calculation and export. |
+| Source changed notification | Carries a revision/identity change so dependent work becomes stale promptly. |
+| PV evaluate request | Accepted source snapshot + immutable six-input `BatterySimulationSettings`. |
+| Accepted PV result | `BatterySimulationResult`, its settings snapshot, source identity, operation revision and published-artifact identity. |
 
-Changing a valid numeric text field to blank or malformed text must invalidate battery export immediately, even before focus leaves the field. Do not silently calculate with its last valid value.
+Do not simply pass a reference to mutable `Evaluation.Settings` or the window's current text fields. Freeze/deep-copy the relevant values; `with { }` is not sufficient for a mutable 24-element array.
 
-At Calculate, capture the current source identity and a deep snapshot of all six settings, including the 24 load values. Give battery work a separate revision/cancellation token. Accept completion only if both its settings revision and irradiance source identity still match. Tab switching, chart navigation and a window resize do not cancel or rerun a study.
+Planned calculation flow:
 
-Conservative first-release behavior: upstream work in progress prevents starting battery work. Battery-only work must not hold the native image-processing semaphore; serialize only shared storage publication where necessary.
+1. The irradiance workspace explicitly requests an update through its service.
+2. The service completes, validates and publishes the irradiance result.
+3. An accepted source snapshot is exposed; the shell updates downstream availability.
+4. The user edits the PV workspace and clicks Evaluate system.
+5. The PV service checks source currency and validated settings, then calls `PanelBatterySimulation.Compute`.
+6. The result returns with the source identity and PV revision that produced it.
+7. Recheck both identities before accepting/publishing the result.
+8. The workspace renders returned values and enables export only for that accepted result.
 
-## 6. Dependency and recalculation rules
+Use an injectable backend-call boundary for orchestration tests. Tests should be able to delay a request, invalidate its source and confirm that its late completion is rejected.
 
-| User or external change | Irradiance impact | Battery impact |
+Updates to old APIs can be staged behind adapters to preserve existing callers. Register/construct the PV service in the application's composition layer, not inside the chart or the tab-selection handler.
+
+## I.5. Dependency, readiness and state model
+
+Keep fine-grained irradiance-stage dependencies in their existing domain. Add a workspace dependency: **PV evaluation consumes the accepted final shaded irradiance snapshot.**
+
+The rule “irradiance must be perfectly valid” means complete, current, structurally valid and accepted under the existing scientific assumptions:
+
+- Successful completed upstream calculation matching current relevant inputs.
+- No unresolved relevant draft errors or refresh/update in progress.
+- Required upstream artifacts present and verified under the existing completeness contract.
+- Nonempty final shaded series covering both boundaries of the selected study period.
+- Finite, nonnegative values; valid explicit intervals and unique IDs.
+- Ordered, contiguous coverage without gaps or overlaps.
+- Explicit valid study timezone.
+
+Combine existing requested-period validation with the battery adapter's series validation. A contiguous middle fragment is not complete coverage of a requested year.
+
+Nighttime zeros and fully shaded intervals are valid. Existing conservative treatment of unobserved sky remains an assumption to disclose; do not invent a requirement for 100% observed sky or imply that validated historical data is physically certain.
+
+### Tab behavior
+
+Before a valid source exists, show the PV tab label with an unavailable state and a persistent message such as **“Complete and update irradiance results to use PV Autonomy.”** Recommended initial behavior is to disable entry into its working controls.
+
+If the source becomes invalid while the PV tab is already open, keep the page and its draft values visible with a blocking explanation. Disable evaluation/export, label old results stale, and provide **Go to irradiance**. Do not force a tab switch or discard inputs.
+
+The service enforces the same rule even if called without the UI. Whether an unavailable tab can be selected solely to read an explanation is a small remaining UX choice; it does not relax the operating dependency.
+
+### Independent states and invalidation
+
+Each workspace has its own needs-attention, update-required, running, current, stopped and failed states; PV also has source-unavailable. No optional PV state may make a complete irradiance study incomplete.
+
+| Change | Irradiance | PV evaluation |
 |---|---|---|
-| Panel surface area, panel efficiency, conversion efficiency | None | Stale; rerun battery only. |
-| Battery capacity, initial SoC, any hourly load entry | None | Stale; rerun battery only. |
-| Panel tilt, azimuth or diffuse model | Existing transposition/shading invalidation | Source unavailable until upstream update; then battery requires explicit calculation. |
-| Camera/profile/photo/mask/pose affecting final shading | Existing dependency-specific invalidation | Invalidate battery if final shaded source is affected. |
-| Weather, selected period, effective time zone, relevant site/interval settings | Existing dependency-specific invalidation | Invalidate dependent battery result. |
-| Force weather refresh | Upstream update required/running | Stale even before replacement weather arrives. |
-| Relevant source file changed in place | Existing fingerprint detection | Invalidate dependent battery result. |
-| Upstream diagnostic files removed or altered | Existing verification rules | Block until upstream validity is restored under the chosen readiness policy. |
-| Battery output file removed or altered | None | Battery export/result-publication state invalid; upstream remains usable. |
-| Graph zoom/day, tab choice, overlay visibility | None | None. |
+| Load entry, area, efficiencies, capacity or initial SoC | Unchanged | Stale; evaluate PV only. |
+| Relevant weather/date/timezone/site/interval change | Existing dependency-specific invalidation | Source unavailable; invalidate PV. |
+| Panel tilt/azimuth/diffuse model | Recompute affected panel stages | Invalidate PV. |
+| Relevant photo/profile/mask/camera change | Existing shading dependency invalidation | Invalidate PV. |
+| Source-file content changed in place | Existing fingerprint checks | Invalidate PV if its shaded source is affected. |
+| Force weather refresh | Update required/running | Block and invalidate before replacement data arrives. |
+| Battery output changed/missing | Unchanged | PV publication/export no longer current. |
+| Tab selection, chart zoom/day, legend visibility | Unchanged | Unchanged. |
 
-Do not invalidate battery results merely for an inactive provider/import option or checkerboard setup that does not alter the loaded profile. Reuse the existing relevance mapping.
+Inactive provider/import options and future checkerboard setup should remain governed by the existing relevance mapping. Do not invalidate everything on every edit.
 
-Switching back to old settings must not resurrect a supposedly current battery result automatically after its artifacts were invalidated. Explicit calculation may reuse a verified cache, but must republish and verify the requested result.
+Use separate revisions/cancellation tokens per operation. UI-thread changes mark results stale immediately, including malformed uncommitted text. Background callbacks dispatch to the UI and check revision/source identity before updating it. Stop, source changes and shutdown must not permit an obsolete result to become current.
 
-A battery identity should include the selected final shaded series, effective time zone, six settings and relevant battery library identities/model version. Do not key it only by the raw weather fingerprint: different shading can share the same raw dataset.
+Part I should establish ordering and ownership: do not hold the native image-processing semaphore for PV arithmetic. Serialize shared output publication through the existing storage owner. Until concurrency is deliberately supported, prevent overlapping upstream/PV evaluations and explain why the action is unavailable.
 
-## 7. How much frontend restructuring?
+## I.6. Optional results, storage and export scopes
 
-| Approach | Initial effort | Longer-term consequence |
+The current diagnostic store is not yet ready for an optional downstream workspace:
+
+- `IsCurrent` expects global Complete status and no invalidated group.
+- `HasCompleteDataset` requires `AllStages` and mandatory artifacts.
+- `Invalidate` marks the global run Stale.
+- Recovery, stage enumeration and export share those assumptions.
+
+Blindly extending every “All” list with battery would create a circular dependency: upstream readiness could require a battery result that itself requires upstream readiness.
+
+Part I therefore needs explicit completeness scopes:
+
+- **Irradiance complete:** existing required upstream stages are current.
+- **PV complete:** accepted upstream source + matching PV settings/result/artifacts.
+- A future optimization result will have its own completeness definition.
+
+Recommended storage direction: optional `07-battery` under the existing managed Debug Data root, sharing one writer owner and bounded staging area. Define the scope model in Part I; implement actual PV artifact writing in Part II.
+
+Required structural changes:
+
+1. Separate mandatory upstream stages from optional downstream stages.
+2. Give PV results their own identity/status and record the exact upstream identity.
+3. PV-only edits/failures do not change upstream scientific identity or completeness.
+4. Downstream invalidation cannot delete or rewrite valid upstream files.
+5. Recovery can mark an interrupted optional result incomplete while retaining upstream success.
+6. Existing manifests/settings migrate explicitly; preserve user inputs and exported scenarios.
+7. Export chooses a scope and matching verified artifacts, not every file that happens to exist.
+8. Scoped software identities avoid invalidating expensive source computations solely for a PV-library update.
+
+Maintain a single `DebugDataStore` owner for the root. Its lease and shared staging directory cannot safely be independently recreated by every workspace.
+
+A separate bounded PV root is an alternative if manifest evolution proves disproportionately risky, but source identity, coordinated invalidation and coherent exports are still necessary. Decide that substitution during Part I rather than discovering the storage problem at the end of Part II.
+
+## I.7. Prepare for orientation optimization without implementing it
+
+The architecture should permit a later service to evaluate candidate panel directions against the same load, battery and weather period.
+
+That extension will require more than the current final shaded curve. Each changed orientation requires its own transposition and panel-dependent shading; it cannot reuse a single orientation's final irradiance as though it were orientation-independent.
+
+Expose a future-compatible service boundary between:
+
+```text
+Prepared weather / solar geometry / calibrated sky scene
+  -> candidate orientation
+  -> candidate final shaded panel irradiance
+  -> PV/battery evaluation with fixed system/load settings
+  -> candidate score and provenance
+```
+
+For now, document the ownership and preserve the ability to extract a pure candidate-evaluation operation from existing orchestration. Do not build the search algorithm, optimizer screen or full batch API in these parts.
+
+A future optimizer must not simulate candidates by changing visible sliders, replacing the user's accepted study or repeatedly publishing candidates into the same current Debug Data folders. Candidate work should be isolated; accepting a chosen design is an explicit later action.
+
+Do not bake in an objective such as “highest annual irradiance.” That can differ from minimizing unmet load or maintaining a reserve. Annual claims also require adequate full-year source coverage; the PV evaluator itself supports any valid supplied period.
+
+### Part I completion checkpoint
+
+Part I is complete when the existing irradiance workspace operates inside the new shell, its current behavior remains verified, readiness/state/service/storage boundaries are in place, and a test workspace can consume a stable source notification without reaching into another view's controls.
+
+This is a useful deliverable on its own. Review it before adding the production PV controls. The actual optimizer remains deferred.
+
+# Part II — Build the PV Autonomy workspace
+
+## II.1. Required screen arrangement
+
+Implement the user's layout, not the earlier dialog-based proposal:
+
+```text
+SOLARSHADE                                         Help / workspace export
+[Irradiance & shading] [PV Autonomy]
+
+Source status | selected dates | timezone | panel orientation | View irradiance
++-------------------------+------------------------------------------------+
+| DAILY CONSUMPTION       | PV SYSTEM SETTINGS                             |
+| Local hour       Wh    | Panel area | Panel efficiency | Conversion     |
+| 00:00–01:00      [ ]    | Battery capacity | Initial SoC | Evaluate / Stop|
+| 01:00–02:00      [ ]    +------------------------------------------------+
+| ...                    | Minimum SoC | Final SoC | Unmet energy          |
+| 23:00–24:00      [ ]    +------------------------------------------------+
+|                         | Legend: Load demand / PV available / SoC       |
+| Paste 24 values         |                                                |
+| Fill constant           |    ONE COMBINED TIME-SERIES CHART               |
+| Nominal daily total     |    left axis: energy (Wh)                      |
+|                         |    right axis: SoC (0–100%)                    |
+| independently scrolls  |                                                |
+| when required           | Full period / day / first shortfall / details  |
++-------------------------+------------------------------------------------+
+Workspace status and actionable error/provenance message
+```
+
+Use a left column approximately 260–320 device-independent units wide, with the larger right column taking remaining width. Treat these as initial sizing targets, verified against the existing 1080 × 720 minimum and 1440 × 960 default.
+
+The consumption list is always part of the page, with its own vertical scroll when all 24 entries cannot fit. Do not make editing depend on opening a separate modal. Keep column headings and the daily total/actions available without scrolling the entire application.
+
+Place the five scalar inputs in one or two rows at the top right; wrapping at smaller widths should preserve readable labels. Keep the lower-right chart dominant. A small splitter may help resizing, but enforce usable minimum widths.
+
+The source strip is read-only. Period, timezone, panel tilt and azimuth come from the irradiance study. Changing them belongs in that workspace. Do not duplicate competing controls in PV Autonomy.
+
+## II.2. Consumption editor and system settings
+
+Label the table **Daily consumption**, with **Hour (study time)** and **Consumption (Wh)** columns. Add concise help: **“Repeats each day. Each value is the energy used during that one-hour slot.”**
+
+Support keyboard navigation, select-and-replace, paste of exactly 24 ordered spreadsheet values and a fill-all constant action. Validate paste as a complete transaction before replacing the draft. Invalid text stays visible and blocks evaluation; blanks must not silently become zeros.
+
+The nominal daily total is the sum of the 24 values. A 23/25-hour DST day follows the backend's local-hour repetition semantics rather than forcing its actual total to that nominal sum.
+
+| Input | UI unit/range | Backend mapping |
 |---|---|---|
-| Add all controls/events to `MainWindow`, perhaps using partial files | Low | Splitting files does not separate state ownership; global status and lifecycle become harder to reason about. |
-| Extract focused views and a small battery coordinator | Moderate | Establishes boundaries needed by this feature while preserving existing scientific orchestration. |
-| Convert the entire frontend to MVVM/XAML and a new application architecture | High | Larger regression surface and delayed feature delivery; justified only as a separately agreed project. |
+| Panel area | m², nonnegative | `PanelAreaM2` unchanged. |
+| Panel efficiency | %, greater than 0 and at most 100 | Divide once by 100 into `PanelEfficiency`. |
+| Conversion efficiency | %, greater than 0 and at most 100 | Divide once by 100 into `ConversionEfficiency`. |
+| Battery capacity | Wh, positive | `BatteryCapacityWh` unchanged. |
+| Initial charge / SoC | %, 0–100 | Divide once by 100 into `InitialSoc`. |
+| Daily consumption table | 24 finite nonnegative Wh values | Deep snapshot into `HourlyLoadWh`. |
 
-**Recommendation:** focused extraction. A complete frontend rewrite is not a prerequisite.
+The initial SoC applies at the start of the entire study, not at the currently zoomed day. Show that start date beside it or in contextual help.
 
-Provisional boundaries, with names subject to implementation discussion:
+Keep Wh as the first-release battery unit. Ah support would require voltage and extra conversion semantics; it is not an additional backend setting in this plan.
 
-- `MainWindow`: application shell, tabs, shared header and lifetime.
-- `IrradianceWorkspaceView`: existing controls/previews; initially keep its established behavior.
-- `BatteryWorkspaceView`: system editor, load summary, chart and local status.
-- `BatteryWorkspaceController`: draft validation, source readiness, revision handling, calculation requests and accepted snapshot.
-- `DailyLoadEditor`: independent editing transaction returning exactly 24 values.
-- `BatteryChart`: presentation of returned battery values.
-- Shared application storage/export coordination: retain one owner of managed output.
+Recommended defaults: persist user-entered settings; provide an explicit example preset rather than implying that an arbitrary capacity or initial charge is measured. Exact first-run defaults remain to be selected.
 
-These can remain programmatic WPF controls. Avoid introducing a framework merely to achieve two tabs.
+## II.3. Connect settings, backend results and presentation
 
-The most important extraction is **state ownership**, not the number of source files. Existing window-level tests may need their controls/test seams relocated; avoid breaking the UI and rewriting the test architecture in the same step without a behavior-preserving checkpoint.
+Part II implements the PV service boundary established in Part I:
 
-## 8. Scientific integration and chart semantics
+- Reference `SolarShade.PvBattery.Integration` and `SolarShade.PvBattery.IO` from the Windows frontend.
+- Consume the accepted `Evaluation.Run` through `PanelBatterySimulation.Compute`.
+- Do not recalculate irradiance or re-import the application's workbook for this in-memory workflow.
+- Use the existing settings/series validation in addition to source readiness and visible-field parsing.
+- Run numerical/export work off the UI thread with cancellation.
+- Bind the accepted `BatterySimulationResult` to summaries, chart and details.
+- Keep input parsing, immutable request creation, computation and UI rendering as distinct steps.
 
-Call `PanelBatterySimulation.Compute` using the accepted `Evaluation.Run`; do not re-import the application's own workbook in the normal interactive path. Keep XLSX input as the existing standalone/offline path for now. Adding a second independent battery-source picker would create another provenance and readiness workflow.
+Returned values must drive presentation directly: `Hours` for the three main series, `Summary` for headline metrics and `Steps` for detailed source/subhour diagnostics if needed. Do not reproduce energy accounting in frontend code.
 
-Reference the integration and IO projects from the Windows frontend. Adapt percentages to backend fractions once at the boundary. Keep energy calculations in the backend.
+Settings edits invalidate PV results only. An upstream update makes the source unavailable while running and requires an explicit new PV evaluation after successful completion. No automatic calculation on a keystroke, tab switch or new source arrival.
 
-The chart needs its own treatment:
+## II.4. One overlaid chart with two explicit vertical scales
 
-- SoC is a state at interval end, not an interval-mean irradiance value. Do not reuse the current irradiance step renderer unchanged.
-- Show an initial point at the study start, then clearly identified end-of-hour points. Any connecting line is a visual guide, not evidence of measured within-hour behavior.
-- Keep the axis at 0–100%; show both percent and stored Wh on hover.
-- Mark intervals with unmet load, including when hourly endpoints alone would hide a subhour depletion/recovery.
-- Compute headline minimum SoC from the returned summary, which includes substeps and the initial state, not only plotted hourly endpoints.
-- Distinguish “battery reached zero” from “demand was not met.” Exact depletion at a boundary can have zero unmet energy.
-- Preserve partial-hour markers and UTC offsets around repeated local hours.
-- Day selection and zoom only change the view; they must not restart simulation or reapply initial SoC.
-- For long studies, any display reduction must preserve extrema and shortfall markers. Exports retain all returned rows.
-- Label the shortfall timestamp as “First interval with unmet load”; the backend does not return the exact within-interval outage instant.
+All three requested curves are visible by default on the same shared time axis:
 
-Keep PV/load energy comparison optional, in a separate detail view or subplot with its own units. Do not put SoC (%) and irradiance (W/m²) on an unexplained shared axis.
+| Series | Backend value | Meaning | Axis |
+|---|---|---|---|
+| **Load demand** | `BatteryHour.LoadWh` | Requested consumption, including any portion that could not be served. | Left: energy in the interval, Wh. |
+| **PV energy available** | `BatteryHour.PvWh` | Electrical PV energy after panel and conversion efficiencies, before any surplus is curtailed. | Left: the same energy scale. |
+| **Battery SoC** | `BatteryHour.EndSocPercent` | Stored-energy fraction at the interval end. | Right: fixed 0–100%. |
 
-Suggested main summary: minimum SoC, final SoC, unmet load in Wh. Secondary details: intervals containing shortfall, generated/consumed/served/curtailed energy and first shortfall interval.
+This implements the requested overlay while keeping quantities dimensionally distinct. Do not place Wh and percent on one undifferentiated numeric scale or independently normalize the load and PV traces.
 
-Use “No unmet load during this study” rather than a permanent reliability guarantee.
+“PV energy available” is preferable to “energy stored” or simply “harvested”: some available energy may be discarded when the battery is full. Curtailment and served/unmet load remain separate diagnostics.
 
-## 9. Settings, defaults and restart behavior
+Rendering requirements:
 
-Prefer a separate battery settings object owned by the battery workspace, rather than adding every field to the existing irradiance `UserSettings`. It can be persisted in a separate versioned settings file or nested under a future application-settings envelope. Separate persistence is the smaller first-release change.
+1. One shared, timezone-aware horizontal axis and crosshair; all three hover values refer to the same returned interval.
+2. The energy axis starts at zero and uses one common scale for load and PV. SoC retains 0–100% even when another curve is hidden.
+3. Use distinct colors and line styles, an explicit legend and axis labels. Curve crossings across the energy/SoC axes do not signify equality; the hover shows units.
+4. Represent load/PV as interval-energy steps or interval bands. Represent SoC as endpoint samples with a connecting guide and an initial point at the study start.
+5. Label the chart **Hourly energy and battery charge**; identify partial intervals explicitly in hover/details and show their actual duration. Values remain actual Wh for that interval, not implicitly rescaled W.
+6. Mark every interval with unmet load, even if its end SoC has recovered above zero. Make the mark distinguishable from the three main traces.
+7. Minimum SoC comes from the backend summary, including initial/substep values. It may be lower than all displayed hourly endpoints.
+8. Repeated local hours retain their UTC offsets; partial first/last hours keep their bounds.
+9. Full period, day navigation, zoom/pan and first-shortfall navigation only change the view. They never reset or recalculate the battery.
+10. Legend toggles are display-only. When all curves are hidden, show a clear empty-chart prompt rather than suggesting missing source data.
+11. For long studies, preserve energy peaks, SoC minima and shortfall markers during display reduction. Avoid smooth averaging that hides depletion; exports retain every original row.
 
-Keep editable draft text separate from validated numerical settings. Deep-copy the load profile on Apply and Calculate; existing `with { }` copies of settings are shallow and would not protect a mutable array added naively.
+Reuse appropriate `ChartTimeAxis` helpers. The existing irradiance renderer assumes `PanelRow` interval means and cannot be reused unchanged for endpoint SoC or dual scales.
 
-Decisions still needed:
+Start with a focused WPF `PvSystemChart` using existing drawing conventions. A charting package is an alternative only if it materially reduces the work after checking dual-axis behavior, interval rendering, accessibility, licensing and packaging; no package selection is assumed here.
 
-- Start with blank system values, or clearly labelled editable example values? **Preference:** blank on a new real study; provide an explicit battery example/preset.
-- Initial SoC default: 100%, 50%, or require entry? Do not imply that a default is measured.
-- “Load example”: replace battery settings too, or preserve them? **Preference:** load an explicitly labelled complete example when requested; ordinary upstream recalculation preserves the user's battery settings.
-- On restart, restore a verified current result or only settings? **Preference for first release:** restore settings, then require explicit calculation using a current irradiance snapshot unless verified result restoration is already straightforward.
+## II.5. Results, persistence and exports
 
-The backend JSON export is an audit artifact, not an established result-loading API. Do not assume that its immutable result type can be passed directly through `CurrentValueCache.Read<T>` and restored without additional design and tests.
+Headline results: minimum SoC, final SoC and unmet energy. Expandable details can show PV/load/served/curtailed energy, intervals containing shortfall and the first shortfall interval.
 
-Use the study timezone, not a separately selected battery timezone. Changing the effective automatic system timezone follows the upstream invalidation rules. An explanatory DST note belongs beside the repeating daily profile.
+An exact zero SoC at a boundary is not automatically an outage. Use unmet-load quantities for the supply assessment. The backend returns the start of the first interval containing a shortfall, not the exact within-interval outage instant.
 
-## 10. Managed outputs: the main integration risk
+Persist PV settings separately from upstream `UserSettings` and view preferences. Deep-copy the profile whenever creating an accepted request. Restore drafts on restart without silently declaring old results current.
 
-The existing storage model assumes one all-or-nothing calculation:
+First-release recommendation: restore settings and require explicit evaluation once a current source is available. If result restoration is implemented, require verified source/settings/software/artifact identity. The backend JSON audit export is not an established result-loading API; its immutable result type needs deliberate handling rather than a naive `CurrentValueCache.Read<T>`.
 
-- `DebugDataRun.IsCurrent` requires global Complete status and no invalidated group.
-- `HasCompleteDataset` requires every entry in `AllStages` and the mandatory export artifacts.
-- `Invalidate` changes the global status to Stale.
-- `SnapshotExport` currently copies the recorded artifact set and validates one complete irradiance export.
-- Dependency groups, key comparisons, stage enumeration and recovery share these assumptions.
+Publish CSV, JSON and XLSX through the existing library exporters into the optional stage agreed in Part I. Per-file atomic writes are insufficient for a complete three-file stage: stage them together, verify, recheck source/revision and mark complete only after successful publication.
 
-Simply adding `Battery` to every “All” list would create incorrect behavior: a battery edit could invalidate a valid irradiance study; an unconfigured battery could block irradiance export; battery readiness could depend on its own completion.
+Use contextual **Export irradiance** and **Export PV results** actions. Irradiance export remains valid before any PV evaluation. PV export contains the accepted six settings, source provenance, model assumptions and exact returned values. Its JSON includes the supplied irradiance series for audit.
 
-### Storage options
+If combined system export is added, capture matching upstream and PV snapshots and explicitly select their verified artifacts. Stale optional files must never be included automatically.
 
-| Option | Benefit | Tradeoff |
+Preserve the existing one-page irradiance `Summary.pdf`. A separate `BatterySummary.pdf` is an option; changing the existing report into multiple pages is not part of this plan by default.
+
+## II.6. Complete the user-facing workflow
+
+Update Help, source-unavailable messages, terminology, example behavior and packaged documentation. Explain:
+
+- Irradiance first, then PV evaluation.
+- Consumption repeats by study-local hour.
+- Initial SoC applies at the study start.
+- PV and load use the energy axis; SoC uses the percentage axis.
+- Model assumptions and conservative shading provenance.
+- “No unmet load during this study” is a result for the supplied period, not a guarantee for unseen weather.
+
+Verify the application at 1080 × 720 and 1440 × 960, including 125% and 150% scaling. Ensure all 24 load slots are reachable, top-right fields wrap sensibly and the combined graph retains readable axes.
+
+# Delivery checkpoints and acceptance
+
+## Separate implementation milestones
+
+| Part | Milestone | Completion evidence |
 |---|---|---|
-| Optional `07-battery` under the existing managed Debug Data root | One discoverable dataset, writer owner and export provenance chain. | Requires explicit upstream/battery completeness scopes and careful changes to manifest validation and recovery. |
-| A separate bounded battery output root linked to an irradiance snapshot | Less direct coupling to the existing stage manifest. | Two datasets and publication lifecycles; coherent combined export and upstream invalidation still need coordination. |
-| Results only in memory, writing files on export | Smallest storage integration. | Departs from the existing “completed results have managed diagnostics” behavior; no comparable recovery/audit set. |
+| I | A — Inventory and boundary design | Current ownership map, service/source contracts, compile paths and migration plan recorded. |
+| I | B — Tabbed shell and extracted irradiance workspace | Existing workflow works inside its tab; no duplicate subscriptions or service instances. |
+| I | C — Independent state, source readiness and optional-result storage | A test dependent workspace can observe invalidation; optional failures cannot invalidate upstream success. |
+| I | D — Regression checkpoint | Existing numerical/manual-update/export/packaged behavior preserved; architecture ready for PV integration. |
+| II | A — Inline load table and top-right settings | All six inputs validated, persisted and converted correctly; no edit triggers calculation. |
+| II | B — Service/backend integration | Direct backend and UI-driven requests return identical values; cancellation and stale-result rejection verified. |
+| II | C — Three-series combined graph and summaries | Shared-time alignment, dual axes, partial/DST intervals and shortfalls rendered correctly. |
+| II | D — Managed publication and export | Complete matching snapshots only; recovery and locked-file failures handled. |
+| II | E — Packaged acceptance | Full two-tab workflow, examples, Help, restart and exports pass review. |
 
-**Provisional preference:** an optional `07-battery` stage under the same storage owner. This is a deliberate storage change, not just another folder name. If preserving the current manifest untouched is more important, discuss the separate-root option before implementation.
+Use separate implementation PRs for Part I and Part II, with smaller commits inside each. Part I is the dependency of Part II; do not describe the tabbed-shell checkpoint as completion of the PV feature.
 
-Required behavior whichever option is chosen:
+The planning PR remains documentation-only. Reassess exact effort after Part I's inventory; the work includes lifecycle and data ownership, not just UI styling.
 
-1. Irradiance completeness is defined independently of optional battery state.
-2. Battery completeness requires a valid upstream snapshot plus matching battery settings and artifacts.
-3. A battery result records its own identity and the exact source identity. Updating only the battery must not replace or rewrite the scientific identity of its source.
-4. Draft battery edits remove or mark stale only current battery artifacts, following the existing bounded-storage policy.
-5. Source changes invalidate dependent battery artifacts without deleting user-owned scenario exports.
-6. Use the existing storage owner/lock; do not open a competing `DebugDataStore` for the same root.
-7. Write all required battery files to staging, verify them, then publish a completed battery stage. The backend's per-file atomic exporters do not make three separate files a transaction.
-8. Recheck source/settings identity at publication and export. Cancelled or superseded work cannot publish as current.
-9. Recovery handles an interrupted optional stage without destroying valid irradiance outputs.
-10. Old manifests/settings migrate predictably; changing flags, required-stage lists or software fingerprints must be tested explicitly.
+## Part I acceptance tests
 
-Candidate files: `battery-hourly.csv`, `battery-result.json`, `battery-hourly.xlsx`, plus stage provenance. Decide whether all three are mandatory managed artifacts or whether some are optional export formats.
+- Existing irradiance numerical values, explicit-update behavior and export content remain unchanged.
+- Moving files into folders preserves compile inclusion and excludes test/generated sources.
+- Switching tabs repeatedly preserves drafts/results and causes no weather fetch, native processing or export.
+- One workspace/service instance and one source subscription exist per session; closure disposes them safely.
+- State/readiness is service-owned and can be tested without inspecting a visual label.
+- Missing, failed, stale, truncated or invalid shaded source blocks the dependent workspace; valid zero irradiance is accepted.
+- Source changes in place and effective timezone changes invalidate the correct downstream work.
+- A fake dependent operation finishing after invalidation cannot publish current results.
+- Optional-result failure or missing output leaves valid upstream completeness/export intact.
+- Manifest/settings migration, interrupted publication and a second app instance preserve existing storage guarantees.
+- Battery-only software identity changes do not unnecessarily invalidate upstream scientific caches.
+- A test workspace can register with the shell and consume a source snapshot without accessing irradiance controls. This tests extensibility without implementing an optimizer.
 
-Avoid invalidating the expensive source calculations solely because the battery library was updated. The existing global software fingerprint may need a scoped extension; a universal cache redesign is not required for this feature.
+## Part II acceptance tests
 
-## 11. Export choices
+- Every displayed/exported quantity agrees with direct backend calls and the frozen reference fixture.
+- Exactly 24 nonnegative load values are required; zero is valid, blanks are not silently accepted.
+- Invalid paste does not partially replace the profile; keyboard editing works in the inline list.
+- Uncommitted invalid text immediately disables evaluation/export as appropriate.
+- Percent-to-fraction conversion happens once; capacity/load stay in Wh.
+- Battery edits preserve upstream file bytes and expensive preparation counters.
+- Duplicate clicks start one evaluation; Stop/source edits/settings edits reject late completion.
+- PV availability follows all relevant irradiance changes, not irrelevant display preferences.
+- Load demand shows requested energy even when unmet; PV shows available generation before curtailment.
+- Both energy traces share a scale; SoC remains 0–100%; legend toggles do not change results.
+- Partial hours and DST transitions retain correct interval energies, timestamps and offsets.
+- Initial SoC is plotted at study start; day navigation does not reset it.
+- Zero SoC without unmet load is distinguished from actual shortfall.
+- Subhour depletion/recovery is still flagged even if hourly endpoints are positive.
+- Long-period display reduction does not hide minima, peaks or shortfall intervals.
+- Locked files, export interruption and restart never expose mixed or partial data as current.
+- Irradiance-only export excludes stale optional PV files; combined export, if implemented, rejects mismatched identities.
+- The inline table, top settings and chart work at minimum size/scaling with keyboard-accessible controls and non-color status messages.
+- Packaged first launch, example loading, both explicit calculations, restart and export work with the added project dependencies.
 
-The first tab's existing export must continue to work without a battery calculation. A battery failure must not turn that valid export into a failure.
+The backend integration baseline recorded 460 passing tests, including 65 PV–battery tests. Re-establish the current baseline when implementation begins; this planning revision does not constitute a new test run.
 
-| Export approach | Assessment |
+## Decisions remaining for discussion
+
+The two implementation parts, top tabs, left consumption list, top-right settings, combined three-series chart and valid-irradiance dependency are now recorded as the selected direction.
+
+| Remaining choice | Recommendation |
 |---|---|
-| Separate “Export irradiance” and “Export battery” actions | Clear initial implementation; least ambiguity about readiness. |
-| One export menu with Irradiance / Battery / Complete system choices | Useful once combined export is implemented, but more eligibility and snapshot rules. |
-| Automatically include whatever battery files exist | Reject: stale or mismatched optional files could silently enter an export. |
+| Final public name | PV Autonomy tab; PV System Autonomy heading and plain-language subtitle. |
+| Extent of presentation rewrite | Extract programmatic WPF views/controllers; defer a wholesale MVVM/XAML conversion. |
+| Unavailable-tab explanation | Visible unavailable tab/reason; block working controls. An explanatory page may remain selectable if preferred. |
+| Optional artifact storage | Same root/owner with explicit completeness scopes; revisit separate-root alternative during Part I if necessary. |
+| First-run values | Blank real-study inputs plus explicit example preset; preserve user settings across upstream updates. |
+| Restarted results | Restore settings first; restore results only through verified identity-aware logic. |
+| Report scope | Data exports initially; separate PV recap if required, preserving the existing irradiance PDF. |
 
-**Initial preference:** contextual actions per tab. Battery export should include the six settings, complete source/timezone provenance, exact result rows and a verified source reference sufficient to audit which shaded series was used. The backend JSON already contains the supplied irradiance intervals.
-
-If a complete-system export is included, freeze matching upstream and battery snapshots together. Explicitly select artifacts by export scope; do not blindly copy old optional files just because they remain listed in a manifest.
-
-The current irradiance PDF is intentionally one page and its exporter enforces that. Options for battery reporting:
-
-- Keep the existing PDF unchanged and export battery data only in the first release.
-- Add a separate one-page `BatterySummary.pdf`.
-- Introduce a new multi-page system report through a separately named export mode.
-
-Do not silently add pages to the existing `Summary.pdf` contract. **Preference:** data exports first, or a separate battery recap if a readable shareable report is part of the agreed first release.
-
-## 12. Proposed implementation milestones
-
-These are review checkpoints, not time estimates or approval to start implementation.
-
-| Milestone | Work | Exit condition |
-|---|---|---|
-| 0 — Agree scope and UX | Resolve the key decisions below; sketch normal, blocked and stale states. | The tab, load editor, refactoring boundary and export/storage scope are agreed. |
-| 1 — Establish view boundaries | Extract enough window construction/state ownership to host two workspaces. Keep battery as a placeholder. | Existing irradiance behavior, numerical results and manual-update/export tests are unchanged. |
-| 2 — Define readiness and optional-state ownership | Centralize source readiness; introduce battery settings/revisions and explicit storage completeness scopes. | Battery edits cannot dirty irradiance; source edits reliably block battery; old manifests remain usable. |
-| 3 — Connect controls and backend | Add system inputs, load editor and explicit Calculate/Stop actions; consume accepted `PanelRun`. | UI-derived requests produce the same returned results as direct backend calls. |
-| 4 — Present results | Add SoC chart, summaries, source strip, shortfall navigation and details. | Partial intervals, repeated hours, empty/full battery and subhour shortfalls display correctly. |
-| 5 — Publish and export | Add managed artifacts and selected export/report behavior; settings/recovery handling. | No mixed/stale snapshot can be exported; failure leaves valid upstream data usable. |
-| 6 — Regression and packaged review | Run existing/new tests, inspect responsive layout, update Help/docs and package the application. | Packaged workflow works from first launch through edit, calculation, restart and export. |
-
-Separate behavior-preserving extraction from new behavior in commits where possible. A focused frontend branch can be reviewed against the merged backend. No backend model rewrite should be hidden inside this UI work.
-
-## 13. Acceptance tests to design before implementation
-
-The merged backend's recorded baseline is 460 passing solution tests, including 65 PV–battery tests. Re-establish the current baseline when implementation starts; that historical count is not a new test run for this planning document.
-
-### Source readiness and independence
-
-- Missing source, baseline-only output, failed/stopped upstream work, stale settings and missing artifacts block battery calculation and export.
-- Truncated but otherwise contiguous data fails requested-period coverage validation.
-- Gaps, overlaps, duplicate IDs, nonfinite values and missing shaded totals are rejected.
-- Zero nighttime irradiance and a fully shaded zero series remain valid.
-- A valid conservatively shaded dataset remains usable with its assumptions visible.
-- Every dependency-table change affects exactly its downstream work.
-- Battery settings edits leave upstream artifacts and expensive preparation counters unchanged.
-- Missing battery outputs block battery export but preserve irradiance export.
-- Completing irradiance without ever opening the battery tab still succeeds.
-
-### Inputs and calculation lifecycle
-
-- Typed-but-uncommitted invalid text disables battery export immediately.
-- Percent fields convert to fractions exactly once; Wh inputs are not mistaken for Ah.
-- Exactly 24 valid nonnegative entries are required; zero load is valid.
-- Invalid paste and cancelled editor changes do not partially mutate the accepted profile.
-- Repeated edits and tab switches do not start calculations.
-- Double-clicking Calculate starts one run; Stop cannot leave a current partial result.
-- Source/settings changes during a slow calculation prevent its late result from becoming current.
-- Settings snapshots retain their original 24 values after subsequent edits.
-- Existing and new settings files reopen predictably without silently selecting a measured-looking default.
-
-### Numerical presentation
-
-- Compare every displayed/exported value against direct backend output for the frozen fixture.
-- First point represents initial SoC; hourly points represent interval ends.
-- Zero SoC with no unmet load is not labelled an outage.
-- A subhour shortfall followed by recovery remains visible even if the hourly endpoint is positive.
-- Summary minimum agrees with the backend's substep-aware minimum.
-- Partial first/last hours and DST repeated hours retain their correct identity.
-- Selecting another display day does not reset stored energy.
-- Long-period chart reduction preserves minimum values and every shortfall indicator.
-
-### Storage, export and recovery
-
-- Exercise locked XLSX files, failed writes, cancelled publication and application restart.
-- Verify source and battery snapshots match throughout export, even if drafts change during copying.
-- Irradiance-only export excludes stale battery artifacts; combined export rejects mismatched versions.
-- Old manifests and caches migrate without treating an optional missing battery stage as upstream failure.
-- Existing upstream files remain byte-identical during battery-only calculation.
-- Repeated updates keep bounded managed output; explicit user exports are preserved.
-- A second app instance cannot race the active writer.
-- Any new PDF is rendered and visually checked, with the existing recap's one-page contract preserved.
-
-### Interface and packaged behavior
-
-- Inspect 1440 × 960 and 1080 × 720, plus 125% and 150% scaling.
-- Ensure all input fields, profile cells, action buttons and status explanations are reachable.
-- Check keyboard navigation, accessible field names, focus after editor closure and non-color status cues.
-- Validate full-year navigation without freezing the UI.
-- Test the packaged executable, including dependency inclusion, first launch, Load example, manual updates, Stop, restart and exports.
-
-## 14. Decisions for our next discussion
-
-| Priority | Decision | Initial recommendation |
-|---|---|---|
-| 1 | Two tabs or another layout? | Two full-workspace tabs; keep irradiance setup and system sizing separate. |
-| 2 | What happens before irradiance is ready? | Accessible explanation with calculation/export blocked; disabled-tab variant remains available. |
-| 3 | Where should the 24-hour editor live? | Dedicated editor, with preview and daily total always visible on the battery page. |
-| 4 | How much refactoring now? | Focused view/state extraction; no full MVVM/XAML conversion. |
-| 5 | Where do optional battery diagnostics belong? | Same managed root, optional stage, explicit independent completeness checks. |
-| 6 | Which export/report modes are essential? | Per-tab export; preserve current irradiance PDF; decide separately on battery recap. |
-| 7 | Which defaults and restart behavior? | Explicit example values; persist user settings; restore results only with verified source identity. |
-
-The highest-impact choices are state/storage ownership and the refactoring boundary. Tab styling can change later without changing the scientific contract; a global validity design would be much harder to unwind.
-
-## 15. References and review scope
+## References
 
 - [PV–battery backend model, API and units](../src/PvBatterySimulation/README.md)
 - [Backend validation record](../src/PvBatterySimulation/VALIDATION.md)
 - [Existing manual-update and export specification](MANUAL_UPDATE_AND_EXPORT_PLAN.md)
-- [Application architecture](APPLICATION_ARCHITECTURE.md) — useful ownership context; some historical lifecycle prose predates the manual-update milestones, so current code and the implemented manual-update specification take precedence.
+- [Application architecture](APPLICATION_ARCHITECTURE.md) — some historical lifecycle prose predates the manual-update milestones; current code and implemented behavior take precedence.
 - [Frontend running and packaging guidance](../src/ApplicationFrontend/RUNNING.md)
 
-This draft changes no frontend or scientific source. The next step is discussion and revision of these options, followed by an agreed implementation specification.
+This revision updates the implementation plan only. The next discussion can refine the remaining choices without reopening the user-selected layout or combining the two implementation parts.
