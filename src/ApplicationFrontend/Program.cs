@@ -24,6 +24,7 @@ public static class Program
         try { var window = new MainWindow(); app.Run(window); return 0; }
         catch (Exception ex)
         {
+            try { File.AppendAllText(AppData.PathFor("errors.log"), DateTimeOffset.Now + " Startup: " + ex + Environment.NewLine); } catch { }
             MessageBox.Show(ex.Message + "\n\nExtract the complete package to a folder you can write to, then open APPLICATION.exe there.", "SolarShade · unable to start", MessageBoxButton.OK, MessageBoxImage.Error);
             return 1;
         }
