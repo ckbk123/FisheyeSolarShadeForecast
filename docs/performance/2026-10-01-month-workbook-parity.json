@@ -1,0 +1,86 @@
+[
+  {
+    "File": "04-solar-positions\\solar-integration-samples.xlsx",
+    "Before": {
+      "Cells": 1252815,
+      "Sha256": "6241e58a8e8d2f61847f3d09b8990749e8dd21c4a600ce5f5871c026090313e2"
+    },
+    "After": {
+      "Cells": 1252815,
+      "Sha256": "6241e58a8e8d2f61847f3d09b8990749e8dd21c4a600ce5f5871c026090313e2"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-positions.xlsx",
+    "Before": {
+      "Cells": 7667,
+      "Sha256": "8f41fb3fe8e7a25b2bb8285eabcecada2740a3146afc718db98d8f9e675bd9de"
+    },
+    "After": {
+      "Cells": 7667,
+      "Sha256": "8f41fb3fe8e7a25b2bb8285eabcecada2740a3146afc718db98d8f9e675bd9de"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\sun-path-projection.xlsx",
+    "Before": {
+      "Cells": 6706,
+      "Sha256": "7160288e52649fc9d563b845b23769d1b9f3dea73875d4a25fed2458cf365906"
+    },
+    "After": {
+      "Cells": 6706,
+      "Sha256": "7160288e52649fc9d563b845b23769d1b9f3dea73875d4a25fed2458cf365906"
+    },
+    "Equal": true
+  },
+  {
+    "File": "05-transposition\\panel-unshaded.xlsx",
+    "Before": {
+      "Cells": 425974,
+      "Sha256": "69fa6b3133bbedeb2826d2acc523a9235357e255a88948492b886ac7bf0a273e"
+    },
+    "After": {
+      "Cells": 425974,
+      "Sha256": "69fa6b3133bbedeb2826d2acc523a9235357e255a88948492b886ac7bf0a273e"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\panel-shaded.xlsx",
+    "Before": {
+      "Cells": 6970,
+      "Sha256": "b39da10286a21892786c929c7c2383b88fb250b30edc77957d0df735181950ab"
+    },
+    "After": {
+      "Cells": 6970,
+      "Sha256": "b39da10286a21892786c929c7c2383b88fb250b30edc77957d0df735181950ab"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\shading-correction-factors.xlsx",
+    "Before": {
+      "Cells": 5680,
+      "Sha256": "03dfb94a4317042aa169ff8e4e184f2faff2687e962123cb34e354f294245481"
+    },
+    "After": {
+      "Cells": 5680,
+      "Sha256": "03dfb94a4317042aa169ff8e4e184f2faff2687e962123cb34e354f294245481"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\shading-visibility.xlsx",
+    "Before": {
+      "Cells": 292327,
+      "Sha256": "d763f17dbd897f3edf47846872e15d080d5f87821e1adaaaf2af0847993a2d62"
+    },
+    "After": {
+      "Cells": 292327,
+      "Sha256": "d763f17dbd897f3edf47846872e15d080d5f87821e1adaaaf2af0847993a2d62"
+    },
+    "Equal": true
+  }
+]

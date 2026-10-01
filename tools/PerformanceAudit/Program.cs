@@ -180,7 +180,7 @@ internal static class Program
             Measure("chart-battery-render", () => { var chart = new PvSystemChart(); chart.SetResult(battery); Render(chart); });
             await Task.Delay(30);
         }
-        Log(new { Scenario = scenario, Name = "output-sizes", DebugBytes = Directory.GetFiles(debug, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length), CacheBytes = Directory.GetFiles(AppData.Root, "*.gz", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length), PeakWorkingSetBytes = Process.GetCurrentProcess().PeakWorkingSet64 });
+        Log(new { Scenario = scenario, Name = "output-sizes", DebugBytes = Directory.GetFiles(debug, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length), CacheBytes = Directory.GetFiles(AppData.Root, "*", SearchOption.AllDirectories).Where(f => f.EndsWith(".gz") || f.EndsWith(".cache")).Sum(f => new FileInfo(f).Length), PeakWorkingSetBytes = Process.GetCurrentProcess().PeakWorkingSet64 });
     }
     static void Render(FrameworkElement element)
     {

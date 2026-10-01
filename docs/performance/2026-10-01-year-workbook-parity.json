@@ -1,0 +1,266 @@
+[
+  {
+    "File": "04-solar-positions\\solar-integration-samples-002.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "c5af474b4dc4b75cb19ec669829230e1ce308c663aaeb56dba57ad0dd5b1513d"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "c5af474b4dc4b75cb19ec669829230e1ce308c663aaeb56dba57ad0dd5b1513d"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples-003.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "2f01015f0de35c854c35cb6d9d45d8ea7c1c016ba286ea7a517f396dcc98bb46"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "2f01015f0de35c854c35cb6d9d45d8ea7c1c016ba286ea7a517f396dcc98bb46"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples-004.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "d8604e0499fcf314f505846d4b96178bb3337356dbcddfb7a6e20e88dc2c6f6d"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "d8604e0499fcf314f505846d4b96178bb3337356dbcddfb7a6e20e88dc2c6f6d"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples-005.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "afe7f0f2e77d51a6daeb8a91e590e4d45d9faaa1245bcdf8e371118ff5042ce1"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "afe7f0f2e77d51a6daeb8a91e590e4d45d9faaa1245bcdf8e371118ff5042ce1"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples-006.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "b7072771b7ac60a75eeb2f54c892dd1645866b9b3d63babb6192ba041ff49388"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "b7072771b7ac60a75eeb2f54c892dd1645866b9b3d63babb6192ba041ff49388"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples-007.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "4100e46b06f6e7ea351290d8b4aa46be3b50c07482a74950e61d58c17db9f90a"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "4100e46b06f6e7ea351290d8b4aa46be3b50c07482a74950e61d58c17db9f90a"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples-008.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "b644b0674e43d81424e8a3f39c68aefa0eda43c576e8b51287909345c8adb13b"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "b644b0674e43d81424e8a3f39c68aefa0eda43c576e8b51287909345c8adb13b"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples-009.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "40fbb8e91e02f76683a566010c0f9efc55d0f1936a4e21e66034d88e7f1ce86c"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "40fbb8e91e02f76683a566010c0f9efc55d0f1936a4e21e66034d88e7f1ce86c"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples-010.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "0b8e4b37991447b4b175759b0d7ccee0a61b967c1b8ff6919bd3a1f6687a6f1d"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "0b8e4b37991447b4b175759b0d7ccee0a61b967c1b8ff6919bd3a1f6687a6f1d"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples-011.xlsx",
+    "Before": {
+      "Cells": 768015,
+      "Sha256": "a2193cb254ec6013f04698ad08406b6c52ebfb47ebc709c763b171961676c196"
+    },
+    "After": {
+      "Cells": 768015,
+      "Sha256": "a2193cb254ec6013f04698ad08406b6c52ebfb47ebc709c763b171961676c196"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-integration-samples.xlsx",
+    "Before": {
+      "Cells": 1500015,
+      "Sha256": "c6eadc06eb2addd35b4c9d900160ab284b84efbb3cc42c54799a21089459f3c7"
+    },
+    "After": {
+      "Cells": 1500015,
+      "Sha256": "c6eadc06eb2addd35b4c9d900160ab284b84efbb3cc42c54799a21089459f3c7"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\solar-positions.xlsx",
+    "Before": {
+      "Cells": 96371,
+      "Sha256": "1c7b12e40d812ab4acf486d088729b5db25e53282bd98ba10d27b080d2751a2a"
+    },
+    "After": {
+      "Cells": 96371,
+      "Sha256": "1c7b12e40d812ab4acf486d088729b5db25e53282bd98ba10d27b080d2751a2a"
+    },
+    "Equal": true
+  },
+  {
+    "File": "04-solar-positions\\sun-path-projection.xlsx",
+    "Before": {
+      "Cells": 75649,
+      "Sha256": "dac08beca0d7e44640e6be7a1d3a09881a7734d88925a2feb45e530b12e93193"
+    },
+    "After": {
+      "Cells": 75649,
+      "Sha256": "dac08beca0d7e44640e6be7a1d3a09881a7734d88925a2feb45e530b12e93193"
+    },
+    "Equal": true
+  },
+  {
+    "File": "05-transposition\\panel-unshaded.xlsx",
+    "Before": {
+      "Cells": 5361192,
+      "Sha256": "31d4d8e3cd3d6e9d9ef7ab4ffa90769dab48185603baf0f6d7f3354b00ad5445"
+    },
+    "After": {
+      "Cells": 5361192,
+      "Sha256": "31d4d8e3cd3d6e9d9ef7ab4ffa90769dab48185603baf0f6d7f3354b00ad5445"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\panel-shaded.xlsx",
+    "Before": {
+      "Cells": 87610,
+      "Sha256": "7687ffe5839ca6a335e6071bfce9f7c0e83c948ae3c5d88aa2fb46aa62ac604b"
+    },
+    "After": {
+      "Cells": 87610,
+      "Sha256": "7687ffe5839ca6a335e6071bfce9f7c0e83c948ae3c5d88aa2fb46aa62ac604b"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\shading-correction-factors.xlsx",
+    "Before": {
+      "Cells": 69727,
+      "Sha256": "201e81237a97031381bb20782f7bb40cf458b80c71a470aa022a278ef4614ab4"
+    },
+    "After": {
+      "Cells": 69727,
+      "Sha256": "201e81237a97031381bb20782f7bb40cf458b80c71a470aa022a278ef4614ab4"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\shading-visibility-002.xlsx",
+    "Before": {
+      "Cells": 700007,
+      "Sha256": "ff3e4aa24f3dce5d9d9e577542dc5e98ef361fd205e178473fa04544b4cdec55"
+    },
+    "After": {
+      "Cells": 700007,
+      "Sha256": "ff3e4aa24f3dce5d9d9e577542dc5e98ef361fd205e178473fa04544b4cdec55"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\shading-visibility-003.xlsx",
+    "Before": {
+      "Cells": 700007,
+      "Sha256": "d2866191ecc1d45e0483972f49c01584ffc465397995d396349f4f91cd6ae93b"
+    },
+    "After": {
+      "Cells": 700007,
+      "Sha256": "d2866191ecc1d45e0483972f49c01584ffc465397995d396349f4f91cd6ae93b"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\shading-visibility-004.xlsx",
+    "Before": {
+      "Cells": 700007,
+      "Sha256": "3a03f908d3a6af7e4ae2a3b7c11ec79f9aaf16670221a18e40385750b5fda4da"
+    },
+    "After": {
+      "Cells": 700007,
+      "Sha256": "3a03f908d3a6af7e4ae2a3b7c11ec79f9aaf16670221a18e40385750b5fda4da"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\shading-visibility-005.xlsx",
+    "Before": {
+      "Cells": 700007,
+      "Sha256": "ec0941a3f0f9c9bad427e3045517c50997b44ea5c9a556dfe0991fa4047b1128"
+    },
+    "After": {
+      "Cells": 700007,
+      "Sha256": "ec0941a3f0f9c9bad427e3045517c50997b44ea5c9a556dfe0991fa4047b1128"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\shading-visibility-006.xlsx",
+    "Before": {
+      "Cells": 179207,
+      "Sha256": "366e4319e38eec581b6a63c9fd0a4237ebc43dc271f41258ffcc5bfcd3d477da"
+    },
+    "After": {
+      "Cells": 179207,
+      "Sha256": "366e4319e38eec581b6a63c9fd0a4237ebc43dc271f41258ffcc5bfcd3d477da"
+    },
+    "Equal": true
+  },
+  {
+    "File": "06-shading\\shading-visibility.xlsx",
+    "Before": {
+      "Cells": 700007,
+      "Sha256": "d8becb8232bc25a7a91a8cdb6f1623eefadca809899f58b2cefb515a3da01d80"
+    },
+    "After": {
+      "Cells": 700007,
+      "Sha256": "d8becb8232bc25a7a91a8cdb6f1623eefadca809899f58b2cefb515a3da01d80"
+    },
+    "Equal": true
+  }
+]

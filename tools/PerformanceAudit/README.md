@@ -21,3 +21,9 @@ Modes: `month`, `year`, `legacy`, `calibration`, `cpu-mask`.
 Output: JSON lines on stdout and `measurements.json`. Stage medians are not an exclusive decomposition of end-to-end time. Render probes include offscreen layout/rasterization. Allocation is process-wide cumulative managed allocation, and cache totals include additional probe entries. The live app is not driven by this harness; dispatcher gaps are measured around service calls on an STA dispatcher.
 
 The 30 September audit also tested an isolated, reverted prototype changing the legacy classification predicate in `DebugDataStore.PrepareInputs` from `Where(IsLegacyRun)` to `Where(path => deferredCleanup.Contains(path) || IsLegacyRun(path))`. This is not a released fix: initial discovery remains slow, and production migration/inventory semantics require the tests specified in the plan. Raw prototype measurements are retained with the baseline evidence.
+
+## Fix verification (1 October)
+
+Cache-size accounting includes both the legacy `.gz` and v2 `.cache` formats. The standalone panel-cache probe is retained for baseline comparison even though the application no longer reads or writes that cache. Its allocations inflate the final benchmark-process peak relative to normal app updates.
+
+`compare_workbooks.py baseline_debug updated_debug output.json` compares every decoded cell of the three numerical stage workbooks, including split files, while ignoring harmless ZIP/XML encoding differences. It uses the Python standard library.
