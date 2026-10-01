@@ -6,7 +6,10 @@ using System.Xml;
 namespace SolarShade.Irradiance;
 
 /// <summary>Mechanical workbook transport. Scientific schemas and calculations belong to each stage exporter.</summary>
-public sealed record ScientificSheet(string Name, IReadOnlyList<string> Headers, IEnumerable<object?[]> Rows);
+public sealed record ScientificSheet(string Name, IReadOnlyList<string> Headers, IEnumerable<object?[]> Rows)
+{
+    public Action<ScientificRowWriter, CancellationToken>? WriteRows { get; init; }
+}
 public static class ScientificWorkbook
 {
     private const string Ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -75,7 +78,12 @@ public static class ScientificWorkbook
                         xml.WriteEndElement();
                     }
                     Row(sheet.Headers.Cast<object?>().ToArray(), true);
-                    foreach (var row in sheet.Rows) Row(row, false);
+                    if (sheet.WriteRows is { } writeRows)
+                    {
+                        var writer = new ScientificRowWriter(xml, sheet.Headers.Count, ct);
+                        writeRows(writer, ct); writer.Complete(); rowNumber = writer.RowNumber;
+                    }
+                    else foreach (var row in sheet.Rows) Row(row, false);
                     xml.WriteEndElement(); xml.WriteStartElement("autoFilter"); xml.WriteAttributeString("ref", $"A1:{Column(sheet.Headers.Count)}{rowNumber}"); xml.WriteEndElement(); xml.WriteEndElement();
                 }
             }

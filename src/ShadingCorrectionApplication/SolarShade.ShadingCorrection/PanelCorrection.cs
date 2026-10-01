@@ -129,11 +129,26 @@ public static partial class ShadingCorrectionModule
                 run.Rows.Select(r => new object?[] { r.Timestamp, r.AfterDirect, r.AfterDiffuse, r.AfterTotal, r.UpperTotal, r.IntervalId, r.SourceStart, r.SourceEnd, r.Start, r.End }));
             Write("shading-correction-factors.xlsx", ["Timestamp", "Direct transmission", "Sky diffuse transmission", "Total transmission", "Loss fraction", "Interval ID", "Source start", "Source end", "Interval start", "Interval end"],
                 run.Rows.Select(r => new object?[] { r.Timestamp, r.DirectTransmission, r.DiffuseTransmission, r.TotalTransmission, r.LossFraction, r.IntervalId, r.SourceStart, r.SourceEnd, r.Start, r.End }));
+            const int chunkSize = 100_000;
             int part = 0;
-            foreach (var rows in run.Visibility.Chunk(100_000))
-                Write(part++ == 0 ? "shading-visibility.xlsx" : $"shading-visibility-{part:D3}.xlsx",
-                    ["Interval ID", "Substep timestamp", "Quadrature weight", "Direct visible fraction", "Direct observed fraction", "Isotropic visible fraction", "Isotropic observed fraction"],
-                    rows.Select(r => new object?[] { r.IntervalId, r.Timestamp, r.Weight, r.Direct.Visible, r.Direct.Known, r.IsotropicDiffuse.Visible, r.IsotropicDiffuse.Known }));
+            for (int offset = 0; offset < run.Visibility.Count; offset += chunkSize)
+            {
+                int first = offset;
+                var path = Path.Combine(directory, part++ == 0 ? "shading-visibility.xlsx" : $"shading-visibility-{part:D3}.xlsx");
+                ScientificSheet sheet = new("Panel results",
+                    ["Interval ID", "Substep timestamp", "Quadrature weight", "Direct visible fraction", "Direct observed fraction", "Isotropic visible fraction", "Isotropic observed fraction"], [])
+                { WriteRows = (writer, token) =>
+                    {
+                        for (int i = first; i < Math.Min(run.Visibility.Count, first + chunkSize); i++)
+                        {
+                            token.ThrowIfCancellationRequested(); var r = run.Visibility[i];
+                            writer.Begin(); writer.Text(r.IntervalId); writer.Instant(r.Timestamp); writer.Number(r.Weight);
+                            writer.Number(r.Direct.Visible); writer.Number(r.Direct.Known); writer.Number(r.IsotropicDiffuse.Visible); writer.Number(r.IsotropicDiffuse.Known); writer.End();
+                        }
+                    }
+                };
+                ScientificWorkbook.Write(path, [sheet], metadata + " Model=" + run.Model, ct); paths.Add(path);
+            }
         }
         ct.ThrowIfCancellationRequested();
         var json = Path.Combine(directory, "panel-results.json");

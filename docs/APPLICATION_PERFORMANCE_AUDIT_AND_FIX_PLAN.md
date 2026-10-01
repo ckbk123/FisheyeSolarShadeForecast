@@ -1,3 +1,5 @@
+> Implementation update (1 October 2026): see [Preview 0.1.1 results and release decisions](PERFORMANCE_FIX_RELEASE_NOTES.md). The five work areas are grouped into one implementation PR with separate commits; measurements below remain the original baseline.
+
 # Application performance audit and fix plan
 
 Date: 30 September 2026. Audited source: `901dc62` (PV frontend plus startup-cleanup hotfix). Status: **investigation and proposed implementation plan; no performance changes installed**.

@@ -4,10 +4,11 @@
     <UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
     <PlatformTarget>x64</PlatformTarget><AssemblyName>APPLICATION</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.1.0</Version><DebugType>none</DebugType>
+    <Version>0.1.1</Version><DebugType>none</DebugType>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="Packaging/PreviewReadme.txt" Link="Read me.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Compile Include="*.cs" />
     <Compile Include="Shell/**/*.cs;State/**/*.cs;Services/**/*.cs;Storage/**/*.cs;Workspaces/**/*.cs;Charts/**/*.cs" />
     <Content Include="Packaging/Native/*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

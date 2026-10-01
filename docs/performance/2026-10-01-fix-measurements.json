@@ -1,0 +1,1566 @@
+{
+  "Date": "2026-10-01",
+  "BaseRevision": "2a749a1",
+  "Hardware": "Ryzen 7 5700X, 8 cores/16 logical processors, 63.9 GiB RAM, RTX 3070",
+  "Method": "Release, same sequential OneDrive harness and fixtures as the baseline; 3 warm repetitions, one first update. Backend/dispatcher measurements, offscreen WPF renders; not an older-PC or live interactive p95 claim.",
+  "Month": [
+    {
+      "Scenario": "month",
+      "Name": "update-first",
+      "Ms": 5505.6797,
+      "ReportedMs": 5492.5053,
+      "MaxDispatcherGapMs": 45.18560000000002,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 87264096,
+      "PeakWorkingSetBytes": 570601472,
+      "Rows": 696,
+      "Events": [
+        {
+          "Message": "Preparing sky mask",
+          "AtMs": 123.3153,
+          "SincePreviousMs": 123.3153
+        },
+        {
+          "Message": "Drawing cardinal directions on the sky photograph",
+          "AtMs": 2149.9572,
+          "SincePreviousMs": 2026.6418999999999
+        },
+        {
+          "Message": "Reading irradiance and interval metadata",
+          "AtMs": 2557.7196,
+          "SincePreviousMs": 407.76240000000007
+        },
+        {
+          "Message": "Preparing solar positions for source intervals",
+          "AtMs": 2648.7214,
+          "SincePreviousMs": 91.0018
+        },
+        {
+          "Message": "Drawing sun paths on the calibrated image",
+          "AtMs": 2745.7075,
+          "SincePreviousMs": 96.98610000000008
+        },
+        {
+          "Message": "Preparing panel visibility",
+          "AtMs": 4531.2934,
+          "SincePreviousMs": 1785.5858999999996
+        },
+        {
+          "Message": "Calculating irradiance on the panel",
+          "AtMs": 4586.0643,
+          "SincePreviousMs": 54.77090000000044
+        },
+        {
+          "Message": "Applying panel shading and saving library results",
+          "AtMs": 4781.3021,
+          "SincePreviousMs": 195.23779999999988
+        }
+      ]
+    },
+    {
+      "Scenario": "month",
+      "Name": "update-unchanged-0",
+      "Ms": 75.8048,
+      "ReportedMs": 64.3628,
+      "MaxDispatcherGapMs": 32.57300000000032,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 1286536,
+      "PeakWorkingSetBytes": 570601472,
+      "Rows": 696,
+      "Events": []
+    },
+    {
+      "Scenario": "month",
+      "Name": "update-unchanged-1",
+      "Ms": 75.1478,
+      "ReportedMs": 65.3531,
+      "MaxDispatcherGapMs": 30.501100000000406,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 1301312,
+      "PeakWorkingSetBytes": 570601472,
+      "Rows": 696,
+      "Events": []
+    },
+    {
+      "Scenario": "month",
+      "Name": "update-unchanged-2",
+      "Ms": 72.1605,
+      "ReportedMs": 63.1133,
+      "MaxDispatcherGapMs": 35.60710000000017,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 1284840,
+      "PeakWorkingSetBytes": 570601472,
+      "Rows": 696,
+      "Events": []
+    },
+    {
+      "Scenario": "month",
+      "Name": "observe-panel-edit-0",
+      "Ms": 53.075,
+      "CpuMs": 62.5,
+      "AllocatedBytes": 124232
+    },
+    {
+      "Scenario": "month",
+      "Name": "update-panel-edit-0",
+      "Ms": 680.9789,
+      "ReportedMs": 673.9453,
+      "MaxDispatcherGapMs": 39.00240000000031,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 20003272,
+      "PeakWorkingSetBytes": 587083776,
+      "Rows": 696,
+      "Events": [
+        {
+          "Message": "Calculating irradiance on the panel",
+          "AtMs": 249.4935,
+          "SincePreviousMs": 249.4935
+        },
+        {
+          "Message": "Applying panel shading and saving library results",
+          "AtMs": 398.9582,
+          "SincePreviousMs": 149.46469999999997
+        }
+      ]
+    },
+    {
+      "Scenario": "month",
+      "Name": "observe-panel-edit-1",
+      "Ms": 53.1204,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 90360
+    },
+    {
+      "Scenario": "month",
+      "Name": "update-panel-edit-1",
+      "Ms": 715.2605,
+      "ReportedMs": 706.5502,
+      "MaxDispatcherGapMs": 40.04200000000037,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 20407640,
+      "PeakWorkingSetBytes": 588484608,
+      "Rows": 696,
+      "Events": [
+        {
+          "Message": "Calculating irradiance on the panel",
+          "AtMs": 232.7629,
+          "SincePreviousMs": 232.7629
+        },
+        {
+          "Message": "Applying panel shading and saving library results",
+          "AtMs": 423.3599,
+          "SincePreviousMs": 190.59699999999998
+        }
+      ]
+    },
+    {
+      "Scenario": "month",
+      "Name": "observe-panel-edit-2",
+      "Ms": 39.8649,
+      "CpuMs": 31.25,
+      "AllocatedBytes": 82160
+    },
+    {
+      "Scenario": "month",
+      "Name": "update-panel-edit-2",
+      "Ms": 691.8973,
+      "ReportedMs": 682.4636,
+      "MaxDispatcherGapMs": 44.97389999999905,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 19358896,
+      "PeakWorkingSetBytes": 590745600,
+      "Rows": 696,
+      "Events": [
+        {
+          "Message": "Calculating irradiance on the panel",
+          "AtMs": 224.778,
+          "SincePreviousMs": 224.778
+        },
+        {
+          "Message": "Applying panel shading and saving library results",
+          "AtMs": 383.3007,
+          "SincePreviousMs": 158.52270000000001
+        }
+      ]
+    },
+    {
+      "Scenario": "month",
+      "Name": "recheck-source-and-artifacts",
+      "Ms": 46.0597,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 65600
+    },
+    {
+      "Scenario": "month",
+      "Name": "readiness-inspect",
+      "Ms": 5.4596,
+      "CpuMs": 0,
+      "AllocatedBytes": 32800
+    },
+    {
+      "Scenario": "month",
+      "Name": "prepare-inputs-no-legacy",
+      "Ms": 1.3442,
+      "CpuMs": 0,
+      "AllocatedBytes": 0
+    },
+    {
+      "Scenario": "month",
+      "Name": "recheck-source-and-artifacts",
+      "Ms": 49.0718,
+      "CpuMs": 62.5,
+      "AllocatedBytes": 57400
+    },
+    {
+      "Scenario": "month",
+      "Name": "readiness-inspect",
+      "Ms": 6.5493,
+      "CpuMs": 0,
+      "AllocatedBytes": 32800
+    },
+    {
+      "Scenario": "month",
+      "Name": "prepare-inputs-no-legacy",
+      "Ms": 1.1924,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "month",
+      "Name": "recheck-source-and-artifacts",
+      "Ms": 49.3533,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 57400
+    },
+    {
+      "Scenario": "month",
+      "Name": "readiness-inspect",
+      "Ms": 4.8715,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 32800
+    },
+    {
+      "Scenario": "month",
+      "Name": "prepare-inputs-no-legacy",
+      "Ms": 1.066,
+      "CpuMs": 0,
+      "AllocatedBytes": 0
+    },
+    {
+      "Scenario": "month",
+      "Name": "import-xlsx-or-csv",
+      "Ms": 6.6826,
+      "CpuMs": 0,
+      "AllocatedBytes": 1712584
+    },
+    {
+      "Scenario": "month",
+      "Name": "solar-compute",
+      "Ms": 4.3482,
+      "CpuMs": 125,
+      "AllocatedBytes": 3178912
+    },
+    {
+      "Scenario": "month",
+      "Name": "solar-xlsx",
+      "Ms": 431.6562,
+      "CpuMs": 640.625,
+      "AllocatedBytes": 1715480
+    },
+    {
+      "Scenario": "month",
+      "Name": "sun-path-generate",
+      "Ms": 312.3268,
+      "CpuMs": 312.5,
+      "AllocatedBytes": 945576
+    },
+    {
+      "Scenario": "month",
+      "Name": "cardinal-generate",
+      "Ms": 361.2002,
+      "CpuMs": 359.375,
+      "AllocatedBytes": 252760
+    },
+    {
+      "Scenario": "month",
+      "Name": "visibility-scene",
+      "Ms": 15.0959,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 25473104
+    },
+    {
+      "Scenario": "month",
+      "Name": "transposition-compute",
+      "Ms": 22.6416,
+      "CpuMs": 31.25,
+      "AllocatedBytes": 2910128
+    },
+    {
+      "Scenario": "month",
+      "Name": "transposition-xlsx",
+      "Ms": 108.6445,
+      "CpuMs": 109.375,
+      "AllocatedBytes": 1541640
+    },
+    {
+      "Scenario": "month",
+      "Name": "shading-cold-directions",
+      "Ms": 58.6404,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 14245304
+    },
+    {
+      "Scenario": "month",
+      "Name": "shading-warm-directions",
+      "Ms": 6.1983,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 6070360
+    },
+    {
+      "Scenario": "month",
+      "Name": "shading-xlsx-json",
+      "Ms": 77.0906,
+      "CpuMs": 78.125,
+      "AllocatedBytes": 3977456
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-write-solar",
+      "Ms": 57.9144,
+      "CpuMs": 62.5,
+      "AllocatedBytes": 74488
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-read-solar",
+      "Ms": 114.6284,
+      "CpuMs": 109.375,
+      "AllocatedBytes": 11850080
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-reject-solar",
+      "Ms": 0.7678,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-write-panel",
+      "Ms": 231.8688,
+      "CpuMs": 234.375,
+      "AllocatedBytes": 318496
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-read-panel",
+      "Ms": 421.0144,
+      "CpuMs": 500,
+      "AllocatedBytes": 43604792
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-reject-panel",
+      "Ms": 0.679,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-write-shading",
+      "Ms": 38.3381,
+      "CpuMs": 31.25,
+      "AllocatedBytes": 2697768
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-read-shading",
+      "Ms": 101.475,
+      "CpuMs": 109.375,
+      "AllocatedBytes": 17547664
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-reject-shading",
+      "Ms": 0.6664,
+      "CpuMs": 0,
+      "AllocatedBytes": 12016
+    },
+    {
+      "Scenario": "month",
+      "Name": "battery-compute",
+      "Ms": 17.1894,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 851632
+    },
+    {
+      "Scenario": "month",
+      "Name": "battery-outputs",
+      "Ms": 25.0949,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 3529648
+    },
+    {
+      "Scenario": "month",
+      "Name": "chart-irradiance-render",
+      "Ms": 204.9898,
+      "CpuMs": 234.375,
+      "AllocatedBytes": 1275288
+    },
+    {
+      "Scenario": "month",
+      "Name": "chart-battery-render",
+      "Ms": 92.2021,
+      "CpuMs": 93.75,
+      "AllocatedBytes": 13628096
+    },
+    {
+      "Scenario": "month",
+      "Name": "import-xlsx-or-csv",
+      "Ms": 6.2104,
+      "CpuMs": 0,
+      "AllocatedBytes": 1701520
+    },
+    {
+      "Scenario": "month",
+      "Name": "solar-compute",
+      "Ms": 10.4329,
+      "CpuMs": 125,
+      "AllocatedBytes": 3175848
+    },
+    {
+      "Scenario": "month",
+      "Name": "solar-xlsx",
+      "Ms": 433.6437,
+      "CpuMs": 703.125,
+      "AllocatedBytes": 1717880
+    },
+    {
+      "Scenario": "month",
+      "Name": "sun-path-generate",
+      "Ms": 326.6706,
+      "CpuMs": 468.75,
+      "AllocatedBytes": 490584
+    },
+    {
+      "Scenario": "month",
+      "Name": "cardinal-generate",
+      "Ms": 310.4762,
+      "CpuMs": 312.5,
+      "AllocatedBytes": 252760
+    },
+    {
+      "Scenario": "month",
+      "Name": "visibility-scene",
+      "Ms": 13.8613,
+      "CpuMs": 0,
+      "AllocatedBytes": 25488992
+    },
+    {
+      "Scenario": "month",
+      "Name": "transposition-compute",
+      "Ms": 3.7244,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 2906008
+    },
+    {
+      "Scenario": "month",
+      "Name": "transposition-xlsx",
+      "Ms": 146.0509,
+      "CpuMs": 140.625,
+      "AllocatedBytes": 1533400
+    },
+    {
+      "Scenario": "month",
+      "Name": "shading-cold-directions",
+      "Ms": 79.0167,
+      "CpuMs": 78.125,
+      "AllocatedBytes": 14239152
+    },
+    {
+      "Scenario": "month",
+      "Name": "shading-warm-directions",
+      "Ms": 8.1304,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 6062152
+    },
+    {
+      "Scenario": "month",
+      "Name": "shading-xlsx-json",
+      "Ms": 83.6132,
+      "CpuMs": 93.75,
+      "AllocatedBytes": 3454688
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-write-solar",
+      "Ms": 58.3303,
+      "CpuMs": 62.5,
+      "AllocatedBytes": 76432
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-read-solar",
+      "Ms": 96.0933,
+      "CpuMs": 93.75,
+      "AllocatedBytes": 11816504
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-reject-solar",
+      "Ms": 0.5276,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-write-panel",
+      "Ms": 209.7421,
+      "CpuMs": 265.625,
+      "AllocatedBytes": 84600
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-read-panel",
+      "Ms": 209.389,
+      "CpuMs": 250,
+      "AllocatedBytes": 43595272
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-reject-panel",
+      "Ms": 0.4781,
+      "CpuMs": 0,
+      "AllocatedBytes": 10416
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-write-shading",
+      "Ms": 46.5541,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 2705824
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-read-shading",
+      "Ms": 78.1301,
+      "CpuMs": 78.125,
+      "AllocatedBytes": 17526576
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-reject-shading",
+      "Ms": 0.5487,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "month",
+      "Name": "battery-compute",
+      "Ms": 1.6587,
+      "CpuMs": 0,
+      "AllocatedBytes": 568808
+    },
+    {
+      "Scenario": "month",
+      "Name": "battery-outputs",
+      "Ms": 16.8853,
+      "CpuMs": 31.25,
+      "AllocatedBytes": 3155328
+    },
+    {
+      "Scenario": "month",
+      "Name": "chart-irradiance-render",
+      "Ms": 50.0088,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 709016
+    },
+    {
+      "Scenario": "month",
+      "Name": "chart-battery-render",
+      "Ms": 81.1291,
+      "CpuMs": 78.125,
+      "AllocatedBytes": 13599200
+    },
+    {
+      "Scenario": "month",
+      "Name": "import-xlsx-or-csv",
+      "Ms": 3.165,
+      "CpuMs": 0,
+      "AllocatedBytes": 1702488
+    },
+    {
+      "Scenario": "month",
+      "Name": "solar-compute",
+      "Ms": 2.2503,
+      "CpuMs": 0,
+      "AllocatedBytes": 3184640
+    },
+    {
+      "Scenario": "month",
+      "Name": "solar-xlsx",
+      "Ms": 385.9376,
+      "CpuMs": 390.625,
+      "AllocatedBytes": 1738784
+    },
+    {
+      "Scenario": "month",
+      "Name": "sun-path-generate",
+      "Ms": 390.2507,
+      "CpuMs": 781.25,
+      "AllocatedBytes": 498784
+    },
+    {
+      "Scenario": "month",
+      "Name": "cardinal-generate",
+      "Ms": 294.6105,
+      "CpuMs": 296.875,
+      "AllocatedBytes": 244560
+    },
+    {
+      "Scenario": "month",
+      "Name": "visibility-scene",
+      "Ms": 13.1732,
+      "CpuMs": 0,
+      "AllocatedBytes": 25488992
+    },
+    {
+      "Scenario": "month",
+      "Name": "transposition-compute",
+      "Ms": 3.4812,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 2908120
+    },
+    {
+      "Scenario": "month",
+      "Name": "transposition-xlsx",
+      "Ms": 114.9757,
+      "CpuMs": 109.375,
+      "AllocatedBytes": 1535040
+    },
+    {
+      "Scenario": "month",
+      "Name": "shading-cold-directions",
+      "Ms": 57.2157,
+      "CpuMs": 62.5,
+      "AllocatedBytes": 14228008
+    },
+    {
+      "Scenario": "month",
+      "Name": "shading-warm-directions",
+      "Ms": 6.5386,
+      "CpuMs": 0,
+      "AllocatedBytes": 6070344
+    },
+    {
+      "Scenario": "month",
+      "Name": "shading-xlsx-json",
+      "Ms": 78.7831,
+      "CpuMs": 109.375,
+      "AllocatedBytes": 3465720
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-write-solar",
+      "Ms": 57.5663,
+      "CpuMs": 62.5,
+      "AllocatedBytes": 65600
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-read-solar",
+      "Ms": 48.6557,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 11835008
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-reject-solar",
+      "Ms": 0.5275,
+      "CpuMs": 0,
+      "AllocatedBytes": 8368
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-write-panel",
+      "Ms": 190.2357,
+      "CpuMs": 187.5,
+      "AllocatedBytes": 73328
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-read-panel",
+      "Ms": 200.323,
+      "CpuMs": 203.125,
+      "AllocatedBytes": 43592488
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-reject-panel",
+      "Ms": 0.5867,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-write-shading",
+      "Ms": 47.8918,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 2697768
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-read-shading",
+      "Ms": 66.7141,
+      "CpuMs": 78.125,
+      "AllocatedBytes": 17523056
+    },
+    {
+      "Scenario": "month",
+      "Name": "cache-reject-shading",
+      "Ms": 0.5212,
+      "CpuMs": 0,
+      "AllocatedBytes": 11496
+    },
+    {
+      "Scenario": "month",
+      "Name": "battery-compute",
+      "Ms": 2.0888,
+      "CpuMs": 31.25,
+      "AllocatedBytes": 568808
+    },
+    {
+      "Scenario": "month",
+      "Name": "battery-outputs",
+      "Ms": 17.3214,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 3157000
+    },
+    {
+      "Scenario": "month",
+      "Name": "chart-irradiance-render",
+      "Ms": 48.9763,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 717216
+    },
+    {
+      "Scenario": "month",
+      "Name": "chart-battery-render",
+      "Ms": 135.3466,
+      "CpuMs": 140.625,
+      "AllocatedBytes": 13604648
+    },
+    {
+      "Scenario": "month",
+      "Name": "output-sizes",
+      "DebugBytes": 24383145,
+      "CacheBytes": 11640611,
+      "PeakWorkingSetBytes": 698413056
+    }
+  ],
+  "Year": [
+    {
+      "Scenario": "year",
+      "Name": "update-first",
+      "Ms": 16502.5571,
+      "ReportedMs": 16444.4936,
+      "MaxDispatcherGapMs": 46.21299999999974,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 546659648,
+      "PeakWorkingSetBytes": 782131200,
+      "Rows": 8760,
+      "Events": [
+        {
+          "Message": "Preparing sky mask",
+          "AtMs": 113.3854,
+          "SincePreviousMs": 113.3854
+        },
+        {
+          "Message": "Drawing cardinal directions on the sky photograph",
+          "AtMs": 2140.832,
+          "SincePreviousMs": 2027.4465999999998
+        },
+        {
+          "Message": "Reading irradiance and interval metadata",
+          "AtMs": 2507.6566,
+          "SincePreviousMs": 366.8245999999999
+        },
+        {
+          "Message": "Preparing solar positions for source intervals",
+          "AtMs": 2831.1961,
+          "SincePreviousMs": 323.5395000000003
+        },
+        {
+          "Message": "Drawing sun paths on the calibrated image",
+          "AtMs": 4450.8587,
+          "SincePreviousMs": 1619.6625999999997
+        },
+        {
+          "Message": "Preparing panel visibility",
+          "AtMs": 11256.3604,
+          "SincePreviousMs": 6805.5017
+        },
+        {
+          "Message": "Calculating irradiance on the panel",
+          "AtMs": 11310.5503,
+          "SincePreviousMs": 54.18990000000122
+        },
+        {
+          "Message": "Applying panel shading and saving library results",
+          "AtMs": 13495.7252,
+          "SincePreviousMs": 2185.1749
+        }
+      ]
+    },
+    {
+      "Scenario": "year",
+      "Name": "update-unchanged-0",
+      "Ms": 473.8257,
+      "ReportedMs": 437.1757,
+      "MaxDispatcherGapMs": 39.634799999999814,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 14862184,
+      "PeakWorkingSetBytes": 796389376,
+      "Rows": 8760,
+      "Events": []
+    },
+    {
+      "Scenario": "year",
+      "Name": "update-unchanged-1",
+      "Ms": 487.3099,
+      "ReportedMs": 460.7456,
+      "MaxDispatcherGapMs": 35.884399999999005,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 14870392,
+      "PeakWorkingSetBytes": 811048960,
+      "Rows": 8760,
+      "Events": []
+    },
+    {
+      "Scenario": "year",
+      "Name": "update-unchanged-2",
+      "Ms": 458.9281,
+      "ReportedMs": 428.6389,
+      "MaxDispatcherGapMs": 40.4932000000008,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 14870296,
+      "PeakWorkingSetBytes": 824905728,
+      "Rows": 8760,
+      "Events": []
+    },
+    {
+      "Scenario": "year",
+      "Name": "observe-panel-edit-0",
+      "Ms": 86.6837,
+      "CpuMs": 93.75,
+      "AllocatedBytes": 157992
+    },
+    {
+      "Scenario": "year",
+      "Name": "update-panel-edit-0",
+      "Ms": 4143.8375,
+      "ReportedMs": 4112.1619,
+      "MaxDispatcherGapMs": 41.35029999999824,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 237275792,
+      "PeakWorkingSetBytes": 899796992,
+      "Rows": 8760,
+      "Events": [
+        {
+          "Message": "Calculating irradiance on the panel",
+          "AtMs": 542.1115,
+          "SincePreviousMs": 542.1115
+        },
+        {
+          "Message": "Applying panel shading and saving library results",
+          "AtMs": 2175.4299,
+          "SincePreviousMs": 1633.3184
+        }
+      ]
+    },
+    {
+      "Scenario": "year",
+      "Name": "observe-panel-edit-1",
+      "Ms": 74.3903,
+      "CpuMs": 109.375,
+      "AllocatedBytes": 120464
+    },
+    {
+      "Scenario": "year",
+      "Name": "update-panel-edit-1",
+      "Ms": 3842.5348,
+      "ReportedMs": 3815.7288,
+      "MaxDispatcherGapMs": 48.90530000000217,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 236773664,
+      "PeakWorkingSetBytes": 965484544,
+      "Rows": 8760,
+      "Events": [
+        {
+          "Message": "Calculating irradiance on the panel",
+          "AtMs": 484.1393,
+          "SincePreviousMs": 484.1393
+        },
+        {
+          "Message": "Applying panel shading and saving library results",
+          "AtMs": 2082.0694,
+          "SincePreviousMs": 1597.9300999999998
+        }
+      ]
+    },
+    {
+      "Scenario": "year",
+      "Name": "observe-panel-edit-2",
+      "Ms": 69.5533,
+      "CpuMs": 93.75,
+      "AllocatedBytes": 128664
+    },
+    {
+      "Scenario": "year",
+      "Name": "update-panel-edit-2",
+      "Ms": 3954.7473,
+      "ReportedMs": 3925.768,
+      "MaxDispatcherGapMs": 46.3676000000014,
+      "DispatcherGapsOver100Ms": 0,
+      "AllocatedBytes": 253459240,
+      "PeakWorkingSetBytes": 1010937856,
+      "Rows": 8760,
+      "Events": [
+        {
+          "Message": "Calculating irradiance on the panel",
+          "AtMs": 473.4315,
+          "SincePreviousMs": 473.4315
+        },
+        {
+          "Message": "Applying panel shading and saving library results",
+          "AtMs": 2138.9664,
+          "SincePreviousMs": 1665.5348999999997
+        }
+      ]
+    },
+    {
+      "Scenario": "year",
+      "Name": "recheck-source-and-artifacts",
+      "Ms": 448.6254,
+      "CpuMs": 875,
+      "AllocatedBytes": 98400
+    },
+    {
+      "Scenario": "year",
+      "Name": "readiness-inspect",
+      "Ms": 7.9888,
+      "CpuMs": 31.25,
+      "AllocatedBytes": 57400
+    },
+    {
+      "Scenario": "year",
+      "Name": "prepare-inputs-no-legacy",
+      "Ms": 1.4376,
+      "CpuMs": 0,
+      "AllocatedBytes": 0
+    },
+    {
+      "Scenario": "year",
+      "Name": "recheck-source-and-artifacts",
+      "Ms": 447.6044,
+      "CpuMs": 906.25,
+      "AllocatedBytes": 98400
+    },
+    {
+      "Scenario": "year",
+      "Name": "readiness-inspect",
+      "Ms": 8.7979,
+      "CpuMs": 0,
+      "AllocatedBytes": 49200
+    },
+    {
+      "Scenario": "year",
+      "Name": "prepare-inputs-no-legacy",
+      "Ms": 1.2832,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "year",
+      "Name": "recheck-source-and-artifacts",
+      "Ms": 391.3645,
+      "CpuMs": 468.75,
+      "AllocatedBytes": 98400
+    },
+    {
+      "Scenario": "year",
+      "Name": "readiness-inspect",
+      "Ms": 8.0223,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 49200
+    },
+    {
+      "Scenario": "year",
+      "Name": "prepare-inputs-no-legacy",
+      "Ms": 1.2953,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "year",
+      "Name": "import-xlsx-or-csv",
+      "Ms": 77.8132,
+      "CpuMs": 78.125,
+      "AllocatedBytes": 63160568
+    },
+    {
+      "Scenario": "year",
+      "Name": "solar-compute",
+      "Ms": 63.2196,
+      "CpuMs": 500,
+      "AllocatedBytes": 40026344
+    },
+    {
+      "Scenario": "year",
+      "Name": "solar-xlsx",
+      "Ms": 5021.974,
+      "CpuMs": 5250,
+      "AllocatedBytes": 22138680
+    },
+    {
+      "Scenario": "year",
+      "Name": "sun-path-generate",
+      "Ms": 403.4438,
+      "CpuMs": 406.25,
+      "AllocatedBytes": 13371400
+    },
+    {
+      "Scenario": "year",
+      "Name": "cardinal-generate",
+      "Ms": 345.4508,
+      "CpuMs": 375,
+      "AllocatedBytes": 252760
+    },
+    {
+      "Scenario": "year",
+      "Name": "visibility-scene",
+      "Ms": 25.2017,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 25488224
+    },
+    {
+      "Scenario": "year",
+      "Name": "transposition-compute",
+      "Ms": 134.1678,
+      "CpuMs": 125,
+      "AllocatedBytes": 36837536
+    },
+    {
+      "Scenario": "year",
+      "Name": "transposition-xlsx",
+      "Ms": 1393.2479,
+      "CpuMs": 1390.625,
+      "AllocatedBytes": 19810768
+    },
+    {
+      "Scenario": "year",
+      "Name": "shading-cold-directions",
+      "Ms": 900.6896,
+      "CpuMs": 953.125,
+      "AllocatedBytes": 140977584
+    },
+    {
+      "Scenario": "year",
+      "Name": "shading-warm-directions",
+      "Ms": 183.5284,
+      "CpuMs": 171.875,
+      "AllocatedBytes": 79279128
+    },
+    {
+      "Scenario": "year",
+      "Name": "shading-xlsx-json",
+      "Ms": 898.828,
+      "CpuMs": 921.875,
+      "AllocatedBytes": 51433432
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-write-solar",
+      "Ms": 777.2177,
+      "CpuMs": 796.875,
+      "AllocatedBytes": 709704
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-read-solar",
+      "Ms": 973.3856,
+      "CpuMs": 1078.125,
+      "AllocatedBytes": 148976792
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-reject-solar",
+      "Ms": 0.8538,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-write-panel",
+      "Ms": 2665.7329,
+      "CpuMs": 2750,
+      "AllocatedBytes": 1101400
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-read-panel",
+      "Ms": 2688.9023,
+      "CpuMs": 2687.5,
+      "AllocatedBytes": 548684272
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-reject-panel",
+      "Ms": 0.6713,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-write-shading",
+      "Ms": 501.6793,
+      "CpuMs": 500,
+      "AllocatedBytes": 33768000
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-read-shading",
+      "Ms": 934.6016,
+      "CpuMs": 984.375,
+      "AllocatedBytes": 224044096
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-reject-shading",
+      "Ms": 0.799,
+      "CpuMs": 0,
+      "AllocatedBytes": 16400
+    },
+    {
+      "Scenario": "year",
+      "Name": "battery-compute",
+      "Ms": 48.1652,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 7965800
+    },
+    {
+      "Scenario": "year",
+      "Name": "battery-outputs",
+      "Ms": 138.3555,
+      "CpuMs": 140.625,
+      "AllocatedBytes": 40160096
+    },
+    {
+      "Scenario": "year",
+      "Name": "chart-irradiance-render",
+      "Ms": 257.6235,
+      "CpuMs": 265.625,
+      "AllocatedBytes": 2360408
+    },
+    {
+      "Scenario": "year",
+      "Name": "chart-battery-render",
+      "Ms": 107.9895,
+      "CpuMs": 109.375,
+      "AllocatedBytes": 10406880
+    },
+    {
+      "Scenario": "year",
+      "Name": "import-xlsx-or-csv",
+      "Ms": 85.1869,
+      "CpuMs": 78.125,
+      "AllocatedBytes": 63165104
+    },
+    {
+      "Scenario": "year",
+      "Name": "solar-compute",
+      "Ms": 46.9632,
+      "CpuMs": 156.25,
+      "AllocatedBytes": 40027000
+    },
+    {
+      "Scenario": "year",
+      "Name": "solar-xlsx",
+      "Ms": 5080.5479,
+      "CpuMs": 5234.375,
+      "AllocatedBytes": 22122752
+    },
+    {
+      "Scenario": "year",
+      "Name": "sun-path-generate",
+      "Ms": 407.7109,
+      "CpuMs": 421.875,
+      "AllocatedBytes": 5043984
+    },
+    {
+      "Scenario": "year",
+      "Name": "cardinal-generate",
+      "Ms": 314.383,
+      "CpuMs": 312.5,
+      "AllocatedBytes": 252760
+    },
+    {
+      "Scenario": "year",
+      "Name": "visibility-scene",
+      "Ms": 14.424,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 25488992
+    },
+    {
+      "Scenario": "year",
+      "Name": "transposition-compute",
+      "Ms": 70.6652,
+      "CpuMs": 62.5,
+      "AllocatedBytes": 36836984
+    },
+    {
+      "Scenario": "year",
+      "Name": "transposition-xlsx",
+      "Ms": 1301.985,
+      "CpuMs": 1312.5,
+      "AllocatedBytes": 19812192
+    },
+    {
+      "Scenario": "year",
+      "Name": "shading-cold-directions",
+      "Ms": 909.3401,
+      "CpuMs": 921.875,
+      "AllocatedBytes": 140975968
+    },
+    {
+      "Scenario": "year",
+      "Name": "shading-warm-directions",
+      "Ms": 219.8837,
+      "CpuMs": 218.75,
+      "AllocatedBytes": 79287456
+    },
+    {
+      "Scenario": "year",
+      "Name": "shading-xlsx-json",
+      "Ms": 981.2794,
+      "CpuMs": 984.375,
+      "AllocatedBytes": 43041688
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-write-solar",
+      "Ms": 859.9662,
+      "CpuMs": 859.375,
+      "AllocatedBytes": 720568
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-read-solar",
+      "Ms": 857.2075,
+      "CpuMs": 859.375,
+      "AllocatedBytes": 148829608
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-reject-solar",
+      "Ms": 0.5948,
+      "CpuMs": 0,
+      "AllocatedBytes": 11264
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-write-panel",
+      "Ms": 2683.4678,
+      "CpuMs": 2625,
+      "AllocatedBytes": 852800
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-read-panel",
+      "Ms": 2902.9134,
+      "CpuMs": 2890.625,
+      "AllocatedBytes": 548693896
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-reject-panel",
+      "Ms": 0.5396,
+      "CpuMs": 0,
+      "AllocatedBytes": 8496
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-write-shading",
+      "Ms": 466.3713,
+      "CpuMs": 484.375,
+      "AllocatedBytes": 33759504
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-read-shading",
+      "Ms": 746.1889,
+      "CpuMs": 750,
+      "AllocatedBytes": 224037752
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-reject-shading",
+      "Ms": 0.7501,
+      "CpuMs": 0,
+      "AllocatedBytes": 11320
+    },
+    {
+      "Scenario": "year",
+      "Name": "battery-compute",
+      "Ms": 24.6092,
+      "CpuMs": 31.25,
+      "AllocatedBytes": 7709680
+    },
+    {
+      "Scenario": "year",
+      "Name": "battery-outputs",
+      "Ms": 137.4725,
+      "CpuMs": 140.625,
+      "AllocatedBytes": 39763744
+    },
+    {
+      "Scenario": "year",
+      "Name": "chart-irradiance-render",
+      "Ms": 72.1594,
+      "CpuMs": 78.125,
+      "AllocatedBytes": 1838032
+    },
+    {
+      "Scenario": "year",
+      "Name": "chart-battery-render",
+      "Ms": 78.2964,
+      "CpuMs": 62.5,
+      "AllocatedBytes": 10212088
+    },
+    {
+      "Scenario": "year",
+      "Name": "import-xlsx-or-csv",
+      "Ms": 28.2488,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 63164304
+    },
+    {
+      "Scenario": "year",
+      "Name": "solar-compute",
+      "Ms": 35.6054,
+      "CpuMs": 265.625,
+      "AllocatedBytes": 40031672
+    },
+    {
+      "Scenario": "year",
+      "Name": "solar-xlsx",
+      "Ms": 4942.4994,
+      "CpuMs": 5265.625,
+      "AllocatedBytes": 22127856
+    },
+    {
+      "Scenario": "year",
+      "Name": "sun-path-generate",
+      "Ms": 346.5664,
+      "CpuMs": 343.75,
+      "AllocatedBytes": 5043984
+    },
+    {
+      "Scenario": "year",
+      "Name": "cardinal-generate",
+      "Ms": 303.0641,
+      "CpuMs": 312.5,
+      "AllocatedBytes": 252760
+    },
+    {
+      "Scenario": "year",
+      "Name": "visibility-scene",
+      "Ms": 16.0451,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 25488992
+    },
+    {
+      "Scenario": "year",
+      "Name": "transposition-compute",
+      "Ms": 71.6556,
+      "CpuMs": 62.5,
+      "AllocatedBytes": 36828392
+    },
+    {
+      "Scenario": "year",
+      "Name": "transposition-xlsx",
+      "Ms": 1388.4994,
+      "CpuMs": 1375,
+      "AllocatedBytes": 19812848
+    },
+    {
+      "Scenario": "year",
+      "Name": "shading-cold-directions",
+      "Ms": 813.4054,
+      "CpuMs": 796.875,
+      "AllocatedBytes": 140991824
+    },
+    {
+      "Scenario": "year",
+      "Name": "shading-warm-directions",
+      "Ms": 205.4112,
+      "CpuMs": 187.5,
+      "AllocatedBytes": 79275640
+    },
+    {
+      "Scenario": "year",
+      "Name": "shading-xlsx-json",
+      "Ms": 907.553,
+      "CpuMs": 968.75,
+      "AllocatedBytes": 43044680
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-write-solar",
+      "Ms": 709.0926,
+      "CpuMs": 734.375,
+      "AllocatedBytes": 720208
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-read-solar",
+      "Ms": 746.6189,
+      "CpuMs": 750,
+      "AllocatedBytes": 148826784
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-reject-solar",
+      "Ms": 0.5578,
+      "CpuMs": 0,
+      "AllocatedBytes": 10752
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-write-panel",
+      "Ms": 2403.876,
+      "CpuMs": 2406.25,
+      "AllocatedBytes": 848520
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-read-panel",
+      "Ms": 2655.3999,
+      "CpuMs": 2593.75,
+      "AllocatedBytes": 548691792
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-reject-panel",
+      "Ms": 0.6467,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-write-shading",
+      "Ms": 518.9917,
+      "CpuMs": 515.625,
+      "AllocatedBytes": 33768000
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-read-shading",
+      "Ms": 734.4752,
+      "CpuMs": 734.375,
+      "AllocatedBytes": 224030864
+    },
+    {
+      "Scenario": "year",
+      "Name": "cache-reject-shading",
+      "Ms": 0.777,
+      "CpuMs": 0,
+      "AllocatedBytes": 12320
+    },
+    {
+      "Scenario": "year",
+      "Name": "battery-compute",
+      "Ms": 54.9734,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 7709552
+    },
+    {
+      "Scenario": "year",
+      "Name": "battery-outputs",
+      "Ms": 98.4619,
+      "CpuMs": 93.75,
+      "AllocatedBytes": 39767968
+    },
+    {
+      "Scenario": "year",
+      "Name": "chart-irradiance-render",
+      "Ms": 51.6342,
+      "CpuMs": 46.875,
+      "AllocatedBytes": 1812232
+    },
+    {
+      "Scenario": "year",
+      "Name": "chart-battery-render",
+      "Ms": 121.5707,
+      "CpuMs": 125,
+      "AllocatedBytes": 10216472
+    },
+    {
+      "Scenario": "year",
+      "Name": "output-sizes",
+      "DebugBytes": 299858455,
+      "CacheBytes": 143685372,
+      "PeakWorkingSetBytes": 1331736576
+    }
+  ],
+  "Legacy": [
+    {
+      "Scenario": "legacy",
+      "Name": "legacy-fixture",
+      "Directories": 126,
+      "Files": 1582
+    },
+    {
+      "Scenario": "legacy",
+      "Name": "prepare-inputs-legacy-0",
+      "Ms": 5.5679,
+      "CpuMs": 15.625,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "legacy",
+      "Name": "prepare-inputs-legacy-1",
+      "Ms": 1.2604,
+      "CpuMs": 0,
+      "AllocatedBytes": 0
+    },
+    {
+      "Scenario": "legacy",
+      "Name": "prepare-inputs-legacy-2",
+      "Ms": 1.0165,
+      "CpuMs": 0,
+      "AllocatedBytes": 8200
+    },
+    {
+      "Scenario": "legacy",
+      "Name": "prepare-inputs-legacy-3",
+      "Ms": 1.0249,
+      "CpuMs": 0,
+      "AllocatedBytes": 0
+    },
+    {
+      "Scenario": "legacy",
+      "Name": "prepare-inputs-legacy-4",
+      "Ms": 0.972,
+      "CpuMs": 0,
+      "AllocatedBytes": 0
+    },
+    {
+      "Scenario": "legacy",
+      "Name": "prepare-inputs-legacy-5",
+      "Ms": 0.9599,
+      "CpuMs": 0,
+      "AllocatedBytes": 0
+    }
+  ]
+}

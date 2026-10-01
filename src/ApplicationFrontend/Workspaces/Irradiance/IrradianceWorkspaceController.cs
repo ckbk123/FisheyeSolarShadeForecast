@@ -11,7 +11,9 @@ public sealed class IrradianceWorkspaceController : IDisposable
     internal CancellationTokenSource? Pending { get; set; }
     internal bool Updating { get; set; }
     internal bool Calibrating { get; set; }
-    public bool IsBusy => Updating || Calibrating;
+    internal bool Verifying { get; set; }
+    internal bool Revalidating { get; set; }
+    public bool IsBusy => Updating || Calibrating || Verifying;
     private bool dependentBusy;
     public bool DependentBusy
     {
@@ -25,7 +27,7 @@ public sealed class IrradianceWorkspaceController : IDisposable
     public IrradianceWorkspaceController(IIrradianceService service) => Service = service;
     public void RefreshSource()
     {
-        if (disposed) return;
+        if (disposed || Verifying && State == UpdateState.UpToDate || Revalidating && Updating && State is UpdateState.Updating or UpdateState.UpToDate) return;
         SourceReadiness next;
         if (IsBusy || State != UpdateState.UpToDate)
             next = new(null, IsBusy ? "Solar Irradiance is updating." : "Complete and update Solar Irradiance first.");

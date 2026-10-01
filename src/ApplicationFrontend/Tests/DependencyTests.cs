@@ -86,13 +86,15 @@ public sealed class DependencyTests
             var result = window.Completed!; var before = Artifacts(result.DebugDirectory!);
             Assert.NotNull(window.CardinalsForTest); Assert.True(window.SunPathVisibleForTest);
             window.EditFieldForTest("CameraTilt", "10");
+            await window.InputsSettled;
             AssertRemovedOnly(result.DebugDirectory!, before, InputDependencies.PoseChain);
             Assert.Null(window.CardinalsForTest); Assert.False(window.SunPathVisibleForTest);
             string manifest = Path.Combine(result.DebugDirectory!, "run.json");
             var firstWrite = File.GetLastWriteTimeUtc(manifest); var firstBytes = File.ReadAllBytes(manifest);
             for (int i = 0; i < 100; i++) window.EditFieldForTest("CameraTilt", (i % 90).ToString());
+            await window.InputsSettled;
             Assert.Equal(firstWrite, File.GetLastWriteTimeUtc(manifest)); Assert.Equal(firstBytes, File.ReadAllBytes(manifest));
-            window.EditFieldForTest("CameraTilt", "0"); window.RecheckSources();
+            window.EditFieldForTest("CameraTilt", "0"); await window.RecheckSourcesAsync();
             Assert.Equal(UpdateState.UpdateRequired, window.UpdateStateForTest); Assert.False(window.ExportEnabledForTest);
             Assert.Throws<InvalidOperationException>(() => AppServices.Export(result, Path.Combine(fixture.Root, "exports")));
             Assert.Equal(1, fixture.Runs);
@@ -101,7 +103,7 @@ public sealed class DependencyTests
             Assert.Equal(result.Run.BeforeEnergy, window.Completed!.Run.BeforeEnergy);
             Assert.Equal(result.Run.AfterEnergy, window.Completed.Run.AfterEnergy);
         }
-        finally { window.Close(); }
+        finally { await window.InputsSettled; window.Close(); }
     });
 
     [Fact]
@@ -118,12 +120,13 @@ public sealed class DependencyTests
             AssertRemovedOnly(result.DebugDirectory!, before, ArtifactGroup.None);
             window.EditFieldForTest("PanelTilt", "-");
             Assert.Equal(UpdateState.NeedsAttention, window.UpdateStateForTest);
+            await window.InputsSettled;
             AssertRemovedOnly(result.DebugDirectory!, before, InputDependencies.PanelChain);
             Assert.Same(cardinals, window.CardinalsForTest); Assert.True(window.SunPathVisibleForTest);
             window.EditFieldForTest("PanelTilt", fixture.Settings.PanelTilt.ToString());
             Assert.Equal(UpdateState.UpdateRequired, window.UpdateStateForTest); Assert.False(window.ExportEnabledForTest);
         }
-        finally { window.Close(); }
+        finally { await window.InputsSettled; window.Close(); }
     });
 
     [Theory][InlineData("SkyImage")][InlineData("ProfilePath")][InlineData("ImportPath")]
@@ -164,7 +167,7 @@ public sealed class DependencyTests
             await Until(() => window.UpdateStateForTest == UpdateState.UpdateRequired);
             Assert.False(window.ExportEnabledForTest); Assert.Equal(1, fixture.Runs);
         }
-        finally { window.Close(); }
+        finally { await window.InputsSettled; window.Close(); }
     });
 
     [Theory][InlineData(false)][InlineData(true)]
@@ -192,15 +195,16 @@ public sealed class DependencyTests
             using (var locked = new FileStream(Path.Combine(debug, "05-transposition", "panel-unshaded.xlsx"), FileMode.Open, FileAccess.Read, FileShare.Read))
             {
                 window.EditFieldForTest("PanelTilt", "45");
+                Assert.False(window.ExportEnabledForTest); await window.InputsSettled;
                 Assert.Equal(UpdateState.Failed, window.UpdateStateForTest); Assert.False(window.ExportEnabledForTest);
                 using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(debug, "run.json")));
                 Assert.Equal("Stale", manifest.RootElement.GetProperty("Status").GetString());
             }
-            window.RecheckSources(); AssertRemovedOnly(debug, before, InputDependencies.PanelChain);
+            await window.RecheckSourcesAsync(); AssertRemovedOnly(debug, before, InputDependencies.PanelChain);
             window.Calculate(); await Until(() => !window.UpdatingForTest);
             Assert.Equal(UpdateState.UpToDate, window.UpdateStateForTest);
         }
-        finally { window.Close(); }
+        finally { await window.InputsSettled; window.Close(); }
     });
 
     [Fact]

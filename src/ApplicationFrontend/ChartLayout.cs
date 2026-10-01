@@ -47,6 +47,29 @@ public sealed record ChartTimeAxis(int GridHours, ChartTimeTick[] Ticks, ChartDa
 public readonly record struct ChartVertex(DateTimeOffset Time, double Value, bool StartFigure);
 public static class ChartSteps
 {
+    public readonly record struct Envelope(int Column, DateTimeOffset Start, DateTimeOffset End, double Minimum, double Maximum, bool StartFigure);
+    public static IEnumerable<Envelope> Envelopes(PanelRow[] rows, int first, int last, Func<PanelRow, double?> value, int pixels)
+    {
+        if (last < first) yield break;
+        long start = rows[first].Start.UtcTicks, duration = Math.Max(1, rows[last].End.UtcTicks - start);
+        Envelope? current = null; DateTimeOffset? previousEnd = null;
+        for (int i = first; i <= last; i++)
+        {
+            var row = rows[i]; var selected = value(row);
+            if (selected is not { } v || !double.IsFinite(v) || row.End <= row.Start)
+            { if (current is { } complete) yield return complete; current = null; previousEnd = null; continue; }
+            int column = (int)((row.Start.UtcTicks - start) / (double)duration * Math.Max(1, pixels));
+            if (current is not { } bucket || bucket.Column != column || previousEnd != row.Start)
+            {
+                if (current is { } complete) yield return complete;
+                current = new(column, row.Start, row.End, v, v, previousEnd != row.Start);
+            }
+            else current = bucket with { End = row.End, Minimum = Math.Min(bucket.Minimum, v), Maximum = Math.Max(bucket.Maximum, v) };
+            previousEnd = row.End;
+        }
+        if (current is { } final) yield return final;
+    }
+
     public static IEnumerable<ChartVertex> Vertices(PanelRow[] rows, int first, int last, Func<PanelRow, double?> value)
     {
         DateTimeOffset? previousEnd = null;

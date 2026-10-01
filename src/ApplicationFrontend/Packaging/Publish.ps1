@@ -7,6 +7,12 @@ $publishRoot = if ($ExistingStage) { [IO.Path]::GetFullPath($ExistingStage) } el
 if ([IO.Path]::GetFileName($DeliveryName) -ne $DeliveryName -or $DeliveryName -in @('.', '..')) { throw 'DeliveryName must be a directory name.' }
 $deliveryRoot = Join-Path $repoRoot $DeliveryName
 if (-not $ExistingStage) {
+foreach ($modelName in @('efficientnet-b4.onnx', 'efficientnet-b5.onnx', 'efficientnet-b6.onnx', 'efficientnet-b7.onnx')) {
+  $modelFile = Join-Path $repoRoot ('src/SkyPhotoMasking/Models/' + $modelName)
+  if (-not (Test-Path -LiteralPath $modelFile) -or (Get-Item -LiteralPath $modelFile).Length -lt 1MB) {
+    throw ('The real Git LFS model is required before publishing: ' + $modelName + '. Run git lfs pull in this checkout.')
+  }
+}
 if (-not $SkipRestore) {
   dotnet restore $project -r win-x64 --configfile (Join-Path $sourceRoot 'NuGet.Config') -p:SelfContained=true -p:PublishSingleFile=true -p:NuGetAudit=false
   if ($LASTEXITCODE -ne 0) { throw 'Restore failed.' }
@@ -27,10 +33,11 @@ New-Item -ItemType Directory -Force -Path $stageData | Out-Null
 if (@(Get-ChildItem -LiteralPath $stageData -Force | Where-Object Name -ne 'settings.json').Count -gt 0) { throw 'Publish stage contains session data. Run smoke tests with external Data/Debug Data directories.' }
 if (@(Get-ChildItem -LiteralPath (Join-Path $publishRoot 'Debug Data') -Force | Where-Object Name -ne 'Read me.txt').Count -gt 0) { throw 'Publish stage contains runtime debug runs. Use an external Debug Data directory for smoke tests.' }
 Copy-Item -LiteralPath (Join-Path $publishRoot 'Example/settings.json') -Destination (Join-Path $stageData 'settings.json')
-$extras = Get-ChildItem -LiteralPath $publishRoot | Where-Object Name -notin @('APPLICATION.exe', 'Example', 'Data', 'Debug Data')
+$extras = Get-ChildItem -LiteralPath $publishRoot | Where-Object Name -notin @('APPLICATION.exe', 'Example', 'Data', 'Debug Data', 'Read me.txt')
 if ($extras.Count -gt 0) { throw ('Unexpected publish files: ' + (($extras | Select-Object -ExpandProperty Name) -join ', ')) }
 New-Item -ItemType Directory -Force -Path $deliveryRoot | Out-Null
 Copy-Item -LiteralPath $published -Destination (Join-Path $deliveryRoot 'APPLICATION.exe') -Force
+Copy-Item -LiteralPath (Join-Path $publishRoot 'Read me.txt') -Destination (Join-Path $deliveryRoot 'Read me.txt') -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $deliveryRoot 'Debug Data') | Out-Null
 Copy-Item -LiteralPath (Join-Path $publishRoot 'Debug Data/Read me.txt') -Destination (Join-Path $deliveryRoot 'Debug Data/Read me.txt') -Force
 foreach ($sourceFile in Get-ChildItem -LiteralPath (Join-Path $publishRoot 'Example') -File -Recurse) {
