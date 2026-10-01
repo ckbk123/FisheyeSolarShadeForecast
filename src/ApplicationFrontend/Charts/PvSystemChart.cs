@@ -72,9 +72,24 @@ public sealed class PvSystemChart : FrameworkElement
         while (lo < hi) { int mid = (lo + hi) / 2; if (Time(rows[mid].End) <= time) lo = mid + 1; else hi = mid; }
         Hover?.Invoke(Describe(rows[lo]));
     }
+    private DrawingGroup? cachedDrawing;
+    private (BatterySimulationResult? Result, double From, double To, bool Load, bool Pv, bool Soc, bool Stale, Size Size, double Dpi) drawingKey;
     protected override void OnRender(DrawingContext dc)
     {
-        base.OnRender(dc); dc.DrawRectangle(Brushes.White, null, new Rect(RenderSize));
+        base.OnRender(dc);
+        var key = (result, from, to, ShowLoad, ShowPv, ShowSoc, Stale, RenderSize, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        if (cachedDrawing == null || drawingKey != key)
+        {
+            var drawing = new DrawingGroup(); using (var context = drawing.Open()) Draw(context);
+            drawing.Freeze(); cachedDrawing = drawing; drawingKey = key;
+        }
+        dc.DrawDrawing(cachedDrawing);
+        if (result != null && (ShowLoad || ShowPv || ShowSoc) && pointer is { } point && Plot.Contains(point))
+            dc.DrawLine(new Pen(Brushes.Gray, .8), new(point.X, Plot.Top), new(point.X, Plot.Bottom));
+    }
+    private void Draw(DrawingContext dc)
+    {
+        dc.DrawRectangle(Brushes.White, null, new Rect(RenderSize));
         if (result == null) { Text(dc, "Evaluate your system to display hourly results.", 20, 45); return; }
         if (!ShowLoad && !ShowPv && !ShowSoc) { Text(dc, "Select a series above to show the graph.", 20, 45); return; }
         var plot = Plot; var visible = result.Hours.Where(h => Time(h.End) >= from && Time(h.Start) <= to).ToArray();
@@ -139,7 +154,6 @@ public sealed class PvSystemChart : FrameworkElement
             }
         }
         if (ShowSoc && Time(result.Hours[0].Start) >= from) dc.DrawEllipse(SocBrush, null, new(X(Time(result.Hours[0].Start)), Soc(result.Input.Settings.InitialSoc * 100)), 3, 3);
-        if (pointer is { } point && plot.Contains(point)) dc.DrawLine(new Pen(Brushes.Gray, .8), new(point.X, plot.Top), new(point.X, plot.Bottom));
         dc.Pop();
         if (Stale) Text(dc, "PREVIOUS RESULTS · evaluate again", plot.Left + 10, plot.Top + 10, Brushes.Crimson, 15);
     }

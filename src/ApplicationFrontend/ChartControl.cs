@@ -76,9 +76,22 @@ public sealed class IrradianceChart : FrameworkElement
     }
     private double Before(PanelRow r) => Component switch { 1 => r.BeforeDirect, 2 => r.BeforeDiffuse, _ => r.BeforeTotal };
     private double? After(PanelRow r) => Component switch { 1 => r.AfterDirect, 2 => r.AfterDiffuse, _ => r.AfterTotal };
+    private DrawingGroup? cachedDrawing;
+    private (PanelRow[] Rows, int First, int Last, int Component, Size Size, double Dpi) drawingKey;
     protected override void OnRender(DrawingContext dc)
     {
-        base.OnRender(dc); double w = ActualWidth, h = ActualHeight;
+        base.OnRender(dc);
+        var key = (rows, first, last, Component, RenderSize, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        if (cachedDrawing == null || drawingKey != key)
+        {
+            var drawing = new DrawingGroup(); using (var context = drawing.Open()) Draw(context);
+            drawing.Freeze(); cachedDrawing = drawing; drawingKey = key;
+        }
+        dc.DrawDrawing(cachedDrawing);
+    }
+    private void Draw(DrawingContext dc)
+    {
+        double w = ActualWidth, h = ActualHeight;
         dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, Math.Max(0, w), Math.Max(0, h)));
         if (w < 100 || h < 100) return;
         double right = w - RightMargin, bottom = h - BottomMargin;
@@ -124,11 +137,19 @@ public sealed class IrradianceChart : FrameworkElement
             dc.DrawLine(midnight ? Axis : DayGrid, new(x, bottom), new(x, bottom + 5));
             if (midnight && dayWidth >= 40) dc.DrawLine(Axis, new(x, bottom + 26), new(x, bottom + 47));
         }
-        // Plot each full represented interval. StreamGeometry keeps even year-long views inexpensive;
-        // no sample is skipped, so narrow hourly peaks survive zooming out.
+        // Bound dense display geometry to pixel columns while retaining peaks, troughs and gaps.
+        // Full values remain authoritative for hover, calculations and exports.
         dc.PushClip(new RectangleGeometry(new Rect(Left, Top, PlotWidth, bottom - Top)));
         void Draw(Func<PanelRow, double?> selector, Pen pen)
         {
+            if (last - first > PlotWidth * 2)
+            {
+                // Filled one-pixel envelopes avoid expensive tessellation of thousands of
+                // near-vertical, overlapping antialiased strokes on the software renderer.
+                foreach (var band in ChartSteps.Envelopes(rows, first, last, selector, (int)PlotWidth))
+                    dc.DrawRectangle(pen.Brush, null, new Rect(Left + band.Column, Y(band.Maximum), Math.Max(1, X(band.End) - Left - band.Column), Math.Max(1, Y(band.Minimum) - Y(band.Maximum))));
+                return;
+            }
             var geometry = new StreamGeometry();
             using (var context = geometry.Open())
                 foreach (var vertex in ChartSteps.Vertices(rows, first, last, selector))
