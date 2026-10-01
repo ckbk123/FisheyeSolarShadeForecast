@@ -89,25 +89,32 @@ public static partial class TranspositionModule
         var sheets = new List<ScientificSheet> { main };
         long sampleCount = result.Rows.Sum(r => (long)r.Samples.Count);
         for (long offset = 0; offset < sampleCount; offset += chunkSize)
-            sheets.Add(new(offset == 0 ? "Integration components" : $"Integration components {offset/chunkSize+1}", detailHeaders, DetailRows(result, offset, chunkSize)));
+        {
+            long skip = offset;
+            sheets.Add(new(offset == 0 ? "Integration components" : $"Integration components {offset/chunkSize+1}", detailHeaders, [])
+                { WriteRows = (writer, token) => WriteDetails(result, writer, skip, chunkSize, token) });
+        }
         ScientificWorkbook.Write(outputXlsx, sheets,
             $"Actual returned transposition values. Model {result.Model}; tilt {result.Panel.TiltDegrees}; azimuth {result.Panel.AzimuthDegrees}. Source: {result.Timeline.Dataset.Source}. Constant daylight DNI inferred over whole source interval; constant source DHI. Selected interval energy uses actual duration. No ground reflection. {result.Timeline.Convention}", ct);
         return result with { OutputPath = Path.GetFullPath(outputXlsx) };
     }
 
-    private static IEnumerable<object?[]> DetailRows(PreparedTranspositionResult result, long offset, int count)
+    private static void WriteDetails(PreparedTranspositionResult result, ScientificRowWriter writer, long offset, int count, CancellationToken ct)
     {
-        // Skip whole source rows before allocating cell arrays; memory stays bounded to the streaming writer.
+        var flags = new Dictionary<TranspositionFlags, string>();
         foreach (var row in result.Rows)
         {
             if (offset >= row.Samples.Count) { offset -= row.Samples.Count; continue; }
+            string stamp = row.Interval.Timestamp.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
             for (int i = (int)offset; i < row.Samples.Count && count > 0; i++, count--)
             {
-                var s = row.Samples[i];
-                yield return [row.Interval.Id, row.Interval.Timestamp, s.Solar.Timestamp, s.Solar.Weight,
-                    s.Solar.ApparentZenithDegrees, s.Solar.AzimuthDegrees, s.Direct, s.IsotropicDiffuse, s.CircumsolarDiffuse, s.Flags.ToString()];
+                ct.ThrowIfCancellationRequested(); var s = row.Samples[i];
+                if (!flags.TryGetValue(s.Flags, out var flag)) flags[s.Flags] = flag = s.Flags.ToString();
+                writer.Begin(); writer.Text(row.Interval.Id); writer.Text(stamp); writer.Instant(s.Solar.Timestamp); writer.Number(s.Solar.Weight);
+                writer.Number(s.Solar.ApparentZenithDegrees); writer.Number(s.Solar.AzimuthDegrees); writer.Number(s.Direct);
+                writer.Number(s.IsotropicDiffuse); writer.Number(s.CircumsolarDiffuse); writer.Text(flag); writer.End();
             }
-            offset = 0; if (count == 0) yield break;
+            offset = 0; if (count == 0) return;
         }
     }
 }

@@ -75,31 +75,46 @@ public static class SolarIntervalWorkbook
                 row.AtLabel.AzimuthDegrees, row.Interval.Id, row.Interval.SourceStart, row.Interval.SourceEnd,
                 row.Interval.Start, row.Interval.End, row.AtLabel.ApparentZenithDegrees, row.SourceSamples.Count, row.Samples.Count }), metadata, cancellationToken);
         var artifacts = new List<string> { path };
-        IEnumerable<object?[]> DetailRows()
-        {
-            foreach (var row in timeline.Intervals)
-            {
-                foreach (var set in new[] { (Name: "Source", Samples: row.SourceSamples), (Name: "Selected", Samples: row.Samples) })
-                    foreach (var sample in set.Samples)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var direction = Direction.FromAngles(sample.AzimuthDegrees, sample.ApparentZenithDegrees);
-                        yield return [row.Interval.Id, row.Interval.Timestamp, set.Name, sample.Timestamp,
-                            sample.GeometricZenithDegrees, sample.ApparentZenithDegrees, sample.AzimuthDegrees,
-                            direction.East, direction.North, direction.Up, sample.Weight,
-                            row.Interval.SourceStart, row.Interval.SourceEnd, row.Interval.Start, row.Interval.End];
-                    }
-            }
-        }
+        const int chunkSize = 100_000;
+        long total = timeline.Intervals.Sum(r => (long)r.SourceSamples.Count + r.Samples.Count);
         int part = 0;
-        foreach (var rows in DetailRows().Chunk(100_000))
+        for (long offset = 0; offset < total; offset += chunkSize)
         {
+            long skip = offset;
             string detail = Path.Combine(directory, part++ == 0 ? "solar-integration-samples.xlsx" : $"solar-integration-samples-{part:D3}.xlsx");
-            ScientificWorkbook.Write(detail, "Integration samples",
-                ["Source interval ID", "Source timestamp", "Quadrature domain", "Sample timestamp", "Geometric zenith (degrees)", "Apparent zenith (degrees)", "Azimuth (degrees)", "Apparent east unit vector", "Apparent north unit vector", "Apparent up unit vector", "Mean quadrature weight", "Source start", "Source end", "Selected start", "Selected end"],
-                rows, metadata + " These are numerical integration samples, not additional weather observations.", cancellationToken);
+            ScientificSheet sheet = new("Integration samples",
+                ["Source interval ID", "Source timestamp", "Quadrature domain", "Sample timestamp", "Geometric zenith (degrees)", "Apparent zenith (degrees)", "Azimuth (degrees)", "Apparent east unit vector", "Apparent north unit vector", "Apparent up unit vector", "Mean quadrature weight", "Source start", "Source end", "Selected start", "Selected end"], [])
+                { WriteRows = (writer, ct) => WriteDetails(timeline, writer, skip, chunkSize, ct) };
+            ScientificWorkbook.Write(detail, [sheet], metadata + " These are numerical integration samples, not additional weather observations.", cancellationToken);
             artifacts.Add(detail);
         }
         return artifacts.AsReadOnly();
     }
+    private static void WriteDetails(SolarTimeline timeline, ScientificRowWriter writer, long skip, int count, CancellationToken ct)
+    {
+        foreach (var row in timeline.Intervals)
+        {
+            int size = row.SourceSamples.Count + row.Samples.Count;
+            if (skip >= size) { skip -= size; continue; }
+            string stamp = row.Interval.Timestamp.ToString("O", CultureInfo.InvariantCulture),
+                sourceStart = row.Interval.SourceStart.ToString("O", CultureInfo.InvariantCulture), sourceEnd = row.Interval.SourceEnd.ToString("O", CultureInfo.InvariantCulture),
+                start = row.Interval.Start.ToString("O", CultureInfo.InvariantCulture), end = row.Interval.End.ToString("O", CultureInfo.InvariantCulture);
+            for (int domain = 0; domain < 2; domain++)
+            {
+                var samples = domain == 0 ? row.SourceSamples : row.Samples;
+                if (skip >= samples.Count) { skip -= samples.Count; continue; }
+                for (int i = (int)skip; i < samples.Count && count > 0; i++, count--)
+                {
+                    ct.ThrowIfCancellationRequested(); var sample = samples[i];
+                    var direction = Direction.FromAngles(sample.AzimuthDegrees, sample.ApparentZenithDegrees);
+                    writer.Begin(); writer.Text(row.Interval.Id); writer.Text(stamp); writer.Text(domain == 0 ? "Source" : "Selected"); writer.Instant(sample.Timestamp);
+                    writer.Number(sample.GeometricZenithDegrees); writer.Number(sample.ApparentZenithDegrees); writer.Number(sample.AzimuthDegrees);
+                    writer.Number(direction.East); writer.Number(direction.North); writer.Number(direction.Up); writer.Number(sample.Weight);
+                    writer.Text(sourceStart); writer.Text(sourceEnd); writer.Text(start); writer.Text(end); writer.End();
+                }
+                skip = 0; if (count == 0) return;
+            }
+        }
+    }
+
 }
