@@ -13,6 +13,8 @@ public sealed class DebugDataStore : IDisposable
     private readonly FileStream lease;
     private bool disposed;
     private bool recovered;
+    private readonly HashSet<string> deferredCleanup = new(StringComparer.OrdinalIgnoreCase);
+    internal IReadOnlyCollection<string> DeferredCleanup => deferredCleanup;
     public DebugDataStore(string root)
     {
         Root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
@@ -60,7 +62,25 @@ public sealed class DebugDataStore : IDisposable
             var saved = PortablePaths.Map(settings, Protect);
             // Save references first, so interruption cannot strand selected inputs.
             if (saved != settings) AppData.SaveSettings(saved);
-            foreach (string old in legacy) DeleteTree(Root, old);
+            foreach (string old in legacy)
+            {
+                if (deferredCleanup.Contains(old)) continue;
+                try
+                {
+                    // Old diagnostics are optional housekeeping. Preserve read-only trees intact,
+                    // including OneDrive folders, rather than partly deleting them before failing.
+                    var entries = Files(old).Concat(Directory.GetDirectories(old, "*", SearchOption.AllDirectories)).Append(old);
+                    if (entries.Any(path => (File.GetAttributes(path) & FileAttributes.ReadOnly) != 0))
+                        throw new IOException("Old diagnostics contain read-only files or folders.");
+                    DeleteTree(Root, old);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    deferredCleanup.Add(old);
+                    try { File.AppendAllText(AppData.PathFor("maintenance.log"), $"{DateTimeOffset.Now:O} Deferred old diagnostic cleanup: {old}. {ex.Message}{Environment.NewLine}"); }
+                    catch (Exception logError) when (logError is IOException or UnauthorizedAccessException) { }
+                }
+            }
             if (!recovered) { Current?.Recover(InputDependencies.Capture(saved).SourcePaths); recovered = true; }
             return saved;
         }

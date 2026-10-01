@@ -157,6 +157,60 @@ public sealed class CurrentStoreTests
         using var service = new AppServices(fixture.Debug); service.PrepareInputs(fixture.Settings);
         Assert.True(File.Exists(profile)); Assert.Equal("keep", File.ReadAllText(Path.Combine(Path.GetDirectoryName(profile)!, "user-notes.txt")));
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReadOnlyLegacyDiagnosticsDoNotBlockStartupAndSelectedInputsArePreserved(bool readOnlyDirectory) => Sta(() =>
+    {
+        using var fixture = new Fixture();
+        string profile = Legacy(fixture, "01-calibration", fixture.Settings.ProfilePath);
+        string protectedPath = readOnlyDirectory ? Path.GetDirectoryName(profile)! : profile;
+        var originalAttributes = File.GetAttributes(protectedPath);
+        string? preservedProfile = null;
+        File.SetAttributes(protectedPath, originalAttributes | FileAttributes.ReadOnly);
+        try
+        {
+            using (var store = new DebugDataStore(fixture.Debug))
+            {
+                var migrated = store.PrepareInputs(fixture.Settings with { ProfilePath = profile });
+                preservedProfile = PortablePaths.Resolve(migrated.ProfilePath);
+                Assert.Single(store.DeferredCleanup);
+                Assert.True(File.Exists(profile));
+                Assert.Equal(AppData.FileKey(profile), AppData.FileKey(PortablePaths.Resolve(migrated.ProfilePath)));
+                store.PrepareInputs(migrated);
+                Assert.Single(File.ReadAllLines(AppData.PathFor("maintenance.log")));
+            }
+            using var service = new AppServices(fixture.Debug);
+            var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+            try
+            {
+                Assert.Equal("Solar Irradiance", window.Workspaces.Active!.Title);
+                Assert.NotNull(window.PvAutonomy);
+                Assert.Null(window.Completed);
+                Assert.True(File.Exists(profile));
+            }
+            finally { window.Close(); }
+        }
+        finally
+        {
+            if (File.Exists(protectedPath) || Directory.Exists(protectedPath)) File.SetAttributes(protectedPath, originalAttributes);
+            // File.Copy preserves read-only attributes; restore the test copy before fixture disposal.
+            if (preservedProfile != null && File.Exists(preservedProfile))
+                File.SetAttributes(preservedProfile, File.GetAttributes(preservedProfile) & ~FileAttributes.ReadOnly);
+        }
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public void LockedLegacyFileDefersCleanupWithoutBlockingInputPreparation()
+    {
+        using var fixture = new Fixture(); string profile = Legacy(fixture, "01-calibration", fixture.Settings.ProfilePath);
+        using var locked = new FileStream(profile, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var store = new DebugDataStore(fixture.Debug);
+        var settings = store.PrepareInputs(fixture.Settings);
+        Assert.Single(store.DeferredCleanup); Assert.True(File.Exists(profile));
+        Assert.Equal(fixture.Settings, settings);
+    }
     [Fact]
     public async Task SelectedCurrentProfileIsSavedBeforeInvalidationAndSurvivesUpdates()
     {
