@@ -50,3 +50,5 @@ The proposed on-demand diagnostics mode and shared-domain workbook schema were a
 ## Distribution
 
 Preview 0.1.1 is a self-contained Windows x64 package with the four original model resources, the bundled example, both Solar Irradiance and PV Autonomy, and a short recipient guide. The first model use extracts its resource into local Data. Updating an installed executable preserves the personal Data/settings.json. The distributable ZIP is made from a clean stage, never the developer's saved session.
+
+The shipped executable identifies source commit `14a386c4c3089084b6aea39c3f88bac2ac51cb13`. Normal GPU selection, forced CPU execution, and a clean ZIP extraction launched from a different working directory all passed the packaged end-to-end checks, including both workspaces and PV/backend agreement. All four bundled models were extracted and hashed. Both installed copies match the ZIP executable; both settings files remained byte-identical, and previous executables were backed up. See [packaged validation receipt](performance/2026-10-01-packaged-validation.json). The final documentation commit records these checks without changing the compiled source.

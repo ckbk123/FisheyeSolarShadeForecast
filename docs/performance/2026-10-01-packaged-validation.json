@@ -1,0 +1,69 @@
+{
+  "Version": "0.1.1",
+  "SourceCommit": "14a386c4c3089084b6aea39c3f88bac2ac51cb13",
+  "PullRequest": "https://github.com/ckbk123/FisheyeSolarShadeForecast/pull/11",
+  "ExecutableSha256": "096B6FC9088FBCDFCCBD949E9868D40D841CC5BBD7C36FB066525C48B7647206",
+  "ZipSha256": "8083F5DE3C1A23D653F3285834B72CB9E86817160A3FADAC59226F40E46202B2",
+  "ZipBytes": 763892247,
+  "TestsPassed": 504,
+  "FrontendTestsPassed": 175,
+  "PackagedChecks": [
+    {
+      "Mode": "gpu",
+      "Passed": true,
+      "Portable": false,
+      "Rows": 696,
+      "PvPassed": true,
+      "DirectBatteryBackendMatch": true,
+      "SettingsRestored": true,
+      "UiReadyMilliseconds": 934.5535,
+      "BundledModelCount": 4
+    },
+    {
+      "Mode": "cpu",
+      "Passed": true,
+      "Portable": false,
+      "Rows": 696,
+      "PvPassed": true,
+      "DirectBatteryBackendMatch": true,
+      "SettingsRestored": true,
+      "UiReadyMilliseconds": 900.9223,
+      "BundledModelCount": 4
+    },
+    {
+      "Mode": "portable",
+      "Passed": true,
+      "Portable": true,
+      "Rows": 696,
+      "PvPassed": true,
+      "DirectBatteryBackendMatch": true,
+      "SettingsRestored": true,
+      "UiReadyMilliseconds": 914.9159,
+      "BundledModelCount": 4
+    }
+  ],
+  "CleanZip": {
+    "DataFiles": [
+      "Data/settings.json"
+    ],
+    "DebugFiles": [
+      "Debug Data/Read me.txt"
+    ],
+    "FirstRun": true,
+    "ExecutableMatchesInstalled": true
+  },
+  "InstalledCopies": [
+    {
+      "Folder": "Deliverable-rewritten",
+      "SettingsByteIdentical": true,
+      "ExecutableMatches": true,
+      "PreviousExecutableBackedUp": true
+    },
+    {
+      "Folder": "Deliverable",
+      "SettingsByteIdentical": true,
+      "ExecutableMatches": true,
+      "PreviousExecutableBackedUp": true
+    }
+  ]
+}
