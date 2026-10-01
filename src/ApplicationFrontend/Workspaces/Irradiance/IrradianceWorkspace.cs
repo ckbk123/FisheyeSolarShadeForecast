@@ -326,8 +326,23 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                     var changed = services.ObserveInputs(prepared, invalid, refreshSources, verifyArtifacts);
                     return (prepared, changed);
                 });
-                if (closing || observedRevision != revision) return;
-                if (result.prepared != snapshot) { settings = result.prepared; LoadFields(); WatchSources(); }
+                if (closing) return;
+                if (result.prepared != snapshot)
+                {
+                    // A calculation may already be waiting, or the user may have edited
+                    // other fields. Merge only preserved paths that are still selected.
+                    foreach (string name in new[] { "CalibrationFolder", "SkyFolder", "SkyImage", "ProfilePath", "ImportPath" })
+                    {
+                        var property = typeof(UserSettings).GetProperty(name)!;
+                        if (Equals(property.GetValue(settings), property.GetValue(snapshot)))
+                            property.SetValue(settings, property.GetValue(result.prepared));
+                    }
+                    bool wasLoading = loading; loading = true;
+                    try { foreach (string name in new[] { "CalibrationFolder", "SkyFolder" }) fields[name].Text = (string)typeof(UserSettings).GetProperty(name)!.GetValue(settings)!; }
+                    finally { loading = wasLoading; }
+                    WatchSources(); SaveInputs();
+                }
+                if (observedRevision != revision) return;
                 uiInputs = InputDependencies.Capture(settings, uiInputs, false);
                 if (refreshSources && result.changed != ArtifactGroup.None)
                 {
@@ -453,6 +468,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             await inputWork;
             if (closing || current != revision) return;
             ct.ThrowIfCancellationRequested();
+            snapshot = settings with { };
             var result = await services.Evaluate(snapshot, refresh,
                 text => Dispatcher.InvokeAsync(() => { if (current == revision) status.Text = text; }),
                 asset => Dispatcher.InvokeAsync(() => { if (current == revision && imageRevision == orientationRevision && !closing) ShowMask(asset); }), ct,

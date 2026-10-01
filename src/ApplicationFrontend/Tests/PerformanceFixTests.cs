@@ -74,6 +74,25 @@ public class PerformanceFixTests
         finally { await window.InputsSettled; window.Close(); }
     });
     [Fact]
+    public void StartingUpdateImmediatelyAfterSelectingManagedProfileKeepsThePreservedPath() => Sta(async () =>
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(applicationServices: service);
+        try
+        {
+            window.Calculate(); await Until(() => !window.UpdatingForTest);
+            window.SetProfileForTest(Path.Combine(fixture.Debug, "01-calibration", "camera-profile.json"));
+            window.Calculate(); await Until(() => !window.UpdatingForTest);
+            Assert.Equal(UpdateState.UpToDate, window.UpdateStateForTest);
+            string selected = window.IrradianceController.Settings.ProfilePath;
+            Assert.False(DebugDataStore.Within(fixture.Debug, PortablePaths.Resolve(selected)));
+            Assert.Equal(selected, window.Completed!.Settings.ProfilePath);
+            Assert.Equal(selected, AppData.ReadSettings()!.ProfilePath);
+            Assert.True(File.Exists(PortablePaths.Resolve(selected)));
+        }
+        finally { await window.InputsSettled; window.Close(); }
+    });
+    [Fact]
     public void DenseChartPreservesPeaksTroughsAndGaps()
     {
         var start = DateTimeOffset.UnixEpoch;
