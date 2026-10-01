@@ -23,7 +23,12 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private readonly Func<TimeZoneInfo> systemZone;
     private IIrradianceService services => controller.Service;
     private readonly SourceFileWatch sourceWatch;
-    private int sourceCheckQueued;
+    private int sourceCheckQueued, observations;
+    private bool checkAfterUpdate, fullCheckQueued;
+    private Task inputWork = Task.CompletedTask;
+    private InputDependencies? uiInputs;
+    private ArtifactGroup uiInvalid;
+    public Task InputsSettled => inputWork;
     private CancellationTokenSource? pending { get => controller.Pending; set => controller.Pending = value; }
     private long revision { get => controller.Revision; set => controller.Revision = value; }
     private bool loading, closing, exporting;
@@ -78,11 +83,11 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         actions.Children.Add(Button("Help", ShowHelp));
         export.Click += async (_, _) =>
         {
-            RecheckSources();
+            await RecheckSourcesAsync();
             var snapshot = completed; if (snapshot == null || !export.IsEnabled) return;
             var pick = new OpenFolderDialog { Title = "Choose a folder for a new scenario export" };
             if (pick.ShowDialog(owner) != true) return;
-            RecheckSources(); if (!export.IsEnabled || completed != snapshot) return;
+            await RecheckSourcesAsync(); if (!export.IsEnabled || completed != snapshot) return;
             exporting = true; RefreshButtons();
             try
             {
@@ -182,6 +187,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         settings = services.PrepareInputs(settings);
         LoadFields();
         services.ObserveInputs(settings, refreshSources: true);
+        uiInputs = InputDependencies.Capture(settings);
         WatchSources();
         RefreshInputState();
         loadFirstExample = loadExampleOnFirstRun && settings.FirstRun;
@@ -208,7 +214,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         sourceWatch.Dispose();
         controller.CommandsChanged -= OnCommandsChanged;
         try { AppData.SaveSettings(settings); } catch { }
-        controller.Dispose();
+        if (inputWork.IsCompleted) controller.Dispose();
+        else _ = DisposeAfterObservation();
+        async Task DisposeAfterObservation() { await inputWork; controller.Dispose(); }
     }
     private void AddStyles()
     {
@@ -284,22 +292,65 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         if (loading || closing) return;
         try
         {
-            var prepared = services.PrepareInputs(settings);
-            if (prepared != settings) { settings = prepared; LoadFields(); }
-            var changed = services.ObserveInputs(settings, invalidFields, refreshSources, verifyArtifacts);
+            var next = InputDependencies.Capture(settings, uiInputs, false);
+            var forced = invalidFields.Aggregate(ArtifactGroup.None, (a, f) => a | InputDependencies.ForField(f, settings));
+            var changed = (uiInputs?.Difference(next) ?? ArtifactGroup.All) | forced | uiInvalid;
+            uiInputs = next; uiInvalid = forced;
             if (changed != ArtifactGroup.None)
             {
                 revision++; pending?.Cancel(); export.IsEnabled = false;
                 ApplyInvalidation(changed); RefreshInputState();
             }
+            if (changed != ArtifactGroup.None || refreshSources || verifyArtifacts) QueueObservation(refreshSources, verifyArtifacts);
             WatchSources();
         }
         catch (Exception ex)
         { revision++; pending?.Cancel(); ApplyInvalidation(ArtifactGroup.All); ShowError(ex); }
         if (saveSettings) SaveInputs();
     }
+    private void QueueObservation(bool refreshSources, bool verifyArtifacts)
+    {
+        var previous = inputWork; var snapshot = settings with { }; var invalid = invalidFields.ToArray(); long observedRevision = revision;
+        observations++; if (verifyArtifacts) fullCheckQueued = true;
+        controller.Verifying = true; RefreshButtons();
+        inputWork = ObserveAsync();
+        async Task ObserveAsync()
+        {
+            try
+            {
+                await previous;
+                if (closing) return;
+                var result = await Task.Run(() =>
+                {
+                    var prepared = services.PrepareInputs(snapshot);
+                    var changed = services.ObserveInputs(prepared, invalid, refreshSources, verifyArtifacts);
+                    return (prepared, changed);
+                });
+                if (closing || observedRevision != revision) return;
+                if (result.prepared != snapshot) { settings = result.prepared; LoadFields(); WatchSources(); }
+                uiInputs = InputDependencies.Capture(settings, uiInputs, false);
+                if (refreshSources && result.changed != ArtifactGroup.None)
+                {
+                    revision++; pending?.Cancel(); ApplyInvalidation(result.changed); RefreshInputState();
+                }
+            }
+            catch (Exception ex) { if (!closing && observedRevision == revision) { revision++; pending?.Cancel(); ApplyInvalidation(ArtifactGroup.All); ShowError(ex); } }
+            finally
+            {
+                observations--; if (verifyArtifacts) fullCheckQueued = false;
+                controller.Verifying = observations > 0;
+                if (!closing) RefreshButtons();
+            }
+        }
+    }
     private void WatchSources() => sourceWatch.SetFiles([settings.SkyImage, settings.ProfilePath, settings.ImportPath]);
-    public void RecheckSources() => Changed(saveSettings: false, refreshSources: true, verifyArtifacts: true);
+    public void RecheckSources()
+    {
+        if (closing) return;
+        if (updating || calibrating) { checkAfterUpdate = true; return; }
+        if (!fullCheckQueued) QueueObservation(true, true);
+    }
+    public Task RecheckSourcesAsync() { RecheckSources(); return inputWork; }
     private void ApplyInvalidation(ArtifactGroup groups)
     {
         if ((groups & ArtifactGroup.Mask) != 0)
@@ -349,7 +400,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         update.ToolTip = refreshData.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : null;
         stop.IsEnabled = updating && pending?.IsCancellationRequested == false;
         controller.RefreshSource();
-        export.IsEnabled = !exporting && !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null &&
+        export.IsEnabled = !controller.Verifying && !exporting && !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null &&
             services.IsCurrent(completed) && completed.ManagedDebugRun?.HasCompleteDataset == true;
     }
     public void StopUpdate()
@@ -388,9 +439,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     public async void Begin(bool refresh)
     {
         if (closing || updating || calibrating || controller.DependentBusy) return;
-        RecheckSources();
         if (TimeZoneSelection.ApplySystemZone(settings, systemZone())) { UpdateTimeZoneControls(); Changed(); }
         if (InputProblem() is { } problem) { SetUpdateState(UpdateState.NeedsAttention, problem); return; }
+        controller.Revalidating = !refresh && updateState == UpdateState.UpToDate && completed != null;
         settings.FirstRun = false; SaveInputs();
         pending?.Dispose(); pending = new(); var ct = pending.Token; long current = ++revision; updating = true;
         SetUpdateState(UpdateState.Updating, "Preparing the current inputs…");
@@ -399,6 +450,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         long imageRevision = orientationRevision;
         try
         {
+            await inputWork;
+            if (closing || current != revision) return;
+            ct.ThrowIfCancellationRequested();
             var result = await services.Evaluate(snapshot, refresh,
                 text => Dispatcher.InvokeAsync(() => { if (current == revision) status.Text = text; }),
                 asset => Dispatcher.InvokeAsync(() => { if (current == revision && imageRevision == orientationRevision && !closing) ShowMask(asset); }), ct,
@@ -418,7 +472,15 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         }
         catch (OperationCanceledException) { if (current == revision && !closing) SetUpdateState(UpdateState.Stopped, "Update stopped. Click Update results to retry."); }
         catch (Exception ex) { if (current == revision) ShowError(ex); }
-        finally { updating = false; if (!closing) { RecheckSources(); RefreshButtons(); } }
+        finally
+        {
+            if (!closing && checkAfterUpdate)
+            {
+                checkAfterUpdate = false; QueueObservation(true, true); await inputWork;
+            }
+            updating = false; controller.Revalidating = false;
+            if (!closing) RefreshButtons();
+        }
     }
     public void ShowMask(MaskAsset asset)
     {
@@ -519,7 +581,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private void ShowHelp()
     {
         var text = "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles.\n\n2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading.\n\n3. Set camera pose, panel angles, site, dates and time zone. Dates include the complete end day. Positive camera tilt points toward the image top; bottom south = bearing 180°.\n\n4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the advanced isotropic option. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional.\n\nEach explicit update maintains one current Debug Data set beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files, fingerprints and the current status. Only a complete calculation is marked Complete; calibration or orientation alone is Partial. Unavailable stages are marked skipped. Edits remove affected files from the latest run, hide stale overlays and disable export. Camera rotation preserves the mask and numerical solar positions; panel edits preserve upstream files. Source-file changes are checked without recalculating. Close any locked diagnostic workbook and retry Update. Valid files are kept unchanged. Replacements are staged before publication. Verified old run folders are migrated after protecting selected inputs under Data/Inputs. Close the other SolarShade instance if this dataset is already in use.\n\nExport results copies the verified current debug files and adds a one-page Summary.pdf with the saved parameters and results. It creates a new scenario folder only after every file is ready. Export requires a complete shaded dataset; a baseline alone is insufficient. If inputs change during export, retry after Update results. Example/Irradiance holds the bundled input workbook; Example/Debug Data/reference-run holds a fixed library-generated reference run. Your current dataset uses the top-level Debug Data folder; the bundled reference stays unchanged.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches, extracted model weights and durable Profiles/Inputs. Keep these durable inputs when moving or backing up the application. Your own inputs may be anywhere. Data location:\n" + AppData.Root + "\n\nSolar Irradiance estimates historical direct + sky-diffuse irradiance. Once its complete shaded dataset is current, open PV Autonomy to enter a daily consumption profile, panel area and efficiencies, battery capacity and initial charge. Evaluate system computes hourly battery charge and unmet load for this study. First model use is slower; later panel edits reuse expensive work.";
-        var dialog = new Window { Owner = owner, Title = "Using SolarShade · test build 0.1", Width = 740, Height = 700, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var dialog = new Window { Owner = owner, Title = "Using SolarShade · preview 0.1.1", Width = 740, Height = 700, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         var panel = new StackPanel { Margin = new(22) }; panel.Children.Add(Label(text, 14)); panel.Children.Add(Button("Third-party notices", () => { using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Notices")!; using var reader = new StreamReader(stream); var notice = new Window { Owner = dialog, Title = "Third-party notices", Width = 720, Height = 540, Content = new TextBox { Text = reader.ReadToEnd(), IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } }; notice.ShowDialog(); })); dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; dialog.ShowDialog();
     }
     public Evaluation? Completed => completed;

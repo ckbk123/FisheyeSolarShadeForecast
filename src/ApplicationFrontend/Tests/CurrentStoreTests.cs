@@ -136,7 +136,7 @@ public sealed class CurrentStoreTests
         using (var service = new AppServices(fixture.Debug))
         {
             settings = service.PrepareInputs(settings);
-            Assert.False(File.Exists(profile)); Assert.False(File.Exists(weather));
+            Assert.True(File.Exists(profile)); Assert.True(File.Exists(weather));
             Assert.Equal(AppData.FileKey(fixture.Settings.ProfilePath), AppData.FileKey(PortablePaths.Resolve(settings.ProfilePath)));
             Assert.Equal(settings.ProfilePath, AppData.ReadSettings()!.ProfilePath);
             Assert.True(service.IsCurrent(await Calculate(service, settings)));
@@ -172,7 +172,7 @@ public sealed class CurrentStoreTests
         {
             using (var store = new DebugDataStore(fixture.Debug))
             {
-                var migrated = store.PrepareInputs(fixture.Settings with { ProfilePath = profile });
+                var migrated = store.CleanHistory(fixture.Settings with { ProfilePath = profile });
                 preservedProfile = PortablePaths.Resolve(migrated.ProfilePath);
                 Assert.Single(store.DeferredCleanup);
                 Assert.True(File.Exists(profile));
@@ -207,7 +207,7 @@ public sealed class CurrentStoreTests
         using var fixture = new Fixture(); string profile = Legacy(fixture, "01-calibration", fixture.Settings.ProfilePath);
         using var locked = new FileStream(profile, FileMode.Open, FileAccess.Read, FileShare.Read);
         using var store = new DebugDataStore(fixture.Debug);
-        var settings = store.PrepareInputs(fixture.Settings);
+        var settings = store.CleanHistory(fixture.Settings);
         Assert.Single(store.DeferredCleanup); Assert.True(File.Exists(profile));
         Assert.Equal(fixture.Settings, settings);
     }

@@ -11,6 +11,7 @@ public sealed class DebugDataRun : IDisposable
     private Manifest state = new();
     private string? manifestHash;
     private bool cleanupPending;
+    private readonly Dictionary<string, PerformanceTrace> stageTimings = new();
     public string DirectoryPath => store.Root;
     public string Id => state.Id;
     internal object SyncRoot => store.Gate;
@@ -43,7 +44,7 @@ public sealed class DebugDataRun : IDisposable
     }
     public DebugDataRun(UserSettings settings, string kind = "calculation", string? root = null)
         : this(new DebugDataStore(root ?? DefaultRoot), settings, kind, true) { }
-    internal DebugDataRun(DebugDataStore store, UserSettings settings, string kind = "calculation", bool ownsStore = false)
+    internal DebugDataRun(DebugDataStore store, UserSettings settings, string kind = "calculation", bool ownsStore = false, InputDependencies? verifiedInputs = null)
     {
         this.store = store; this.ownsStore = ownsStore;
         try
@@ -52,9 +53,9 @@ public sealed class DebugDataRun : IDisposable
         {
             store.Check();
             settings = store.PrepareInputs(settings);
-            var inputs = InputDependencies.Capture(settings);
+            var inputs = verifiedInputs ?? InputDependencies.Capture(settings);
             var previous = store.Current;
-            previous?.Invalidate(previous.Differences(inputs) | InputDependencies.WithDependents(previous.ChangedArtifacts(true)), inputs.SourcePaths);
+            previous?.Invalidate(previous.Differences(inputs) | (verifiedInputs == null ? InputDependencies.WithDependents(previous.ChangedArtifacts(true)) : ArtifactGroup.None), inputs.SourcePaths);
             if (kind == "calculation" && previous?.state.Kind == "calibration")
                 previous.Invalidate(ArtifactGroup.Profile | InputDependencies.PoseChain, inputs.SourcePaths);
             previous?.Finish();
@@ -93,7 +94,10 @@ public sealed class DebugDataRun : IDisposable
             var old = state.Stages.GetValueOrDefault(name);
             state.Stages[name] = new("Running", NeedsWrite(StageGroups(name)) ? origin : "Reused published artifacts", AppData.LibraryVersion(owner), old?.Artifacts ?? []);
             state.PendingGroups[name] = state.Invalidated & StageGroups(name);
-            Status("Running"); return path;
+            Status("Running");
+            if (stageTimings.Remove(name, out var previousTiming)) previousTiming.Dispose();
+            stageTimings[name] = PerformanceTrace.Phase("stage", name);
+            return path;
         }
     }
     public void CompleteStage(string name, IReadOnlyList<string> artifacts, bool skipped = false)
@@ -119,6 +123,7 @@ public sealed class DebugDataRun : IDisposable
             state.PendingGroups.Remove(name);
             state.Stages[name] = state.Stages[name] with { Status = skipped ? "Skipped" : "Complete", Artifacts = published.Order().ToArray() };
             Status("Running");
+            if (stageTimings.Remove(name, out var timing)) { timing.Outcome = skipped ? "skipped" : "complete"; timing.Dispose(); }
         }
     }
     public void RecordInput(string name, object fingerprint) { lock (SyncRoot) { Check(); state.Inputs[name] = JsonSerializer.SerializeToElement(fingerprint); Status("Running"); } }
@@ -170,10 +175,11 @@ public sealed class DebugDataRun : IDisposable
             {
                 string manifest = Path.Combine(DirectoryPath, "run.json");
                 if (!File.Exists(manifest) || (checkContents && AppData.FileKey(manifest) != manifestHash)) return ArtifactGroup.All;
+                var checkedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var (relative, hash) in state.ArtifactHashes)
                 {
                     var group = InputDependencies.ForArtifact(relative); if ((state.Invalidated & group) != 0) continue;
-                    string path = Path.Combine(DirectoryPath, relative); DebugDataStore.SafePath(path);
+                    string path = Path.Combine(DirectoryPath, relative); DebugDataStore.SafePath(path, checkedPaths);
                     if (!File.Exists(path) || (checkContents && AppData.FileKey(path) != hash)) changed |= group;
                 }
             }
@@ -216,6 +222,7 @@ public sealed class DebugDataRun : IDisposable
             Check();
             try { RemoveInvalid(InputDependencies.Capture(state.Settings).SourcePaths); store.ClearStaging(); }
             catch (Exception ex) { Status("Failed", "Debug cleanup failed: " + ex.Message); throw; }
+            finally { foreach (var timing in stageTimings.Values) { timing.Outcome = state.Status; timing.Dispose(); } stageTimings.Clear(); }
         }
     }
     internal void Recover(IEnumerable<string> protectedInputs)

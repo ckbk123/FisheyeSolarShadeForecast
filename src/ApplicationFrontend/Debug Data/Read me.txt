@@ -16,9 +16,10 @@ One sibling Debug Data.staging folder holds unpublished work and is removed when
 finished. Interrupted work remains incomplete and can be retried. Debug Data.lock
 prevents other instances from writing here at the same time; the empty file may
 remain after exit. Close another instance or any locked workbooks before retrying.
-Verified historical application run folders are migrated after selected inputs
-are copied into Data/Inputs and their saved paths updated. Unrecognized folders,
-extra user files, explicit exports and the bundled reference are preserved.
+Historical run folders are retained; startup, edits and updates do not scan or
+delete them. Selected inputs inside Debug Data are first copied into Data/Inputs
+and their saved paths updated. Unrecognized files and user exports are preserved.
+Legacy cleanup is a separate explicit maintenance operation, not normal startup.
 
 NUMBERED STAGES
 

@@ -20,7 +20,7 @@ public sealed class MainWindow : Window
 
     public MainWindow(Func<TimeZoneInfo>? systemZoneProvider = null, bool loadExampleOnFirstRun = true, AppServices? applicationServices = null)
     {
-        Title = "SolarShade · Solar Forecast Estimator"; Width = 1440; Height = 960; MinWidth = 1080; MinHeight = 720;
+        Title = "SolarShade · Solar Forecast Estimator · Preview 0.1.1"; Width = 1440; Height = 960; MinWidth = 1080; MinHeight = 720;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = new SolidColorBrush(Color.FromRgb(242, 246, 246));
         FontFamily = new("Segoe UI"); FontSize = 13; Foreground = new SolidColorBrush(Color.FromRgb(25, 48, 58));
@@ -38,7 +38,7 @@ public sealed class MainWindow : Window
         Irradiance = new(this, new(applicationServices ?? new()), systemZoneProvider, loadExampleOnFirstRun);
         host.Register(new("irradiance", "Solar Irradiance", Irradiance, Irradiance.Actions));
         var pvService = new PvEvaluationService(IrradianceController);
-        PvAutonomy = new(this, IrradianceController, new(IrradianceController, pvService), Irradiance.RecheckSources, () => host.Select("irradiance"));
+        PvAutonomy = new(this, IrradianceController, new(IrradianceController, pvService), Irradiance.RecheckSourcesAsync, () => host.Select("irradiance"));
         host.Register(new("pv", "PV Autonomy", PvAutonomy, PvAutonomy.Actions));
         var availability = Label("", 11); availability.Margin = new(20, 3, 0, 3); DockPanel.SetDock(availability, Dock.Top);
         root.Children.Insert(1, availability);
@@ -62,6 +62,8 @@ public sealed class MainWindow : Window
     public void StopUpdate() => Irradiance.StopUpdate();
     public void RefreshSystemTimeZone() => Irradiance.RefreshSystemTimeZone();
     public void RecheckSources() => Irradiance.RecheckSources();
+    public Task RecheckSourcesAsync() => Irradiance.RecheckSourcesAsync();
+    public Task InputsSettled => Irradiance.InputsSettled;
     public void ShowMask(MaskAsset asset) => Irradiance.ShowMask(asset);
     public Task<(CalibrationProfile Profile, string Path, string Details)> CalibrateForTest(UserSettings inputs) => Irradiance.CalibrateForTest(inputs);
     public void SetProfileForTest(string path) => Irradiance.SetProfileForTest(path);

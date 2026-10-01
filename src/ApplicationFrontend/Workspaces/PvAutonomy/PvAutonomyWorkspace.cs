@@ -9,7 +9,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
 {
     private readonly Window owner;
     private readonly IrradianceWorkspaceController source;
-    private readonly Action recheck;
+    private readonly Func<Task> recheck;
     private readonly TextBlock sourceText = Text(""), status = Text(""), summary = Text("", 15), details = Text("", 11), hover = Text("Scroll to zoom · drag to pan. Red marks identify intervals with unmet load.", 11);
     private readonly Button evaluate, stop, export;
     private readonly List<TextBox> fields = [];
@@ -21,14 +21,14 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
     public FrameworkElement Actions { get; }
     public DailyLoadEditor LoadEditor => load;
     public PvSystemChart Chart => chart;
-    public PvAutonomyWorkspace(Window owner, IrradianceWorkspaceController source, PvWorkspaceController controller, Action recheck, Action goToSource)
+    public PvAutonomyWorkspace(Window owner, IrradianceWorkspaceController source, PvWorkspaceController controller, Func<Task> recheck, Action goToSource)
     {
         this.owner = owner; this.source = source; Controller = controller; this.recheck = recheck;
         var actions = new StackPanel { Orientation = Orientation.Horizontal };
         actions.Children.Add(Button("Example system", () => { Controller.SetDraft(PvSettingsDraft.Example()); LoadFields(); }));
         actions.Children.Add(Button("Help", ShowHelp)); export = Button("Export PV results", async () =>
         {
-            recheck(); Controller.VerifyPublication(); if (!Controller.CanExport) return;
+            await recheck(); await Controller.VerifyPublicationAsync(); if (!Controller.CanExport) return;
             var dialog = new OpenFolderDialog { Title = "Choose a folder for PV results" };
             if (dialog.ShowDialog(owner) == true) await Controller.ExportAsync(dialog.FolderName);
         }); actions.Children.Add(export); Actions = actions;
@@ -51,7 +51,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         fields[4].ToolTip = "Charge at the start of the entire study, not the displayed day.";
         fields[2].ToolTip = "Total PV-side conversion efficiency. Battery charging/discharging is ideal in this model.";
         var commands = new WrapPanel(); top.Children.Add(commands);
-        evaluate = Button("Evaluate system", async () => { recheck(); await Controller.EvaluateAsync(); }); evaluate.Background = Brushes.Teal; evaluate.Foreground = Brushes.White;
+        evaluate = Button("Evaluate system", async () => { await recheck(); await Controller.EvaluateAsync(); }); evaluate.Background = Brushes.Teal; evaluate.Foreground = Brushes.White;
         stop = Button("Stop", Controller.Stop); commands.Children.Add(evaluate); commands.Children.Add(stop);
         commands.Children.Add(Text("Initial charge applies at the study start.", 11));
         commands.Children.Add(Button("Model & totals", () => MessageBox.Show(owner, Controller.Result == null ? "Evaluate the system to see totals. Battery charge/discharge is ideal; conversion efficiency applies to PV only." : details.Text,
@@ -98,7 +98,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         day.SelectedDate = next < r.Hours[0].Start.Date ? r.Hours[0].Start.Date : next > r.Hours[^1].Start.Date ? r.Hours[^1].Start.Date : next;
     }
     private void OnSourceChanged(object? sender, EventArgs e) => Refresh();
-    private void OnActivated(object? sender, EventArgs e) { if (!disposed) Controller.VerifyPublication(); }
+    private async void OnActivated(object? sender, EventArgs e) { await recheck(); if (!disposed) await Controller.VerifyPublicationAsync(); }
     private void Refresh()
     {
         var draft = Controller.Draft;

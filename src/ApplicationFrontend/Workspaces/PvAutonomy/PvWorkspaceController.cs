@@ -10,6 +10,8 @@ public sealed class PvWorkspaceController : IDisposable
     private PvSettingsDraft draft;
     private CancellationTokenSource? pending;
     private long revision;
+    private Task cleanup = Task.CompletedTask;
+    public Task CleanupSettled => cleanup;
     private bool disposed;
     private IrradianceSnapshot? acceptedSource;
     private string? acceptedKey;
@@ -18,7 +20,7 @@ public sealed class PvWorkspaceController : IDisposable
     public bool IsBusy { get; private set; }
     public bool IsCurrent { get; private set; }
     public bool CanEvaluate => !disposed && !IsBusy && source.Source.IsReady && !source.IsBusy && Problem == null;
-    public bool CanExport => IsCurrent && !IsBusy && source.Source.IsReady;
+    public bool CanExport => IsCurrent && !IsBusy && !source.IsBusy && source.Source.IsReady;
     public string Status { get; private set; } = "Enter your system settings, then evaluate.";
     public string? Problem { get { try { draft.Parse(); return null; } catch (ArgumentException ex) { return ex.Message; } } }
     public event EventHandler? Changed;
@@ -40,8 +42,15 @@ public sealed class PvWorkspaceController : IDisposable
     private void Invalidate(string message)
     {
         revision++; pending?.Cancel(); IsCurrent = false; Status = message;
-        try { service.Store.Invalidate(); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ObjectDisposedException)
-        { Status += " Saved PV output could not be cleared: " + ex.Message; }
+        var previous = cleanup; long version = revision;
+        cleanup = ClearAsync();
+        async Task ClearAsync()
+        {
+            await previous;
+            try { await Task.Run(service.Store.Invalidate); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ObjectDisposedException)
+            { if (!disposed && version == revision) Status += " Saved PV output could not be cleared: " + ex.Message; }
+        }
     }
     public async Task EvaluateAsync()
     {
@@ -52,6 +61,7 @@ public sealed class PvWorkspaceController : IDisposable
         IsBusy = true; IsCurrent = false; source.DependentBusy = true; Status = "Evaluating system…"; Notify();
         try
         {
+            await cleanup; ct.ThrowIfCancellationRequested();
             var result = await service.Evaluate(snapshot, settings, ct);
             if (disposed || current != revision || !source.IsCurrent(snapshot)) return;
             Result = result; acceptedSource = snapshot; acceptedKey = AppData.Key(settings); IsCurrent = true;
@@ -64,12 +74,21 @@ public sealed class PvWorkspaceController : IDisposable
     public void Stop() { if (IsBusy) { Invalidate("Stopped. Evaluate system to retry."); Notify(); } }
     public void VerifyPublication()
     {
+        if (source.IsBusy) return;
         if (IsCurrent && (acceptedSource == null || !source.IsCurrent(acceptedSource) || !service.Store.IsCurrent(acceptedSource, acceptedKey!)))
+        { Invalidate("Source or PV output changed. Update the source if needed, then evaluate system again."); Notify(); }
+    }
+    public async Task VerifyPublicationAsync()
+    {
+        if (!IsCurrent || source.IsBusy) return;
+        long version = revision; var snapshot = acceptedSource; var key = acceptedKey;
+        bool valid = snapshot != null && source.IsCurrent(snapshot) && await Task.Run(() => service.Store.IsCurrent(snapshot, key!));
+        if (!disposed && version == revision && !valid)
         { Invalidate("Source or PV output changed. Update the source if needed, then evaluate system again."); Notify(); }
     }
     public async Task<string?> ExportAsync(string parent)
     {
-        VerifyPublication(); if (!CanExport) return null;
+        await VerifyPublicationAsync(); if (!CanExport) return null;
         var snapshot = acceptedSource!; string key = acceptedKey!; long current = revision;
         pending?.Dispose(); pending = new(); var ct = pending.Token;
         IsBusy = true; source.DependentBusy = true; Notify();

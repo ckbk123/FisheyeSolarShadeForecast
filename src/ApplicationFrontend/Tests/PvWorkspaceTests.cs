@@ -61,6 +61,10 @@ public sealed class PvWorkspaceTests
                 Assert.Equal(AppData.FileKey(Path.Combine(fixture.Debug, "07-battery", name)), AppData.FileKey(Path.Combine(exported!, name)));
             window.PvAutonomy.Chart.Day(fixture.Settings.Start); window.Workspaces.Select("irradiance"); window.Workspaces.Select("pv");
             Assert.True(pv.IsCurrent); Assert.Equal(count, service.PreparationCount);
+            var unchangedPv = pv.Result; int priorRuns = fixture.Runs;
+            window.Calculate(); await Until(() => !window.UpdatingForTest);
+            Assert.Equal(priorRuns, fixture.Runs); Assert.Same(unchangedPv, pv.Result); Assert.True(pv.IsCurrent);
+
             pv.SetDraft(pv.Draft with { Capacity = "" }); Assert.False(pv.CanEvaluate); Assert.False(pv.CanExport);
             Assert.Equal(hash, AppData.FileKey(Path.Combine(fixture.Debug, "run.json"))); Assert.True(window.ExportEnabledForTest);
             Assert.Equal(count, service.PreparationCount);

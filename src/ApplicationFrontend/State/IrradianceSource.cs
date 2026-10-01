@@ -35,11 +35,16 @@ public sealed record SourceReadiness(IrradianceSnapshot? Snapshot, string Reason
 /// <summary>One shared readiness contract for downstream services and navigation.</summary>
 public static class IrradianceReadiness
 {
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Evaluation, SourceReadiness> snapshots = new();
     public static SourceReadiness Inspect(IIrradianceService service, Evaluation? evaluation)
     {
         if (evaluation == null) return new(null, "Complete and update Solar Irradiance first.");
         if (!service.IsCurrent(evaluation) || evaluation.ManagedDebugRun?.HasCompleteDataset != true)
             return new(null, "Irradiance inputs or saved results changed. Update Solar Irradiance.");
+        return snapshots.GetValue(evaluation, Build);
+    }
+    private static SourceReadiness Build(Evaluation evaluation)
+    {
         try
         {
             ValidatePanel(evaluation.Run, evaluation.Settings);

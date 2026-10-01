@@ -48,13 +48,13 @@ public sealed class DebugDataStore : IDisposable
         lock (Gate)
         {
             Check();
-            var legacy = Directory.Exists(Root) ? Directory.GetDirectories(Root).Where(IsLegacyRun).ToArray() : [];
-            var owned = legacy.Concat(Current == null ? [] : new[] { Root }).ToArray();
             string Protect(string path)
             {
                 if (string.IsNullOrWhiteSpace(path)) return path;
                 string full = PortablePaths.Resolve(path);
-                if (!owned.Any(parent => Within(parent, full))) return path;
+                // Any selected input under managed storage is protected, including a newly
+                // selected historical/unknown folder. Never enumerate history while editing.
+                if (!Within(Root, full)) return path;
                 if (Within(Root, AppData.Root)) throw new IOException("Data must be outside Debug Data to preserve selected inputs.");
                 if (!File.Exists(full) && !Directory.Exists(full)) throw new IOException("A selected input in old debug data is missing: " + full);
                 return PortablePaths.Store(Preserve(full, "Inputs"));
@@ -62,9 +62,24 @@ public sealed class DebugDataStore : IDisposable
             var saved = PortablePaths.Map(settings, Protect);
             // Save references first, so interruption cannot strand selected inputs.
             if (saved != settings) AppData.SaveSettings(saved);
-            foreach (string old in legacy)
+            if (!recovered) { Current?.Recover(InputDependencies.Capture(saved).SourcePaths); recovered = true; }
+            return saved;
+        }
+    }
+    /// <summary>Explicit maintenance, never called by startup, edits or calculations.</summary>
+    public UserSettings CleanHistory(UserSettings settings, CancellationToken ct = default)
+    {
+        var saved = PrepareInputs(settings);
+        var candidates = Directory.Exists(Root) ? Directory.GetDirectories(Root) : [];
+        foreach (string old in candidates)
+        {
+            ct.ThrowIfCancellationRequested();
+            // Discovery is outside the storage lock; revalidate ownership before deleting.
+            if (!IsLegacyRun(old)) continue;
+            lock (Gate)
             {
-                if (deferredCleanup.Contains(old)) continue;
+                Check();
+                if (!IsLegacyRun(old)) continue;
                 try
                 {
                     // Old diagnostics are optional housekeeping. Preserve read-only trees intact,
@@ -76,14 +91,13 @@ public sealed class DebugDataStore : IDisposable
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    deferredCleanup.Add(old);
-                    try { File.AppendAllText(AppData.PathFor("maintenance.log"), $"{DateTimeOffset.Now:O} Deferred old diagnostic cleanup: {old}. {ex.Message}{Environment.NewLine}"); }
+                    bool first = deferredCleanup.Add(old);
+                    try { if (first) File.AppendAllText(AppData.PathFor("maintenance.log"), $"{DateTimeOffset.Now:O} Deferred old diagnostic cleanup: {old}. {ex.Message}{Environment.NewLine}"); }
                     catch (Exception logError) when (logError is IOException or UnauthorizedAccessException) { }
                 }
             }
-            if (!recovered) { Current?.Recover(InputDependencies.Capture(saved).SourcePaths); recovered = true; }
-            return saved;
         }
+        return saved;
     }
     public static string Preserve(string source, string category)
     {
@@ -134,11 +148,14 @@ public sealed class DebugDataStore : IDisposable
         string relative = Path.GetRelativePath(Path.GetFullPath(root), Path.GetFullPath(path));
         return !Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar);
     }
-    internal static void SafePath(string path)
+    internal static void SafePath(string path, HashSet<string>? checkedPaths = null)
     {
         for (string? cursor = Path.GetFullPath(path); cursor != null; cursor = Path.GetDirectoryName(cursor))
+        {
+            if (checkedPaths != null && !checkedPaths.Add(cursor)) return;
             if ((File.Exists(cursor) || Directory.Exists(cursor)) && (File.GetAttributes(cursor) & FileAttributes.ReparsePoint) != 0)
                 throw new IOException("Debug storage cannot follow a redirected path: " + cursor);
+        }
     }
     internal static string[] Files(string directory)
     {

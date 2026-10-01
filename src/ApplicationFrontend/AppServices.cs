@@ -82,6 +82,7 @@ public sealed class AppServices : IIrradianceService
     public ArtifactGroup ObserveInputs(UserSettings settings, IEnumerable<string>? invalidFields = null,
         bool refreshSources = false, bool verifyArtifacts = false, bool refreshWeather = false)
     {
+        using var timing = PerformanceTrace.Phase("input-observation", verifyArtifacts ? "content-verification" : "settings");
         lock (inputGate)
         {
             var next = InputDependencies.Capture(settings, currentInputs, refreshSources);
@@ -145,7 +146,22 @@ public sealed class AppServices : IIrradianceService
         }
     }
 
-    public async Task<Evaluation> Evaluate(UserSettings s, bool refresh, Action<string> progress,
+    public Task<Evaluation> Evaluate(UserSettings s, bool refresh, Action<string> progress,
+        Action<MaskAsset>? onMask, CancellationToken ct, Action<SunPathOverlayResult?>? onSunPath = null, Action<CardinalDirectionOverlayResult?>? onCardinals = null)
+    {
+        var snapshot = s with { };
+        var elapsed = Stopwatch.StartNew();
+        return Task.Run(async () =>
+        {
+            using var trace = PerformanceTrace.Operation("irradiance-update");
+            var value = await EvaluateCore(snapshot, refresh, progress, onMask, ct, onSunPath, onCardinals);
+            var timed = value with { TotalMilliseconds = elapsed.Elapsed.TotalMilliseconds };
+            IrradianceReadiness.Inspect(this, timed); // Build the immutable downstream snapshot on the worker.
+            return timed;
+        }, ct);
+    }
+    private Evaluation? accepted;
+    private async Task<Evaluation> EvaluateCore(UserSettings s, bool refresh, Action<string> progress,
         Action<MaskAsset>? onMask, CancellationToken ct, Action<SunPathOverlayResult?>? onSunPath = null, Action<CardinalDirectionOverlayResult?>? onCardinals = null)
     {
         await evaluationGate.WaitAsync(ct);
@@ -163,8 +179,10 @@ public sealed class AppServices : IIrradianceService
             lock (inputGate)
             {
                 ObserveInputs(s, refreshSources: true, verifyArtifacts: true, refreshWeather: refresh);
-                dependencies = InputDependencies.Capture(s);
-                debug = new(Storage, persisted); tracked = new(debug, dependencies, linked); activeRun = tracked;
+                dependencies = currentInputs!;
+                if (!refresh && accepted is { } prior && IsCurrent(prior) && prior.ManagedDebugRun?.HasCompleteDataset == true)
+                { ct.ThrowIfCancellationRequested(); return prior; }
+                debug = new(Storage, persisted, verifiedInputs: dependencies); tracked = new(debug, dependencies, linked); activeRun = tracked;
             }
             var timer = Stopwatch.StartNew();
             var (activeMask, activeProfile, activeCardinals) = await PrepareImageStages(s, debug, progress, onMask, onCardinals, ct);
@@ -270,14 +288,12 @@ public sealed class AppServices : IIrradianceService
             string transpositionDirectory = debug.BeginStage("05-transposition", "Computed", typeof(TranspositionModule));
             progress("Calculating irradiance on the panel");
             string nextTransposed = AppData.Key(new { Solar = nextGeometry, s.PanelTilt, s.PanelAzimuth, s.Isotropic });
-            if (!refresh && (transposedCache == null || transposedKey != nextTransposed))
-            { transposedCache = await Task.Run(() => Values.Read<PreparedTranspositionResult>("panel", nextTransposed), ct); transposedKey = nextTransposed; }
+            // Transposition is cheaper to compute than to deserialize its duplicated solar timeline.
             if (transposedCache == null || transposedKey != nextTransposed || refresh)
             {
                 var next = await Task.Run(() => TranspositionModule.ComputePrepared(geometry!, new(s.PanelTilt, s.PanelAzimuth),
                     s.Isotropic ? DiffuseModel.Isotropic : DiffuseModel.HayDavies, ct: ct), ct);
                 ct.ThrowIfCancellationRequested(); transposedCache = next; transposedKey = nextTransposed;
-                await Task.Run(() => Values.Write("panel", nextTransposed, next), ct);
             }
             var panelArtifacts = debug.NeedsWrite(ArtifactGroup.Transposition)
                 ? new[] { (await Task.Run(() => TranspositionModule.ExportPrepared(transposedCache, Path.Combine(transpositionDirectory, "panel-unshaded.xlsx"), ct), ct)).OutputPath! } : [];
@@ -304,7 +320,7 @@ public sealed class AppServices : IIrradianceService
                 ct.ThrowIfCancellationRequested(); debug.Complete();
             }
             string note = scene == null ? "Add a calibrated camera profile and sky photo for shading." : "Unknown sky is treated as blocked. No ground reflection. Camera coverage may be provisional.";
-            return new(result, raw!, persisted, activeMask, note, timer.Elapsed.TotalMilliseconds, PreparationCount)
+            return accepted = new(result, raw!, persisted, activeMask, note, timer.Elapsed.TotalMilliseconds, PreparationCount)
                 { DebugDirectory = debug.DirectoryPath, SunPath = activeSunPath, SunPathGenerationCount = SunPathGenerationCount, Cardinals = activeCardinals, CardinalGenerationCount = CardinalGenerationCount,
                     Dependencies = dependencies, ManagedDebugRun = debug };
         }
@@ -334,7 +350,13 @@ public sealed class AppServices : IIrradianceService
     }
 
     /// <summary>Image orientation is independent of the irradiance source, dates, site and panel.</summary>
-    public async Task<OrientationPreview> PrepareOrientation(UserSettings settings, Action<string> progress,
+    public Task<OrientationPreview> PrepareOrientation(UserSettings settings, Action<string> progress,
+        Action<MaskAsset>? onMask, CancellationToken ct, Action<CardinalDirectionOverlayResult?>? onCardinals = null)
+    {
+        var snapshot = settings with { };
+        return Task.Run(() => PrepareOrientationCore(snapshot, progress, onMask, ct, onCardinals), ct);
+    }
+    private async Task<OrientationPreview> PrepareOrientationCore(UserSettings settings, Action<string> progress,
         Action<MaskAsset>? onMask, CancellationToken ct, Action<CardinalDirectionOverlayResult?>? onCardinals = null)
     {
         await evaluationGate.WaitAsync(ct);
@@ -470,7 +492,7 @@ public sealed class AppServices : IIrradianceService
             return (activeMask, activeProfile, activeCardinals);
     }
 
-    public static async Task<IrradianceDataset> Fetch(UserSettings s, bool refresh, CancellationToken ct) => (await FetchWithOrigin(s, refresh, ct)).Dataset;
+    public static Task<IrradianceDataset> Fetch(UserSettings s, bool refresh, CancellationToken ct) => Task.Run(async () => (await FetchWithOrigin(s with { }, refresh, ct)).Dataset, ct);
 
     private static async Task<(IrradianceDataset Dataset, string Origin)> FetchWithOrigin(UserSettings s, bool refresh, CancellationToken ct)
     {
@@ -490,7 +512,12 @@ public sealed class AppServices : IIrradianceService
         Cv2.ImEncode(".png", small, out var bytes); return bytes;
     }
 
-    public async Task<(CalibrationProfile Profile, string Path, string Details)> Calibrate(UserSettings s)
+    public Task<(CalibrationProfile Profile, string Path, string Details)> Calibrate(UserSettings s)
+    {
+        var snapshot = s with { };
+        return Task.Run(() => CalibrateCore(snapshot));
+    }
+    private async Task<(CalibrationProfile Profile, string Path, string Details)> CalibrateCore(UserSettings s)
     {
         await evaluationGate.WaitAsync();
         using var cancellation = new CancellationTokenSource();
