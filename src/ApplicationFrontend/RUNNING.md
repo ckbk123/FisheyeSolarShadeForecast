@@ -1,6 +1,6 @@
 # Running SolarShade
 
-Extract a Preview 0.2.0 package, then launch `APPLICATION.exe`. Keep `Example`, `Data` and `Debug Data` alongside it. The previously installed local `Deliverable.zip` is Preview 0.1.1; publish this source to package the mask editor. All four segmentation models are embedded; no Python, Excel installation or model download is required.
+Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.2.0 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
 
 ## Workflow
 
