@@ -10,6 +10,9 @@ using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using SolarShade.SkyPhotoMasking;
 using SolarShade.Shading;
+using SolarShade.MaskEditor;
+using Cv2 = OpenCvSharp.Cv2;
+using ImreadModes = OpenCvSharp.ImreadModes;
 
 namespace SolarShade.Desktop;
 
@@ -57,6 +60,12 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private bool sunPathPublishedEarly;
     private bool sunPathIsCurrent;
     private byte[]? displayedMaskPng;
+    private MaskAsset? displayedAsset;
+    private readonly Button editMask = new() { Content = "Edit mask", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Right,
+        VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(6) };
+    private readonly Button savedStudies = new() { Content = "Saved studies" };
+    private readonly ComboBox maskChoice = new() { MinWidth = 220 };
+    private sealed record MaskChoice(string? Id, string Title) { public override string ToString() => Title; }
     private readonly IrradianceChart chart = new();
     private readonly Button export = new() { Content = "Export irradiance", IsEnabled = false };
     private ComboBox provider = null!, model = null!, resolution = null!, images = null!, zone = null!, window = null!, quality = null!;
@@ -81,6 +90,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         Actions = actions; actions.Resources = Resources;
         actions.Children.Add(Button("Load example", async () => await LoadExample()));
         actions.Children.Add(Button("Help", ShowHelp));
+        savedStudies.Click += (_, _) => ShowSavedStudies(); actions.Children.Add(savedStudies);
         export.Click += async (_, _) =>
         {
             await RecheckSourcesAsync();
@@ -113,9 +123,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         inputs.Children.Add(Label("Count inner corners, not squares: 7 × 10 squares → 6 × 9 corners.", 11));
         var calButtons = new WrapPanel(); calButtons.Children.Add(Button("Calibrate", async () => await Calibrate())); calButtons.Children.Add(Button("Load profile", PickProfile)); inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
-        images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) { settings.SkyImage = Path.Combine(settings.SkyFolder, name); Changed(); } };
-        model = Combo(inputs, "Sky segmentation", Enum.GetNames<SkyModel>()); model.SelectionChanged += (_, _) => { if (!loading && model.SelectedIndex >= 0) { settings.Model = (SkyModel)model.SelectedIndex; Changed(); } };
-        resolution = Combo(inputs, "Mask resolution", ["1024 · original quality", "512 · faster"]); resolution.SelectionChanged += (_, _) => { if (!loading) { settings.Resolution = resolution.SelectedIndex == 1 ? 512 : 1024; Changed(); } };
+        images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) { settings.SkyImage = Path.Combine(settings.SkyFolder, name); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } };
+        model = Combo(inputs, "Sky segmentation", Enum.GetNames<SkyModel>()); model.SelectionChanged += (_, _) => { if (!loading && model.SelectedIndex >= 0) { settings.Model = (SkyModel)model.SelectedIndex; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
+        resolution = Combo(inputs, "Mask resolution", ["1024 · original quality", "512 · faster"]); resolution.SelectionChanged += (_, _) => { if (!loading) { settings.Resolution = resolution.SelectedIndex == 1 ? 512 : 1024; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
         Section(inputs, "02  CAMERA POSE");
         Field(inputs, "Image bottom bearing, ° true north", "BottomAzimuth"); Field(inputs, "Camera tilt from vertical, °", "CameraTilt");
         inputs.Children.Add(Label("Default: image bottom south (180°), camera looking straight up. Positive tilt points toward image top.", 11));
@@ -148,7 +158,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         PanelSlider(tuning, "Tilt from horizontal, °", "PanelTilt", 90); PanelSlider(tuning, "Front azimuth, ° true north", "PanelAzimuth", 360);
         tuning.Children.Add(Label("N 0° · E 90° · S 180° · W 270°", 11));
         var advanced = new StackPanel { Margin = new(0, 8, 0, 0) }; Field(advanced, "Camera roll, °", "CameraRoll"); Field(advanced, "Maximum incident angle, ° (0 = profile)", "CoverageAngle");
-        centered = new() { Content = "Use a centered image disk", Margin = new(0, 8, 0, 8) }; centered.Checked += (_, _) => { if (!loading) { settings.CenteredDisk = true; Changed(); } }; centered.Unchecked += (_, _) => { if (!loading) { settings.CenteredDisk = false; Changed(); } }; advanced.Children.Add(centered);
+        centered = new() { Content = "Use a centered image disk", Margin = new(0, 8, 0, 8) }; centered.Checked += (_, _) => { if (!loading) { settings.CenteredDisk = true; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } }; centered.Unchecked += (_, _) => { if (!loading) { settings.CenteredDisk = false; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } }; advanced.Children.Add(centered);
         quality = Combo(advanced, "Integration within each source interval", ["60 samples · accurate", "15 samples · quick preview"]); quality.SelectionChanged += (_, _) => { if (!loading) { settings.Substeps = quality.SelectedIndex == 1 ? 15 : 60; Changed(); } };
         isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; advanced.Children.Add(isotropic);
         inputs.Children.Add(new Expander { Header = "Advanced settings", Content = advanced, Margin = new(0, 12, 0, 12) });
@@ -160,8 +170,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         tuning.Children.Add(Label("Edit your inputs, then click Update results.", 11));
 
         var right = new Grid(); Grid.SetColumn(right, 2); body.Children.Add(right);
-        right.RowDefinitions.Add(new() { Height = new GridLength(310) }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new());
-        var preview = new Grid { Background = Brushes.White }; right.Children.Add(preview); preview.RowDefinitions.Add(new() { Height = new GridLength(42) }); preview.RowDefinitions.Add(new()); preview.RowDefinitions.Add(new() { Height = new GridLength(61) });
+        right.RowDefinitions.Add(new() { Height = new GridLength(350) }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new());
+        var preview = new Grid { Background = Brushes.White }; right.Children.Add(preview); preview.RowDefinitions.Add(new() { Height = new GridLength(42) }); preview.RowDefinitions.Add(new()); preview.RowDefinitions.Add(new() { Height = new GridLength(92) });
         var previewHeader = new DockPanel(); preview.Children.Add(previewHeader);
         DockPanel.SetDock(showCardinals, Dock.Right); previewHeader.Children.Add(showCardinals);
         showCardinals.Checked += (_, _) => SetCardinalVisibility(); showCardinals.Unchecked += (_, _) => SetCardinalVisibility();
@@ -171,8 +181,15 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         showSunPath.ToolTip = "Display the sun path for the selected period on the calibrated mask. This changes only the preview.";
         var previewTitle = Label("SKY PHOTO  /  MASK", 14); previewTitle.Margin = new(16, 12, 0, 0); previewHeader.Children.Add(previewTitle);
         var pair = new Grid { Margin = new(12, 0, 12, 0) }; pair.ColumnDefinitions.Add(new()); pair.ColumnDefinitions.Add(new() { Width = new GridLength(12) }); pair.ColumnDefinitions.Add(new()); Grid.SetRow(pair, 1); preview.Children.Add(pair);
-        pair.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = photo }); var maskBorder = new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = maskPreview }; Grid.SetColumn(maskBorder, 2); pair.Children.Add(maskBorder);
-        var previewInfo = new StackPanel { Margin = new(16, 3, 8, 0) }; previewInfo.Children.Add(maskInfo); previewInfo.Children.Add(sunPathInfo); previewInfo.Children.Add(cardinalInfo); Grid.SetRow(previewInfo, 2); preview.Children.Add(previewInfo);
+        pair.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = photo });
+        var maskPane = new Grid(); maskPane.Children.Add(maskPreview); maskPane.Children.Add(editMask);
+        var maskBorder = new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = maskPane }; Grid.SetColumn(maskBorder, 2); pair.Children.Add(maskBorder);
+        editMask.Click += (_, _) => OpenMaskEditor();
+        var previewInfo = new Grid { Margin = new(16, 3, 8, 0) }; previewInfo.ColumnDefinitions.Add(new()); previewInfo.ColumnDefinitions.Add(new());
+        var previewLabels = new StackPanel(); previewLabels.Children.Add(maskInfo); previewLabels.Children.Add(sunPathInfo); previewLabels.Children.Add(cardinalInfo); previewInfo.Children.Add(previewLabels);
+        var maskPicker = new StackPanel(); maskPicker.Children.Add(Label("Mask for calculation", 11)); maskPicker.Children.Add(maskChoice);
+        maskChoice.SelectionChanged += (_, _) => SelectMaskChoice(); Grid.SetColumn(maskPicker, 1); previewInfo.Children.Add(maskPicker);
+        Grid.SetRow(previewInfo, 2); preview.Children.Add(previewInfo);
         var graph = new Grid { Background = Brushes.White, Margin = new(0, 0, 0, 0) }; Grid.SetRow(graph, 2); right.Children.Add(graph);
         graph.RowDefinitions.Add(new() { Height = new GridLength(83) }); graph.RowDefinitions.Add(new() { Height = new GridLength(50) }); graph.RowDefinitions.Add(new()); graph.RowDefinitions.Add(new() { Height = new GridLength(31) }); graph.RowDefinitions.Add(new() { Height = new GridLength(45) });
         var cards = new UniformGridCompat(3) { Margin = new(18, 10, 18, 0) }; graph.Children.Add(cards);
@@ -200,7 +217,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private bool loadFirstExample;
     private async void OnContentRendered(object? sender, EventArgs e)
     {
-        if (!loadFirstExample) return; loadFirstExample = false;
+        if (!loadFirstExample) { QueueObservation(true, true); return; }
+        loadFirstExample = false;
         try { await LoadExample(); } catch (Exception ex) { ShowError(ex); }
     }
     private void OnActivated(object? sender, EventArgs e) { RefreshSystemTimeZone(); RecheckSources(); }
@@ -277,6 +295,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         showSunPath.IsChecked = settings.ShowSunPath; maskPreview.ShowOverlay = settings.ShowSunPath;
         showCardinals.IsChecked = settings.ShowCardinalDirections; photo.ShowOverlay = settings.ShowCardinalDirections;
         PopulateImages(); graphDay.SelectedDate = settings.Start;
+        RefreshMaskChoices();
         calibrationInfo.Text = string.IsNullOrEmpty(settings.ProfilePath) ? "No camera profile selected" : "Profile: " + Path.GetFileName(settings.ProfilePath);
         loading = false;
     }
@@ -286,6 +305,125 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         var files = Directory.Exists(folder) ? Directory.EnumerateFiles(folder).Where(p => new[] { ".jpg", ".jpeg", ".png" }.Contains(Path.GetExtension(p).ToLowerInvariant())).OrderBy(p => p).Select(Path.GetFileName).ToArray() : [];
         images.ItemsSource = files; images.SelectedItem = Path.GetFileName(settings.SkyImage);
         if (files.Length == 1 && images.SelectedIndex < 0) { images.SelectedIndex = 0; settings.SkyImage = Path.Combine(settings.SkyFolder, files[0]!); }
+    }
+    private void RestorePhotoMaskSelection()
+    {
+        settings.SelectedMaskId = null;
+        if (string.IsNullOrEmpty(settings.SkyImage) || !File.Exists(PortablePaths.Resolve(settings.SkyImage))) return;
+        string hash = ManualMaskStore.PhotoHash(settings.SkyImage);
+        if (settings.LastMaskByPhoto.TryGetValue(hash, out string? id))
+        {
+            settings.SelectedMaskId = id;
+            try
+            {
+                var variant = ManualMaskStore.Load(settings.SkyImage, id).Variant;
+                if (!ManualMaskStore.IsCompatible(variant, settings)) settings.SelectedMaskId = null;
+            }
+            catch (Exception)
+            {
+                // Keep the missing/corrupt selection visible so it cannot silently become the AI mask.
+            }
+        }
+    }
+    private void RefreshMaskChoices()
+    {
+        if (maskChoice == null) return;
+        var choices = new List<MaskChoice> { new(null, "AI mask · current model") };
+        try
+        {
+            if (!string.IsNullOrEmpty(settings.SkyImage) && File.Exists(PortablePaths.Resolve(settings.SkyImage)))
+            {
+                string hash = ManualMaskStore.PhotoHash(settings.SkyImage);
+                choices.AddRange(ManualMaskStore.List(hash).Select(v => new MaskChoice(v.Id,
+                    $"{v.Label} · {v.CreatedUtc.ToLocalTime():g} · {v.BaseMask.Model}" +
+                    (ManualMaskStore.IsCompatible(v, settings) ? "" : " · use original AI settings"))));
+            }
+        }
+        catch (Exception ex) { detail.Text = "Could not list saved masks: " + ex.Message; }
+        if (settings.SelectedMaskId != null && choices.All(c => c.Id != settings.SelectedMaskId))
+            choices.Add(new(settings.SelectedMaskId, "Selected edited mask is missing or invalid"));
+        bool previous = loading; loading = true;
+        try { maskChoice.ItemsSource = choices; maskChoice.SelectedItem = choices.First(c => c.Id == settings.SelectedMaskId); }
+        finally { loading = previous; }
+    }
+    private void SelectMaskChoice()
+    {
+        if (loading || maskChoice.SelectedItem is not MaskChoice choice || choice.Id == settings.SelectedMaskId) return;
+        try
+        {
+            if (choice.Id != null)
+            {
+                var selected = ManualMaskStore.Load(settings.SkyImage, choice.Id).Variant;
+                if (!ManualMaskStore.IsCompatible(selected, settings))
+                    throw new InvalidOperationException("Use this mask's original AI model, resolution and disk setting before selecting it.");
+            }
+            settings.SelectedMaskId = choice.Id;
+            if (!string.IsNullOrEmpty(settings.SkyImage) && File.Exists(PortablePaths.Resolve(settings.SkyImage)))
+            {
+                string hash = ManualMaskStore.PhotoHash(settings.SkyImage);
+                settings.LastMaskByPhoto = new(settings.LastMaskByPhoto);
+                if (choice.Id == null) settings.LastMaskByPhoto.Remove(hash);
+                else settings.LastMaskByPhoto[hash] = choice.Id;
+            }
+            Changed(); ShowSelectedMaskPreview();
+        }
+        catch (Exception ex) { RefreshMaskChoices(); ShowError(ex); }
+    }
+    private void ShowSelectedMaskPreview()
+    {
+        try
+        {
+            if (settings.SelectedMaskId == null)
+            {
+                if (AppServices.LoadCachedAiMask(settings) is { } ai) ShowMask(ai);
+                return;
+            }
+            var (variant, png) = ManualMaskStore.Load(settings.SkyImage, settings.SelectedMaskId);
+            if (!ManualMaskStore.IsCompatible(variant, settings))
+                throw new InvalidDataException("The selected edit was made with different AI settings.");
+            using var original = Cv2.ImRead(PortablePaths.Resolve(settings.SkyImage), ImreadModes.Color);
+            using var binary = Cv2.ImDecode(png, ImreadModes.Grayscale);
+            if (original.Empty() || original.Width != variant.BaseMask.Width || original.Height != variant.BaseMask.Height)
+                throw new InvalidDataException("Saved mask and selected photo dimensions differ.");
+            ShowMask(new MaskAsset(AppServices.Preview(original), AppServices.Preview(binary), variant.BaseMask with { Png = png },
+                $"Edited: {variant.Label} · based on {variant.BaseMask.Model}", variant));
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+    private void OpenMaskEditor()
+    {
+        var source = displayedAsset;
+        if (source == null || updating || calibrating) return;
+        try
+        {
+            string path = PortablePaths.Resolve(settings.SkyImage), photoHash = ManualMaskStore.PhotoHash(path);
+            string? openingVariantId = settings.SelectedMaskId;
+            long openingRevision = revision;
+            using var original = Cv2.ImRead(path, ImreadModes.Color);
+            if (original.Empty() || original.Width != source.Result.Width || original.Height != source.Result.Height)
+                throw new InvalidDataException("The selected photo no longer matches the displayed mask.");
+            Cv2.ImEncode(".png", original, out byte[] orientedPhoto);
+            var editor = new MaskEditorWindow(new(orientedPhoto, source.Png, source.Disk.CenterX, source.Disk.CenterY,
+                source.Disk.Radius, "Edited " + DateTime.Now.ToString("dd MMM yyyy HH:mm"), (png, label) =>
+                {
+                    if (revision != openingRevision || settings.SelectedMaskId != openingVariantId || ManualMaskStore.PhotoHash(path) != photoHash)
+                        throw new IOException("The source photo or selected mask changed while the editor was open. Reopen the editor.");
+                    if (openingVariantId != null)
+                    {
+                        var (current, _) = ManualMaskStore.Load(path, openingVariantId);
+                        if (current.PngSha256 != Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(source.Png)))
+                            throw new IOException("The opening edited mask changed on disk. Reopen the editor.");
+                    }
+                    var variant = ManualMaskStore.Save(path, source.Result, source.AiAncestorSha256, openingVariantId, label, png,
+                        source.Variant == null ? source.Png : null);
+                    settings.SelectedMaskId = variant.Id;
+                    settings.LastMaskByPhoto = new(settings.LastMaskByPhoto) { [photoHash] = variant.Id };
+                    Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
+                    return true;
+                })) { Owner = owner };
+            editor.ShowDialog();
+        }
+        catch (Exception ex) { ShowError(ex); }
     }
     private void Changed(bool saveSettings = true, bool refreshSources = false, bool verifyArtifacts = false)
     {
@@ -324,7 +462,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                 {
                     var prepared = services.PrepareInputs(snapshot);
                     var changed = services.ObserveInputs(prepared, invalid, refreshSources, verifyArtifacts);
-                    return (prepared, changed);
+                    Evaluation? restored = null;
+                    if (invalid.Length == 0 && (changed != ArtifactGroup.None || updateState != UpdateState.UpToDate))
+                        restored = services.TryRestoreAccepted(prepared);
+                    return (prepared, changed, restored);
                 });
                 if (closing) return;
                 if (result.prepared != snapshot)
@@ -348,6 +489,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                 {
                     revision++; pending?.Cancel(); ApplyInvalidation(result.changed); RefreshInputState();
                 }
+                if (result.restored != null && !updating && !calibrating)
+                    PresentResult(result.restored, restored: true);
             }
             catch (Exception ex) { if (!closing && observedRevision == revision) { revision++; pending?.Cancel(); ApplyInvalidation(ArtifactGroup.All); ShowError(ex); } }
             finally
@@ -358,7 +501,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             }
         }
     }
-    private void WatchSources() => sourceWatch.SetFiles([settings.SkyImage, settings.ProfilePath, settings.ImportPath]);
+    private void WatchSources() => sourceWatch.SetFiles(InputDependencies.Capture(settings, uiInputs, false).SourcePaths);
     public void RecheckSources()
     {
         if (closing) return;
@@ -370,7 +513,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     {
         if ((groups & ArtifactGroup.Mask) != 0)
         {
-            photo.ClearImage(); maskPreview.ClearImage(); displayedPhoto = displayedMaskPng = null;
+            bool geometryChanged = (groups & (ArtifactGroup.Profile | ArtifactGroup.Orientation)) != 0;
+            if (geometryChanged) { photo.ClearImage(); displayedPhoto = null; }
+            maskPreview.ClearImage(); displayedMaskPng = null;
+            displayedAsset = null; editMask.IsEnabled = false;
             maskInfo.Text = "Sky inputs changed · click Update results";
         }
         if ((groups & ArtifactGroup.Orientation) != 0) InvalidateOrientation("Cardinal directions waiting for Update results");
@@ -417,6 +563,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         controller.RefreshSource();
         export.IsEnabled = !controller.Verifying && !exporting && !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null &&
             services.IsCurrent(completed) && completed.ManagedDebugRun?.HasCompleteDataset == true;
+        editMask.IsEnabled = displayedAsset != null && !updating && !calibrating && !exporting;
+        savedStudies.IsEnabled = !updating && !calibrating && !exporting && !controller.DependentBusy && !controller.Verifying;
     }
     public void StopUpdate()
     {
@@ -475,16 +623,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                 path => Dispatcher.InvokeAsync(() => { if (current == revision && !closing) { ShowSunPath(path); sunPathPublishedEarly = path != null; } }),
                 overlay => Dispatcher.InvokeAsync(() => { if (current == revision && imageRevision == orientationRevision && !closing) ShowCardinals(overlay); }));
             if (current != revision || closing) return;
-            completed = result; chart.Opacity = 1; beforeEnergy.Opacity = afterEnergy.Opacity = reduction.Opacity = 1;
-            ShowSunPath(result.SunPath);
-            chart.SetData(result.Run.Rows, TimeZoneSelection.Resolve(snapshot.Zone));
-            beforeEnergy.Text = result.Run.BeforeEnergy.ToString("F2"); afterEnergy.Text = result.Run.AfterEnergy?.ToString("F2") ?? "—";
-            reduction.Text = result.Run.LossPercent is { } loss ? loss.ToString("F1") + "%" : "—";
-            provenance.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1} for this panel. Unobserved sky assumed blocked. No ground reflection." : "Baseline ready. Add a compatible camera profile and sky photo for the shaded curve.";
-            bool complete = IrradianceReadiness.Inspect(services, result).IsReady;
-            SetUpdateState(complete ? UpdateState.UpToDate : UpdateState.NeedsAttention,
-                complete ? $"{result.Run.Rows.Count:N0} intervals · {result.TotalMilliseconds / 1000:F2} s · Debug Data saved · {result.Raw.Source} · {snapshot.Zone}"
-                    : "The shaded dataset is incomplete. Check the camera profile and sky photograph.");
+            PresentResult(result, restored: false);
         }
         catch (OperationCanceledException) { if (current == revision && !closing) SetUpdateState(UpdateState.Stopped, "Update stopped. Click Update results to retry."); }
         catch (Exception ex) { if (current == revision) ShowError(ex); }
@@ -498,8 +637,24 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             if (!closing) RefreshButtons();
         }
     }
+    private void PresentResult(Evaluation result, bool restored)
+    {
+        completed = result; chart.Opacity = 1; beforeEnergy.Opacity = afterEnergy.Opacity = reduction.Opacity = 1;
+        if (result.Mask != null) ShowMask(result.Mask);
+        ShowCardinals(result.Cardinals); ShowSunPath(result.SunPath);
+        chart.SetData(result.Run.Rows, TimeZoneSelection.Resolve(result.Settings.Zone));
+        beforeEnergy.Text = result.Run.BeforeEnergy.ToString("F2"); afterEnergy.Text = result.Run.AfterEnergy?.ToString("F2") ?? "—";
+        reduction.Text = result.Run.LossPercent is { } loss ? loss.ToString("F1") + "%" : "—";
+        provenance.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1} for this panel. Unobserved sky assumed blocked. No ground reflection." : "Baseline ready. Add a compatible camera profile and sky photo for the shaded curve.";
+        bool complete = IrradianceReadiness.Inspect(services, result).IsReady;
+        SetUpdateState(complete ? UpdateState.UpToDate : UpdateState.NeedsAttention,
+            complete ? restored ? $"{result.Run.Rows.Count:N0} intervals · saved result restored · {result.Raw.Source} · {result.Settings.Zone}"
+                : $"{result.Run.Rows.Count:N0} intervals · {result.TotalMilliseconds / 1000:F2} s · Debug Data saved · {result.Raw.Source} · {result.Settings.Zone}"
+                : "The shaded dataset is incomplete. Check the camera profile and sky photograph.");
+    }
     public void ShowMask(MaskAsset asset)
     {
+        if (displayedPhoto != null) asset = asset with { OriginalPreview = displayedPhoto };
         if (!ReferenceEquals(displayedPhoto, asset.OriginalPreview))
         {
             photo.SetImage(Bitmap(asset.OriginalPreview), asset.Result.Width, asset.Result.Height);
@@ -509,9 +664,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         if (!ReferenceEquals(displayedMaskPng, asset.Png))
         {
             maskPreview.SetMask(Bitmap(asset.Png)); displayedMaskPng = asset.Png;
-            ClearSunPath("Preparing sun path…");
+            if (sunPathIsCurrent && completed?.SunPath != null) ShowSunPath(completed.SunPath);
         }
         maskInfo.Text = asset.Description;
+        displayedAsset = asset; RefreshButtons();
     }
     public static string OrientationInputKey(UserSettings s) => AppData.Key(new
     { s.SkyImage, s.ProfilePath, s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle, s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
@@ -563,7 +719,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         try { File.AppendAllText(AppData.PathFor("errors.log"), DateTimeOffset.Now + " " + ex + Environment.NewLine); } catch { }
     }
     private void PickCalibrationFolder() { var p = new OpenFolderDialog { Title = "Choose checkerboard photographs" }; if (p.ShowDialog(owner) == true) { settings.CalibrationFolder = PortablePaths.Store(p.FolderName); LoadFields(); Changed(); } }
-    private void PickSkyFolder() { var p = new OpenFolderDialog { Title = "Choose the folder containing your sky photograph" }; if (p.ShowDialog(owner) == true) { settings.SkyFolder = PortablePaths.Store(p.FolderName); settings.SkyImage = ""; LoadFields(); Changed(); } }
+    private void PickSkyFolder() { var p = new OpenFolderDialog { Title = "Choose the folder containing your sky photograph" }; if (p.ShowDialog(owner) == true) { settings.SkyFolder = PortablePaths.Store(p.FolderName); settings.SkyImage = ""; settings.SelectedMaskId = null; LoadFields(); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } }
     private void PickProfile() { var p = new OpenFileDialog { Filter = "Camera profile|*.json;*.yml;*.yaml" }; if (p.ShowDialog(owner) == true) { settings.ProfilePath = PortablePaths.Store(p.FileName); settings.CoverageAngle = 0; LoadFields(); Changed(); } }
     private void PickImport() { var p = new OpenFileDialog { Filter = "Horizontal irradiance|*.xlsx;*.csv" }; if (p.ShowDialog(owner) == true) { settings.ImportPath = PortablePaths.Store(p.FileName); Changed(); status.Text = "Imported source selected · check dates, site, time zone and source interval metadata"; detail.Text = p.FileName; } }
     private async Task Calibrate()
@@ -597,8 +753,21 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private void ShowHelp()
     {
         var text = "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles.\n\n2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading.\n\n3. Set camera pose, panel angles, site, dates and time zone. Dates include the complete end day. Positive camera tilt points toward the image top; bottom south = bearing 180°.\n\n4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the advanced isotropic option. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional.\n\nEach explicit update maintains one current Debug Data set beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files, fingerprints and the current status. Only a complete calculation is marked Complete; calibration or orientation alone is Partial. Unavailable stages are marked skipped. Edits remove affected files from the latest run, hide stale overlays and disable export. Camera rotation preserves the mask and numerical solar positions; panel edits preserve upstream files. Source-file changes are checked without recalculating. Close any locked diagnostic workbook and retry Update. Valid files are kept unchanged. Replacements are staged before publication. Verified old run folders are migrated after protecting selected inputs under Data/Inputs. Close the other SolarShade instance if this dataset is already in use.\n\nExport results copies the verified current debug files and adds a one-page Summary.pdf with the saved parameters and results. It creates a new scenario folder only after every file is ready. Export requires a complete shaded dataset; a baseline alone is insufficient. If inputs change during export, retry after Update results. Example/Irradiance holds the bundled input workbook; Example/Debug Data/reference-run holds a fixed library-generated reference run. Your current dataset uses the top-level Debug Data folder; the bundled reference stays unchanged.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches, extracted model weights and durable Profiles/Inputs. Keep these durable inputs when moving or backing up the application. Your own inputs may be anywhere. Data location:\n" + AppData.Root + "\n\nSolar Irradiance estimates historical direct + sky-diffuse irradiance. Once its complete shaded dataset is current, open PV Autonomy to enter a daily consumption profile, panel area and efficiencies, battery capacity and initial charge. Evaluate system computes hourly battery charge and unmet load for this study. First model use is slower; later panel edits reuse expensive work.";
-        var dialog = new Window { Owner = owner, Title = "Using SolarShade · preview 0.1.1", Width = 740, Height = 700, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        text += "\n\nMask editing: After an update generates the AI mask, click Edit mask on its preview. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. The original AI mask stays available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. Exports include mask-provenance.json. Keep Data/Masks and Data/AcceptedResults when moving the application.";
+        var dialog = new Window { Owner = owner, Title = "Using SolarShade · preview 0.2.0", Width = 740, Height = 700, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         var panel = new StackPanel { Margin = new(22) }; panel.Children.Add(Label(text, 14)); panel.Children.Add(Button("Third-party notices", () => { using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Notices")!; using var reader = new StreamReader(stream); var notice = new Window { Owner = dialog, Title = "Third-party notices", Width = 720, Height = 540, Content = new TextBox { Text = reader.ReadToEnd(), IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } }; notice.ShowDialog(); })); dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; dialog.ShowDialog();
+    }
+    private void ShowSavedStudies()
+    {
+        try
+        {
+            var (count, bytes) = AcceptedResultVault.StorageUsage();
+            string message = $"{count} saved studies use {bytes / 1048576.0:F1} MB. They let the app restore earlier photo, mask and study results without recalculating.\n\nClear saved studies now? The current result and saved masks remain available.";
+            if (MessageBox.Show(owner, message, "Saved studies", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            int removed = AcceptedResultVault.ClearKnown();
+            MessageBox.Show(owner, $"Removed {removed} saved studies. Your current result and edited masks are unchanged.", "Saved studies");
+        }
+        catch (Exception ex) { MessageBox.Show(owner, ex.Message, "Saved studies could not be cleared", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
     public Evaluation? Completed => completed;
     public Task<(CalibrationProfile Profile, string Path, string Details)> CalibrateForTest(UserSettings inputs) => services.Calibrate(inputs);

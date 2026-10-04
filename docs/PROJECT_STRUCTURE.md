@@ -31,7 +31,8 @@ All maintained C# source remains under `src`. `artifacts/calibration-validation/
 | `SolarShade.ShadingCorrection` (.NET 10 Windows) | Panel shading, uncertainty bounds, transmission/loss and energy summaries, and shaded/visibility exports. Preserves the original horizontal correction API. |
 | `SolarShade.PvBattery` (.NET 8) | Standalone PV/load/battery energy balance and hourly end-of-hour SoC, with unmet load and curtailment. |
 | `SolarShade.PvBattery.IO` (.NET 8) | Final shaded-panel XLSX import, validated JSON input and CSV/JSON/XLSX result exports; reuses Irradiance workbook transport. |
-| `SolarShade.PvBattery.Integration` (.NET 10 Windows) | Adapter from the existing final `PanelRun`; no shading recomputation. Tests and offline validator live under `src/PvBatterySimulation`. UI wiring is deferred. |
-| `ApplicationFrontend` | Input controls, stage sequencing, caching, progress/cancellation, run manifests and display of returned values. No scientific calculation engine or workbook schemas. |
+| `SolarShade.PvBattery.Integration` (.NET 10 Windows) | Adapter from the accepted final `PanelRun`; no shading recomputation. Tests and offline validator live under `src/PvBatterySimulation`. |
+| `SolarShade.MaskEditor` (.NET 10 Windows) | Modal paint window, native-pixel binary brush, undo/redo, live photo/mask opacity, zoom and pan. It receives a save callback and has no dependency on scientific services or frontend storage. |
+| `ApplicationFrontend` | Solar Irradiance and PV Autonomy workspaces, input controls, stage sequencing, caching, progress/cancellation, run manifests, edited-mask storage and exact accepted-result restoration. `PvEvaluationService` coordinates the PV libraries and optional `07-battery` output. No scientific calculation engine or workbook schemas. |
 
 See [application architecture](APPLICATION_ARCHITECTURE.md) for the dependency direction, stable source-interval contract, stage APIs and Debug Data lifecycle. A library implementation change requires republishing the self-contained executable, but no frontend calculation rewrite when its public interface is unchanged.

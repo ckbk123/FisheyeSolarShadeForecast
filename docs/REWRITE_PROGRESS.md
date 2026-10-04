@@ -1,5 +1,7 @@
 # Rewrite implementation status
 
+Historical 15 September checkpoint. The installed application has since advanced to Preview 0.1.1 with PV Autonomy; see the [current review](SOURCE_AND_EXPORT_REVIEW_2026-10-04.md).
+
 **Complete — 2026-09-15.** See [delivery report](REWRITE_DELIVERY.md) and [architecture](APPLICATION_ARCHITECTURE.md).
 
 Existing libraries own calibration, masking, irradiance import/retrieval, solar positions, transposition, panel shading and scientific summaries/exports. Frontend PanelEngine and WorkbookIo are removed; the frontend sequences stages and displays returned values.

@@ -1,5 +1,7 @@
 # Backend C# port audit — 6 September 2026
 
+Historical checkpoint: the missing application and shaded tilted-panel workflow described below were implemented later. See [current architecture](APPLICATION_ARCHITECTURE.md) and the [4 October source/export review](SOURCE_AND_EXPORT_REVIEW_2026-10-04.md). The findings below describe the 6 September source state.
+
 ## Verdict
 
 The repository contains substantive C# implementations of all seven major computational capabilities listed below. No production Python subprocess bridge, embedded Python runtime, or placeholder algorithm was found in the inspected C# sources and project references. Python files are development exporters or independent numerical oracles. OpenCV and ONNX Runtime are native binary dependencies invoked from C#, not Python scripts.

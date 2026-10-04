@@ -2,9 +2,11 @@
 
 Windows desktop application and C# scientific libraries for estimating solar irradiance and fisheye-image shading. The authoritative repository is [ckbk123/FisheyeSolarShadeForecast](https://github.com/ckbk123/FisheyeSolarShadeForecast).
 
-## Source baseline — 27 September 2026
+## Current application — 4 October 2026
 
-The tag `baseline-2026-09-27` preserves the application and libraries before the improvements. All four milestones are accepted: manual updates, dependency invalidation, one current debug dataset, and complete snapshot exports with a one-page PDF recap. Validation includes 395 passing tests and packaged Windows application checks. Scientific library source remains unchanged. See [milestone progress](docs/IMPLEMENTATION_PROGRESS.md) and [the full specification](docs/MANUAL_UPDATE_AND_EXPORT_PLAN.md).
+The current source builds **Preview 0.2.0**, a portable Windows x64 application with two workspaces: Solar Irradiance and PV Autonomy. Solar Irradiance explicitly updates a study, lets you paint and select immutable variants of its AI sky mask in a modal editor, and exports a complete diagnostic snapshot with the selected mask's provenance. Returning to an exact saved photo, mask and input combination restores its verified accepted result. PV Autonomy evaluates a 24-hour repeating load profile against that accepted shaded result and exports its own CSV, JSON and XLSX files. See [application usage](src/ApplicationFrontend/RUNNING.md), [architecture](docs/APPLICATION_ARCHITECTURE.md), the [mask-editor plan](docs/MASK_EDITOR_IMPLEMENTATION_PLAN.md), and the [Preview 0.1.1 source and export review](docs/SOURCE_AND_EXPORT_REVIEW_2026-10-04.md).
+
+The tag `baseline-2026-09-27` preserves the earlier application before these changes. The four manual-update/export milestones and their 395-test result are historical; see [milestone progress](docs/IMPLEMENTATION_PROGRESS.md).
 
 Requires Windows x64, the .NET 10 SDK (the libraries also target .NET 8), and Git LFS. Install the .NET 8 runtime to run the .NET 8 test projects. Clone with Git rather than downloading the source ZIP so the four ONNX model files are retrieved correctly (about 643 MB in total):
 
@@ -21,13 +23,13 @@ dotnet run --project src/ApplicationFrontend/ApplicationFrontend.csproj -c Relea
 
 The source includes example photographs, irradiance input, the fixed reference run, regression fixtures, model weights via LFS, and native packaging inputs. Local debug runs, caches, build output, validation scratch output and installed packages are excluded. `Deliverable/APPLICATION.exe` and `Deliverable.zip` mentioned below are locally generated outputs, not checked-in files.
 
-See [baseline scope and versioning workflow](docs/BASELINE.md) for what is preserved, verification results and future branch/PR conventions. Existing scientific library source must remain unchanged during the planned interface/storage/export work. Third-party licenses and notices are retained in `THIRD_PARTY_LICENSES` and `src/ApplicationFrontend/Packaging/Licenses`.
+See [baseline scope and versioning workflow](docs/BASELINE.md) for the original checkpoint. Third-party licenses and notices are retained in `THIRD_PARTY_LICENSES` and `src/ApplicationFrontend/Packaging/Licenses`.
 
 ## Existing library and application documentation
 
-The standalone **PV–battery backend** is in `src/PvBatterySimulation`. It consumes the final shaded panel irradiance and six system/load settings to return hourly battery SoC, unmet load and curtailment. It includes in-memory/XLSX adapters, CSV/JSON/XLSX exports, analytical fixtures and an offline validator. See [model, API and validation](src/PvBatterySimulation/README.md). Application UI integration is deferred.
+The **PV–battery backend and PV Autonomy workspace** are in `src/PvBatterySimulation` and `src/ApplicationFrontend/Workspaces/PvAutonomy`. They consume the accepted shaded panel irradiance and system/load settings to return hourly battery SoC, unmet load and curtailment. The workspace is explicitly evaluated after Solar Irradiance is current; its result and export remain separate from the irradiance snapshot. See [model, API and validation](src/PvBatterySimulation/README.md) and [application usage](src/ApplicationFrontend/RUNNING.md).
 
-The Windows test application is now in **`Deliverable/APPLICATION.exe`**, with a matching **`Deliverable.zip`** for sharing. Keep the executable alongside its Example, Data and Debug Data folders; all four segmentation models and the runtime are bundled. Start with **Load example** or select your own inputs. See [application usage, imports, validation and packaging](src/ApplicationFrontend/RUNNING.md). Source and integration tests are under `src/ApplicationFrontend`.
+The local Preview 0.2.0 application is in **`Deliverable/APPLICATION.exe`**, with a matching clean **`Deliverable.zip`** for sharing. These generated outputs are not Git-tracked releases. Keep the executable alongside its Example, Data and Debug Data folders; all four segmentation models and the runtime are bundled. Start with **Load example** or select your own inputs, then click **Update results**. See [application usage, imports, validation and packaging](src/ApplicationFrontend/RUNNING.md). Source and integration tests are under `src/ApplicationFrontend` and the library project folders.
 
 The solar-position and fisheye shading library is in **`src/SolarPositionAndShading`**. It exports timestamp/zenith/azimuth XLSX data, computes direct and constant-isotropic diffuse shading from the existing mask/calibration contracts, and writes a separate shading workbook. See [API, defaults and integration](src/SolarPositionAndShading/README.md), [validation and performance](src/SolarPositionAndShading/VALIDATION.md), and [the 0.25° solar-radius overlay](src/SolarPositionAndShading/Validator/results/noon-20260531-radius-0.25-detail.png).
 

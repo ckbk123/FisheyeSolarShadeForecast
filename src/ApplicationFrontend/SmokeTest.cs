@@ -1,16 +1,23 @@
 using SolarShade.Irradiance;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Windows.Controls;
+using SolarShade.MaskEditor;
+using Cv2 = OpenCvSharp.Cv2;
+using ImreadModes = OpenCvSharp.ImreadModes;
 
 namespace SolarShade.Desktop;
 
 public static class SmokeTest
 {
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowEnabled(IntPtr handle);
     public static int Run(Application app, string output, bool portable = false)
     {
         output = Path.GetFullPath(output); Directory.CreateDirectory(output);
@@ -161,7 +168,7 @@ public static class SmokeTest
                 if (!window.SunPathVisibleForTest || correctedCamera.SunPathGenerationCount != reprojected.SunPathGenerationCount || correctedCamera.PreparationCount != reprojected.PreparationCount)
                     throw new InvalidOperationException("Corrected camera input did not restore the valid cached sun path.");
                 if (!window.CardinalsVisibleForTest || correctedCamera.CardinalGenerationCount != reprojected.CardinalGenerationCount ||
-                    !ReferenceEquals(correctedCamera.Cardinals, reprojected.Cardinals))
+                    correctedCamera.Cardinals == null || !correctedCamera.Cardinals.Png.SequenceEqual(reprojected.Cardinals!.Png))
                     throw new InvalidOperationException("Corrected camera input failed to restore cached cardinal directions.");
                 AppData.Write(Path.Combine(output, "cardinal-ui-result.json"), new { Passed = true, NoAutomaticPreview = true,
                     OriginalColoredPhotoOverlay = true, ToggleIsDisplayOnly = true, PanelEditReusesOverlay = true,
@@ -186,7 +193,8 @@ public static class SmokeTest
                         window.Calculate();
                         await Until(() => window.Completed != previous, 60);
                         var current = window.Completed!;
-                        if (!ReferenceEquals(previous.Cardinals, current.Cardinals) || previous.CardinalGenerationCount != current.CardinalGenerationCount)
+                        if (previous.Cardinals == null || current.Cardinals == null || !previous.Cardinals.Png.SequenceEqual(current.Cardinals.Png) ||
+                            previous.CardinalGenerationCount != current.CardinalGenerationCount)
                             throw new InvalidOperationException("A time-zone edit regenerated cardinal directions.");
                         if (current.Settings.Zone != zoneId || current.Raw.TimeZoneId != zoneId) throw new InvalidOperationException("A system time-zone change left stale data or graph settings.");
                         var firstLocal = TimeZoneInfo.ConvertTime(current.Run.Rows[0].Start, simulatedSystemZone);
@@ -266,6 +274,7 @@ public static class SmokeTest
                     }
                     AppData.Write(Path.Combine(output, "live-providers.json"), live);
                 }
+                await VerifyMaskEditor(window, output);
                 AppData.Write(Path.Combine(output, "smoke-result.json"), new { Passed = true, Portable = portable, LoadedExampleWithoutCalculation = startsExample, RestoredSavedSettings = portable && !startsExample, ExecutableDirectory = AppContext.BaseDirectory, WorkingDirectory = Environment.CurrentDirectory, DataDirectory = AppData.Root, FirstSettings = first.Settings, UiReadyMilliseconds = readyMs, FirstRunMilliseconds = firstMs, ExplicitPanelUpdateMilliseconds = editMs, FirstDebugDirectory = first.DebugDirectory, SecondDebugDirectory = second.DebugDirectory, NativeCadence = first.Raw.NativeCadence, FirstRows = first.Run.Rows.Count, first.Run.BeforeEnergy, first.Run.AfterEnergy, First = first.TotalMilliseconds, Second = second.TotalMilliseconds, second.PreparationCount, second.Run.SkyCoverage, ModelHashes = modelHashes, LoadedDependencies = dependencies, Models = Directory.Exists(AppData.PathFor("models-v1")) ? Directory.GetFiles(AppData.PathFor("models-v1")).Select(Path.GetFileName).ToArray() : [] });
                 exitCode = 0;
             }
@@ -309,6 +318,94 @@ public static class SmokeTest
         pv.SetDraft(pv.Draft with { Capacity = "" });
         if (pv.CanEvaluate || pv.CanExport || !window.ExportEnabledForTest) throw new InvalidOperationException("Invalid PV input affected upstream export or remained current.");
         window.Workspaces.Select("irradiance");
+    }
+
+    private static async Task VerifyMaskEditor(MainWindow window, string output)
+    {
+        window.Workspaces.Select("irradiance");
+        var source = window.Completed?.Mask ?? throw new InvalidOperationException("The mask editor has no AI source.");
+        if (source.Variant != null) throw new InvalidOperationException("Mask editor smoke test must begin with the AI mask.");
+        using var original = Cv2.ImDecode(source.Png, ImreadModes.Grayscale);
+        int x = (int)Math.Round(source.Disk.CenterX), y = (int)Math.Round(source.Disk.CenterY);
+        byte value = original.At<byte>(y, x) == 255 ? (byte)0 : (byte)255;
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var edit = Find<Button>(window, b => Equals(b.Content, "Edit mask"));
+        _ = window.Dispatcher.BeginInvoke(() =>
+        {
+            MaskEditorWindow? editor = null;
+            try
+            {
+                editor = Application.Current.Windows.OfType<MaskEditorWindow>().Single();
+                if (editor.Owner != window || IsWindowEnabled(new System.Windows.Interop.WindowInteropHelper(window).Handle))
+                    throw new InvalidOperationException("The secondary editor did not block the main study window.");
+                Capture(editor, Path.Combine(output, "mask-editor-fit.png"));
+                var maskOpacity = Find<Slider>(editor, s => s.Minimum == 0 && s.Maximum == 100);
+                maskOpacity.Value = 30;
+                Find<Slider>(editor, s => s.Maximum == 800).Value = 175;
+                Find<Slider>(editor, s => s.Maximum == 300).Value = 25;
+                Capture(editor, Path.Combine(output, "mask-editor-window.png"));
+                editor.PaintStrokeForSmoke(x, y, 25, value);
+                maskOpacity.Value = 65;
+                Capture(editor, Path.Combine(output, "mask-editor-painted.png"));
+                Find<TextBox>(editor, t => t.Text.StartsWith("Edited ", StringComparison.Ordinal)).Text = "Smoke edited mask";
+                Find<Button>(editor, b => Equals(b.Content, "Save as new mask"))
+                    .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                completion.SetResult();
+            }
+            catch (Exception ex)
+            {
+                editor?.CloseForSmoke(); completion.SetException(ex);
+            }
+        }, DispatcherPriority.ApplicationIdle);
+        edit.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await completion.Task;
+        string? id = window.Irradiance.Controller.Settings.SelectedMaskId;
+        if (id == null || window.UpdateStateForTest == UpdateState.UpToDate || window.ExportEnabledForTest)
+            throw new InvalidOperationException("Saving an edit did not select it and invalidate the previous result.");
+        Capture(window, Path.Combine(output, "mask-editor-selected.png"));
+        window.Calculate(); await Until(() => window.UpdateStateForTest == UpdateState.UpToDate, 90);
+        var accepted = window.Completed!;
+        if (accepted.Mask?.Variant?.Id != id || !window.ExportEnabledForTest)
+            throw new InvalidOperationException("Edited mask did not reach the accepted calculation.");
+        string exported = AppServices.Export(accepted, Path.Combine(output, "mask-editor-export"));
+        string provenance = File.ReadAllText(Path.Combine(exported, "02-sky-mask", "mask-provenance.json"));
+        if (!provenance.Contains(id, StringComparison.Ordinal) || !provenance.Contains("Edited", StringComparison.Ordinal))
+            throw new InvalidOperationException("Edited mask provenance was lost from the export.");
+        var maskPicker = Find<ComboBox>(window, c => c.Items.Count > 1 &&
+            c.Items[0]?.ToString()?.StartsWith("AI mask", StringComparison.Ordinal) == true);
+        maskPicker.SelectedIndex = 0;
+        await window.InputsSettled;
+        if (window.Irradiance.Controller.Settings.SelectedMaskId != null || !window.ExportEnabledForTest ||
+            window.Completed?.Mask?.Variant != null)
+            throw new InvalidOperationException("Choosing the AI mask did not restore its accepted result.");
+        Capture(window, Path.Combine(output, "mask-editor-ai-return.png"));
+        maskPicker.SelectedIndex = 1;
+        await window.InputsSettled;
+        if (window.Irradiance.Controller.Settings.SelectedMaskId != id || !window.ExportEnabledForTest ||
+            window.Completed?.Mask?.Variant?.Id != id)
+            throw new InvalidOperationException("Returning to the edited mask did not restore its accepted result.");
+        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = window.Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                var editor = Application.Current.Windows.OfType<MaskEditorWindow>().Single();
+                if (IsWindowEnabled(new System.Windows.Interop.WindowInteropHelper(window).Handle))
+                    throw new InvalidOperationException("The editor did not block main controls on reopening.");
+                Find<Button>(editor, b => Equals(b.Content, "Cancel")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                cancelled.SetResult();
+            }
+            catch (Exception ex) { cancelled.SetException(ex); }
+        }, DispatcherPriority.ApplicationIdle);
+        edit.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await cancelled.Task;
+        await window.InputsSettled;
+        if (window.Irradiance.Controller.Settings.SelectedMaskId != id || !window.ExportEnabledForTest)
+            throw new InvalidOperationException("Cancel changed the selected mask or calculation.");
+        AppData.Write(Path.Combine(output, "mask-editor-result.json"), new { Passed = true, Modal = true,
+            OpacityAdjusted = true, ZoomAdjusted = true, BrushAdjusted = true, VariantId = id,
+            SelectedInCalculation = true, ExportIdentifiesEdit = true, DropdownRestoredAiAndEdit = true,
+            CancelPreservedStudy = true });
     }
 
     private static void Capture(FrameworkElement window, string path, double scale = 1)

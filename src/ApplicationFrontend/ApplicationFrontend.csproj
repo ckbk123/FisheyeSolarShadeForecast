@@ -4,7 +4,7 @@
     <UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
     <PlatformTarget>x64</PlatformTarget><AssemblyName>APPLICATION</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.1.1</Version><DebugType>none</DebugType>
+    <Version>0.2.0</Version><DebugType>none</DebugType>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
@@ -13,6 +13,7 @@
     <Compile Include="Shell/**/*.cs;State/**/*.cs;Services/**/*.cs;Storage/**/*.cs;Workspaces/**/*.cs;Charts/**/*.cs" />
     <Content Include="Packaging/Native/*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <ProjectReference Include="../SkyPhotoMasking/SkyPhotoMasking.csproj" />
+    <ProjectReference Include="../MaskEditor/SolarShade.MaskEditor.csproj" />
     <ProjectReference Include="../PvBatterySimulation/SolarShade.PvBattery.Integration/SolarShade.PvBattery.Integration.csproj" />
     <ProjectReference Include="../PvBatterySimulation/SolarShade.PvBattery.IO/SolarShade.PvBattery.IO.csproj" />
     <ProjectReference Include="../OmnicalibFisheyeLensParameterExtractor/SolarShade.Calibration.Solver/SolarShade.Calibration.Solver.csproj" />

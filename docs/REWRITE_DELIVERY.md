@@ -1,5 +1,7 @@
 # Library/frontend rewrite delivery — 2026-09-15
 
+Historical delivery record. The two local installed executable copies now match the Preview 0.1.1 ZIP; see the [4 October source/export review](SOURCE_AND_EXPORT_REVIEW_2026-10-04.md) for current package identity.
+
 ## Result
 
 The existing libraries now own the scientific stages and their native outputs. The frontend owns UI state, sequencing, progress/cancellation, cache coordination, run manifests and display. Frontend PanelEngine and scientific workbook construction were removed.

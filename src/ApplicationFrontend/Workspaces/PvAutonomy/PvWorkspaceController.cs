@@ -33,11 +33,29 @@ public sealed class PvWorkspaceController : IDisposable
     {
         draft = value.Copy(); Invalidate("Settings changed. Evaluate system to update results.");
         try { AppData.Write(settingsPath, draft); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Status = "Settings could not be saved: " + ex.Message; }
-        Notify();
+        Notify(); _ = TryRestoreAsync();
     }
     private void SourceChanged(object? sender, EventArgs e)
     {
-        Invalidate(source.Source.IsReady ? "Irradiance is ready. Evaluate system." : source.Source.Reason); Notify();
+        Invalidate(source.Source.IsReady ? "Irradiance is ready. Evaluate system." : source.Source.Reason);
+        Notify(); _ = TryRestoreAsync();
+    }
+    private async Task TryRestoreAsync()
+    {
+        long version = revision;
+        try
+        {
+            await cleanup;
+            if (disposed || version != revision || !source.Source.IsReady || source.IsBusy || Problem != null) return;
+            var snapshot = source.Source.Snapshot!;
+            string key = AppData.Key(draft.Parse());
+            var restored = await Task.Run(() => PvAcceptedVault.Restore(snapshot, key, service.Store));
+            if (restored == null || disposed || version != revision || !source.IsCurrent(snapshot)) return;
+            Result = restored; acceptedSource = snapshot; acceptedKey = key; IsCurrent = true;
+            Status = "Saved PV result restored for this study."; Notify();
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        { if (!disposed && version == revision && source.Source.IsReady) { Status = "Saved PV result could not be restored: " + ex.Message; Notify(); } }
     }
     private void Invalidate(string message)
     {
@@ -66,6 +84,8 @@ public sealed class PvWorkspaceController : IDisposable
             if (disposed || current != revision || !source.IsCurrent(snapshot)) return;
             Result = result; acceptedSource = snapshot; acceptedKey = AppData.Key(settings); IsCurrent = true;
             Status = result.Summary.UnmetLoadWh > 0 ? "Unmet load detected during this study." : "No unmet load during this study.";
+            try { await Task.Run(() => PvAcceptedVault.Archive(snapshot, acceptedKey, service.Store, result)); }
+            catch (Exception ex) { Status += " The saved result cannot yet be restored later: " + ex.Message; }
         }
         catch (OperationCanceledException) { if (current == revision) Status = "Stopped. Evaluate system to retry."; }
         catch (Exception ex) { if (!disposed && current == revision) Status = "Evaluation failed: " + ex.Message; }

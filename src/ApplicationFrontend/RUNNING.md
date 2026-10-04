@@ -1,6 +1,6 @@
 # Running SolarShade
 
-Extract the complete package, then launch `APPLICATION.exe`. Keep `Example`, `Data` and `Debug Data` alongside it. `Deliverable.zip` contains a clean first-run package. All four segmentation models are embedded; no Python, Excel installation or model download is required.
+Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.2.0 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
 
 ## Workflow
 
@@ -15,7 +15,7 @@ The bottom-left indicator combines color and text: **red** means inputs need att
 
 Typing a relevant new value immediately disables export, even before leaving the field. Previous graphs and summaries are dimmed and labeled when stale. Graph navigation, overlay visibility and future checkerboard setup do not invalidate calculated results. Changes in the automatic Windows time zone require another explicit update.
 
-Edits remove affected diagnostic files and hide stale previews. Camera rotation preserves the mask and numerical solar positions but removes orientation, sun-path and shading files. Panel edits preserve camera previews and upstream files. Repeated edits do not regenerate diagnostics; even reverting to the original value requires Update to restore removed files. Selected source files are monitored and their contents rechecked on activation, Update and Export. Replacing a file under the same name cannot silently retain current results. If Excel holds an affected workbook open, close it and retry Update.
+Edits remove affected diagnostic files and hide stale previews. Camera rotation preserves the mask and numerical solar positions but removes orientation, sun-path and shading files. Panel edits preserve camera previews and upstream files. Repeated edits do not regenerate diagnostics. Returning to an exact accepted photo, mask and input combination can restore its verified result without another calculation; other combinations require Update. Selected source files are monitored and their contents rechecked on activation, Update and Export. Replacing a file under the same name cannot silently retain current results. If Excel holds an affected workbook open, close it and retry Update.
 
 Debug Data holds one current set. Explicit exports are separate snapshots that later updates do not overwrite. Export validates source contents and artifact hashes before copying and before publication. A missing or locked file, a changed input, or PDF failure produces an error; any remaining interrupted temporary folder is clearly named `.solarshade-export-*.partial` and is never reported as complete. Close the affected file and retry. PDF generation is bundled with the application; no PDF printer is needed.
 
@@ -23,7 +23,7 @@ Both curves show irradiance received by the selected panel before/after obstruct
 
 ## PV Autonomy
 
-The application has two independent tabs: **Solar Irradiance** and **PV Autonomy**. Complete an explicit irradiance update first. The PV tab unlocks only for a current, complete shaded dataset covering the selected study dates. If source inputs or files change, PV evaluation/export is blocked until the source is updated and the system is explicitly evaluated again.
+The application has two independent tabs: **Solar Irradiance** and **PV Autonomy**. Complete an explicit irradiance update first. The PV tab unlocks only for a current, complete shaded dataset covering the selected study dates. If source inputs or files change, PV evaluation/export is blocked until the source is updated. A previously accepted PV result can return when the exact irradiance source and PV settings match; other combinations require **Evaluate system**.
 
 In PV Autonomy, enter the 24 hourly consumption values on the left in **Wh per nominal hour**. The profile repeats by study-local hour; DST days can contain 23 or 25 actual hours. Paste exactly 24 tab/newline-separated values or fill every slot with a constant. Blank/invalid inputs remain visible and block calculation. **Example system** deliberately loads illustrative values; it does not calculate.
 
@@ -31,7 +31,7 @@ Enter panel area (m²), panel efficiency (%), conversion efficiency (%), battery
 
 Click **Evaluate system**. The shared chart shows load demand and available PV energy on the same Wh axis, with end-of-hour battery charge on the fixed 0–100% axis. Available PV is after panel/conversion efficiencies and before curtailment. Red marks identify intervals containing unmet load, even when their end charge recovered. Hover or open **Hourly values** for explicit interval bounds, offsets, partial-hour flags and values. **Model & totals** shows full energy totals, assumptions and the first shortfall interval. “No unmet load during this study” does not guarantee supply in unseen weather.
 
-**Export PV results** copies verified CSV, JSON and XLSX files plus a scoped manifest to a new scenario folder. JSON includes the full irradiance input, system settings and substeps. The existing irradiance export and PDF remain independent. PV settings persist in `Data/pv-settings.json`; restart restores drafts, not accepted results. Optional managed outputs occupy `Debug Data/07-battery` under the same storage lease as irradiance; altering them blocks PV export without damaging the irradiance study.
+**Export PV results** copies verified CSV, JSON and XLSX files plus a scoped manifest to a new scenario folder. JSON includes the full irradiance input, system settings and substeps. The existing irradiance export and PDF remain independent. PV settings persist in `Data/pv-settings.json`; a matching accepted PV result can also be restored from `Data/AcceptedResults`. Optional managed outputs occupy `Debug Data/07-battery` under the same storage lease as irradiance; altering them blocks PV export without damaging the irradiance study.
 
 ## Cardinal-direction preview
 
@@ -71,16 +71,24 @@ The chart holds each interval mean over its actual start/end bounds, including t
 
 ## Automatic Debug Data
 
+### Editing and choosing a sky mask
+
+After **Update results** has produced a mask, click **Edit mask** at the lower corner of its preview. A separate modal window keeps the main study controls fixed while you paint. Choose **Black · obstruction** or **White · open sky**, set brush diameter in original-image pixels, and use the mask-opacity slider to see the photo through the mask while painting. The zoom slider, mouse wheel, Fit image, right-drag pan, undo/redo and Reset affect the editor view or strokes only. The saved PNG remains exactly black/white at the original image dimensions; painting outside the detected lens disk is blocked.
+
+**Save as new mask** creates a named, immutable variant. **Cancel** leaves the current calculation unchanged. The **Mask for calculation** dropdown below the preview selects the AI mask or a compatible saved edit. Each photo remembers its last selection. An edit needs an AI mask first, and `Data/Masks/<photo-hash>/AI` retains that original AI source even if ordinary compute caches are cleaned. Saved variants and their labels are under `Data/Masks/<photo-hash>`. A new selection needs **Update results** unless an exact prior accepted result is available; then the app verifies and restores it without recalculation. Matching PV results also return when their settings match.
+
+`02-sky-mask/mask-provenance.json` identifies the active mask as AI or edited, its immutable AI ancestor hash, optional variant/parent IDs and active pixel hash. Scenario exports include that file and the exact selected `sky-mask.png`. `Data/AcceptedResults` retains hash-verified complete studies and shared artifact blobs so photo/mask switch-back can become current after a restart. Keep both `Data/Masks` and `Data/AcceptedResults` when moving or backing up the portable application. **Saved studies** in the main toolbar shows storage use and offers deliberate cleanup; it preserves the current result and every saved mask.
+
 There is one current dataset directly under `Debug Data`, with the stage folders below and one `run.json`. Update replaces only invalid artifacts; unchanged files retain their bytes and modification times. Orientation is prepared within the explicit calculation. Calibrate publishes into `01-calibration` and saves durable copies under `Data/Profiles`. No Export click is needed to save diagnostics.
 
-Edits invalidate affected current files. Verified historical application run folders are removed after selected inputs are copied to `Data/Inputs` and their saved paths updated. Read-only or inaccessible historical folders are left for later cleanup, with a note in `Data/maintenance.log`; this optional housekeeping does not block startup. User exports, bundled examples and unrecognized folders/files are preserved. Keep Data with the application: it now includes durable calibration/input files as well as disposable caches.
+Edits invalidate affected current files. Selected inputs under managed diagnostics are copied to `Data/Inputs` and their saved paths updated before an update. Historical run folders are retained during normal startup, editing and calculation; explicit maintenance can clean verified old runs while preserving read-only, inaccessible or unrecognized content. Keep Data with the application: it includes durable calibration/input files as well as disposable caches.
 
 Updates prepare files in the bounded sibling `Debug Data.staging` directory and remove it when finished. A held `Debug Data.lock` file prevents concurrent instances from changing the same dataset; a lock file left on disk after exit is normal. Close the other application instance if this dataset is already in use. A stopped or interrupted update remains incomplete and can be retried. Close locked diagnostic workbooks before retrying a failed write.
 
 | Stage folder | Actual library output |
 |---|---|
 | `01-calibration` | `calibration.yml`, `camera-profile.json`; calibration-only runs also include observations, solution, solver diagnostics, validation and existing debug overlays/CSVs. |
-| `02-sky-mask` | Exact black-and-white `sky-mask.png` and `mask-details.json`. |
+| `02-sky-mask` | Exact black-and-white `sky-mask.png`, `mask-details.json` and `mask-provenance.json`. |
 | `02-orientation` | `cardinal-directions-overlay.png`, `cardinal-directions.xlsx` and `cardinal-directions-details.json`, generated by the shading library for the original-photo preview. |
 | `03-irradiance` | `horizontal-irradiance.xlsx`, the complete returned/imported dataset with authoritative interval metadata before selection. |
 | `04-solar-positions` | `solar-positions.xlsx`, one position at each selected source label, plus `solar-integration-samples*.xlsx` for full-source and clipped integration geometry. |
@@ -108,7 +116,7 @@ A compatible library change needs no frontend source rewrite. The self-contained
 - `Example/Irradiance/horizontal-irradiance.xlsx`: original buffered hourly Open-Meteo input workbook.
 - `Example/Debug Data/reference-run`: fixed native library outputs from the verified example run, with its own `run.json`.
 - `Example/settings.json`: executable-relative default input paths. First launch and **Load example** load the inputs without calculating; click **Update results** when ready.
-- `Data`: settings, durable Profiles/Inputs, weather/mask/current-value caches and extracted model weights.
+- `Data`: settings, durable Profiles/Inputs/Masks, accepted-result vault, weather/current-value caches and extracted model weights.
 - Top-level `Debug Data`: the one current set of published diagnostic files.
 
 The example settings illustrate a workflow; they do not establish the true site/pose of the photograph. Read the reference run's settings and results for its exact parameters and totals. Source input data is separate from calculated Debug Data. The bundled reference output is fixed; user updates affect only the top-level current dataset.

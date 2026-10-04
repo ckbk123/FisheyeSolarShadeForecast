@@ -1,6 +1,6 @@
 # Implementation and validation record
 
-Completed on 29 September 2026, based on main commit `0d0a9c3`.
+Completed on 29 September 2026, based on main commit `0d0a9c3`. This is the backend-only validation checkpoint. The PV Autonomy UI and package were added later; see [current application usage](../ApplicationFrontend/RUNNING.md) and the [4 October review](../../docs/SOURCE_AND_EXPORT_REVIEW_2026-10-04.md).
 
 ## Implemented scope
 
@@ -11,7 +11,7 @@ Completed on 29 September 2026, based on main commit `0d0a9c3`.
 - Analytical tests, frozen two-day fixture, decimal reference checks and offline validator.
 - Backend solution integration and API/assumption documentation.
 
-Application UI wiring, packaging a new application release, literature/industrial-tool comparison and physical validation are deferred. The module's software verification does not establish real-world outage probability.
+At this checkpoint, application UI wiring and packaging a new application release were deferred; both were subsequently implemented. Literature/industrial-tool comparison and physical validation remain open. The module's software verification does not establish real-world outage probability.
 
 ## Verification
 
