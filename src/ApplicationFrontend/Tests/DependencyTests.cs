@@ -13,8 +13,8 @@ public sealed class DependencyTests
         yield return ["SkyImage", "other.png", ArtifactGroup.Profile | ArtifactGroup.Mask | InputDependencies.PoseChain];
         yield return ["ProfilePath", "other.json", ArtifactGroup.Profile | InputDependencies.PoseChain];
         yield return ["CoverageAngle", 100d, ArtifactGroup.Profile | InputDependencies.PoseChain];
-        yield return ["Model", SolarShade.SkyPhotoMasking.SkyModel.EfficientNetB4, ArtifactGroup.Mask | InputDependencies.PoseChain];
-        yield return ["Resolution", 512, ArtifactGroup.Mask | InputDependencies.PoseChain];
+        yield return ["Model", SolarShade.SkyPhotoMasking.SkyModel.EfficientNetB4, ArtifactGroup.Mask | ArtifactGroup.Shading];
+        yield return ["Resolution", 512, ArtifactGroup.Mask | ArtifactGroup.Shading];
         yield return ["CenteredDisk", true, ArtifactGroup.Mask | InputDependencies.PoseChain];
         yield return ["BottomAzimuth", 90d, InputDependencies.PoseChain];
         yield return ["CameraTilt", 15d, InputDependencies.PoseChain];
@@ -76,7 +76,7 @@ public sealed class DependencyTests
     private static Task<Evaluation> Calculate(AppServices service, UserSettings settings) => service.Evaluate(settings, false, _ => { }, null, CancellationToken.None);
 
     [Fact]
-    public void CameraEditsPreserveMaskAndNumericalFilesAndCannotReviveDeletedArtifacts() => Sta(async () =>
+    public void CameraEditsPreserveMaskAndNumericalFilesAndRestoreOnlyVerifiedAcceptedResult() => Sta(async () =>
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
         var window = new MainWindow(applicationServices: service);
@@ -91,13 +91,14 @@ public sealed class DependencyTests
             Assert.Null(window.CardinalsForTest); Assert.False(window.SunPathVisibleForTest);
             string manifest = Path.Combine(result.DebugDirectory!, "run.json");
             var firstWrite = File.GetLastWriteTimeUtc(manifest); var firstBytes = File.ReadAllBytes(manifest);
-            for (int i = 0; i < 100; i++) window.EditFieldForTest("CameraTilt", (i % 90).ToString());
+            for (int i = 0; i < 100; i++) window.EditFieldForTest("CameraTilt", (i % 89 + 1).ToString());
             await window.InputsSettled;
             Assert.Equal(firstWrite, File.GetLastWriteTimeUtc(manifest)); Assert.Equal(firstBytes, File.ReadAllBytes(manifest));
             window.EditFieldForTest("CameraTilt", "0"); await window.RecheckSourcesAsync();
-            Assert.Equal(UpdateState.UpdateRequired, window.UpdateStateForTest); Assert.False(window.ExportEnabledForTest);
+            await Until(() => window.UpdateStateForTest == UpdateState.UpToDate);
+            Assert.True(window.ExportEnabledForTest);
             Assert.Throws<InvalidOperationException>(() => AppServices.Export(result, Path.Combine(fixture.Root, "exports")));
-            Assert.Equal(1, fixture.Runs);
+            Assert.Equal(2, fixture.Runs);
             window.Calculate(); await Until(() => !window.UpdatingForTest);
             Assert.Equal(UpdateState.UpToDate, window.UpdateStateForTest); Assert.True(window.ExportEnabledForTest);
             Assert.Equal(result.Run.BeforeEnergy, window.Completed!.Run.BeforeEnergy);

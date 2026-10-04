@@ -4,9 +4,13 @@ Implemented ownership after the September 2026 library/frontend rewrite. The [ap
 
 ## Boundary
 
-`ApplicationFrontend` collects input, selects library operations, sequences stages, coordinates caches, reports progress/cancellation, records a run manifest and renders returned results. It supplies output destinations to the library exporters. It contains no scientific `PanelEngine`, interval selection algorithm, DNI inference, sky integration, shading correction, energy/loss derivation or scientific workbook schema.
+`ApplicationFrontend` collects input, selects library operations, sequences stages, coordinates caches, reports progress/cancellation, records a run manifest and renders returned results. It supplies output destinations to the library exporters. It contains no scientific `PanelEngine`, interval selection algorithm, DNI inference, sky integration, shading correction, energy/loss derivation or scientific workbook schema. The separate PV Autonomy workspace calls the PV/battery libraries only after a current, complete Solar Irradiance result is available.
 
 Scientific algorithms and their file formats remain in the existing libraries. The new panel capability extends the original libraries rather than putting all frontend calculations into another catch-all engine. Generic settings/manifest persistence, input hashing, image-preview resizing and chart coordinates remain frontend responsibilities.
+
+`SolarShade.MaskEditor` is a separate WPF module. Its modal window receives an oriented full-resolution photo, a binary starting mask and lens-disk guide, then returns edited PNG bytes and a label through a save callback. It owns brush strokes, undo/redo, opacity and zoom; it does not reference frontend orchestration or scientific libraries. `ApplicationFrontend` validates and stores immutable variants in `Data/Masks`, selects the active mask, and records its AI ancestor and edit provenance in `02-sky-mask/mask-provenance.json`. The shading library still receives the same binary mask type.
+
+Completed accepted studies are archived under `Data/AcceptedResults` with content-addressed artifact blobs. An exact input match is hash-verified and republished into the one current `Debug Data` dataset without scientific recomputation. Matching PV results have a separate archived scope and are rebound to the restored irradiance result. New mask selections invalidate the mask and shading groups while retaining independent solar, weather, transposition and geometric overlays. Returning to a prior mask or photo restores green/export-ready state only after full source and artifact verification.
 
 ## Stage ownership and APIs
 
@@ -18,6 +22,7 @@ Scientific algorithms and their file formats remain in the existing libraries. T
 | Solar positions | `SolarShade.Shading` | `SolarPositionModule.PrepareIntervals` / `PrepareIntervalsToWorkbook`; `SolarIntervalWorkbook.Export`. |
 | Transposition | `SolarShade.Irradiance.Transposition` | `TranspositionModule.ComputePrepared` / `ExportPrepared`. Its existing kernel owns DNI inference and direct/isotropic/circumsolar components. |
 | Shading | `SolarShade.Shading` and `SolarShade.ShadingCorrection` | `PanelSkyScene`, `CameraPose.FromImageBottom`; `ShadingCorrectionModule.ApplyToPanel` / `ExportPanel`. Correction owns interval results, coverage bounds, transmission, energy and loss summaries. |
+| PV autonomy | `SolarShade.PvBattery`, `.Integration`, `.IO` | `PanelBatterySimulation.Compute` adapts the accepted `PanelRun` to the battery simulator; `BatteryFiles` writes the optional CSV, JSON and XLSX result. |
 
 The frontend binds directly to the correction library's `PanelRun` and `PanelRow` values. The optional correction delegate in `AppServices` is an integration seam used by tests to verify that distinct library results reach the UI-bound result unchanged.
 
@@ -64,13 +69,13 @@ Original standalone APIs remain available. The legacy uniform-window shading fil
 
 ## Debug Data and cache lifecycle
 
-Every completed calculation and automatic edit has a unique top-level `Debug Data` run. Numbered folders contain native calibration YAML/profile, binary mask PNG/metadata, raw irradiance XLSX, solar position/integration XLSX, unshaded panel/component XLSX, and shaded/visibility/transmission XLSX plus result JSON. Calibration-only calls use the same `01-calibration` schema.
+The application maintains one current published Solar Irradiance dataset under top-level `Debug Data`. Explicit updates replace only invalid artifacts; a verified unchanged update retains its run identity and files. Numbered folders contain native calibration YAML/profile, binary mask PNG/metadata, raw irradiance XLSX, solar position/integration XLSX, unshaded panel/component XLSX, and shaded/visibility/transmission XLSX plus result JSON. Calibration-only calls use the same `01-calibration` schema. An optional `07-battery` folder has its own manifest and is valid only for its exact accepted irradiance result and PV settings.
 
 Each owning exporter writes the returned values. Diagnostics do not run another scientific calculation merely to populate Excel. Large integration outputs are split into additional sheets or files. Per-file publication is atomic; a later failure may leave earlier valid artifacts, but the run is not marked complete.
 
 Correction exports carry panel orientation, source/time-zone/cadence metadata, source coordinates when known, dataset fingerprint and solar convention. The actual requested calculation site is recorded by the solar stage and run manifest; source coordinates in a standalone correction export must not be mistaken for that requested site.
 
-`DebugDataRun` stores settings, input fingerprints, library versions, stage origins/status and relative artifact paths. It verifies reported files exist inside the run. Cached values are exported through their library into each current run, and the origin identifies reuse. Manual Export copies a successful run and publishes its completed manifest last.
+`DebugDataRun` stores settings, input fingerprints, library versions, stage origins/status and relative artifact paths. It verifies reported files exist inside the run. Cached values are exported through their library when an affected stage needs publication, and the origin identifies reuse. Manual Export copies a successful run and publishes its completed manifest last. PV export verifies and copies its three files plus its separate manifest; it does not add PV files to the irradiance export.
 
 Cache responsibilities in `AppServices`:
 
@@ -79,7 +84,7 @@ Cache responsibilities in `AppServices`:
 - Solar: complete selected dataset and interval fingerprint, site/elevation, quadrature count and contributing library identities.
 - Visibility: mask/profile fingerprints, effective coverage, camera pose and shading library identity; panel-independent disk moments are reused by the library.
 
-Panel edits reuse the source data and solar geometry, then recompute transposition/correction. Location, time-axis or relevant library changes invalidate dependent work. Cache keys and values are published together after successful computation. Native calibration/masking calls remain serialized. They do not interrupt mid-native-call; cancellation is checked around them and during output. Only the newest UI revision is displayed.
+Panel edits reuse the source data and solar geometry, then recompute transposition/correction. Location, time-axis or relevant library changes invalidate dependent work. Cache keys and values are published together after successful computation. Native calibration/masking calls remain serialized. They do not interrupt mid-native-call; cancellation is checked around them and during output. Only the newest UI revision is displayed. Normal input editing and startup do not enumerate historical Debug Data folders; `DebugDataStore.CleanHistory` is an explicit maintenance operation.
 
 ## Sun-path diagnostic overlay
 
@@ -101,10 +106,10 @@ The frontend owns preview sequencing, cancellation, cache keys and visibility on
 
 Irradiance and transposition remain .NET 8 libraries. The Windows .NET 10 solar/shading library consumes their portable contracts and references transposition to reuse the existing angle conversion. Transposition references irradiance, not masks/shading/correction. Shading correction references transposition and shading. Calibration validation's composition wrapper references Solver and Camera; the solver has no validator dependency. These references are acyclic.
 
-`Example/Irradiance` holds the original bundled raw workbook. `Example/Debug Data/reference-run` is a fixed verified run of the current native stages. Current user calculations write to the top-level `Debug Data`; generated camera profiles remain in their calibration runs. `Data` holds settings, caches and extracted embedded weights.
+`Example/Irradiance` holds the original bundled raw workbook. `Example/Debug Data/reference-run` is a fixed verified run of the native irradiance stages. Current user calculations write to the top-level `Debug Data`; durable camera profiles are copied to `Data/Profiles`. `Data` also holds settings, protected selected inputs, caches and extracted embedded weights.
 
 A scientific library implementation change requires no frontend calculation rewrite while its public interface remains compatible. The self-contained executable still must be republished to include that changed code.
 
 ## Verification
 
-Library tests retain independent calibration, solar and transposition reference checks and cover native YAML/PNG/XLSX round trips, source IDs/cadence, clipping, gaps, location mismatch, receiver orientation, unknown coverage, correction summaries, cancellation and output failures. Frontend tests compare direct-library invocation with orchestration, verify returned summary binding, and exercise cache invalidation plus manifest/export behavior. Packaged smoke tests exercise the actual executable, model inference, real calibration, exports and automatic panel updates. Delivery evidence records the final test counts and package hashes separately from this architecture description.
+Library tests retain independent calibration, solar and transposition reference checks and cover native YAML/PNG/XLSX round trips, source IDs/cadence, clipping, gaps, location mismatch, receiver orientation, unknown coverage, correction summaries, cancellation and output failures. Frontend tests compare direct-library invocation with orchestration, verify returned summary binding, and exercise cache invalidation plus manifest/export behavior. Packaged smoke tests exercise the actual executable, model inference, real calibration, explicit panel updates, PV evaluation and exports. Delivery evidence records the final test counts and package hashes separately from this architecture description.

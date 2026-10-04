@@ -70,6 +70,17 @@ public sealed record BatterySummary(
 /// <summary>Snapshot of inputs and results. Hour timestamps are ends of actual elapsed intervals.</summary>
 public sealed class BatterySimulationResult
 {
+    /// <summary>Rehydrates a verified saved result without running the battery model.</summary>
+    public static BatterySimulationResult Restore(string fingerprint, BatterySimulationRequest input,
+        IReadOnlyList<BatteryStep> steps, IReadOnlyList<BatteryHour> hours, BatterySummary summary)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+        ArgumentNullException.ThrowIfNull(input); ArgumentNullException.ThrowIfNull(steps);
+        ArgumentNullException.ThrowIfNull(hours); ArgumentNullException.ThrowIfNull(summary);
+        BatterySimulator.ValidateSettings(input.Settings);
+        if (hours.Count == 0 || steps.Count == 0) throw new InvalidDataException("Saved battery result is empty.");
+        return new(fingerprint, input, steps, hours, summary);
+    }
     public string ModelVersion { get; } = BatterySimulator.ModelVersion;
     public string Assumptions { get; } = "Fixed panel efficiency; conversion applied to PV only; ideal battery charge/discharge; " +
         "all supplied capacity accessible; no power limits; no daily reset; energy-based SoC; " +

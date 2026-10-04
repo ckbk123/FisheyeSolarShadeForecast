@@ -29,8 +29,10 @@ public sealed class InputDependencies
     public SourceIdentity Image { get; }
     public SourceIdentity Profile { get; }
     public SourceIdentity Weather { get; }
+    public SourceIdentity EditedMask { get; }
+    public SourceIdentity EditedMetadata { get; }
     public IReadOnlyDictionary<ArtifactGroup, string> Keys { get; }
-    public IEnumerable<string> SourcePaths => new[] { Image.Path, Profile.Path, Weather.Path }.Where(p => p.Length > 0);
+    public IEnumerable<string> SourcePaths => new[] { Image.Path, Profile.Path, Weather.Path, EditedMask.Path, EditedMetadata.Path }.Where(p => p.Length > 0);
     public static readonly ArtifactGroup[] Groups = Enum.GetValues<ArtifactGroup>().Where(g => g is not (ArtifactGroup.None or ArtifactGroup.All)).ToArray();
     public const ArtifactGroup WeatherChain = ArtifactGroup.Irradiance | ArtifactGroup.Solar | ArtifactGroup.SunPath | ArtifactGroup.Transposition | ArtifactGroup.Shading;
     public const ArtifactGroup GeometryChain = WeatherChain & ~ArtifactGroup.Irradiance;
@@ -42,10 +44,14 @@ public sealed class InputDependencies
         Image = SourceIdentity.Read(s.SkyImage, previous?.Image, refresh);
         Profile = SourceIdentity.Read(s.ProfilePath, previous?.Profile, refresh);
         Weather = SourceIdentity.Read(s.ImportPath, previous?.Weather, refresh);
+        string variantFolder = s.SelectedMaskId == null || Image.Content is "" or "missing" or "unreadable" ? ""
+            : Path.GetDirectoryName(ManualMaskStore.VariantPngPath(Image.Content, s.SelectedMaskId))!;
+        EditedMask = SourceIdentity.Read(variantFolder.Length == 0 ? "" : Path.Combine(variantFolder, "sky-mask.png"), previous?.EditedMask, refresh);
+        EditedMetadata = SourceIdentity.Read(variantFolder.Length == 0 ? "" : Path.Combine(variantFolder, "variant.json"), previous?.EditedMetadata, refresh);
         var keys = new Dictionary<ArtifactGroup, string>();
-        keys[ArtifactGroup.Mask] = AppData.Key(new { Image, s.Model, s.Resolution, s.CenteredDisk });
+        keys[ArtifactGroup.Mask] = AppData.Key(new { Image, s.Model, s.Resolution, s.CenteredDisk, s.SelectedMaskId, EditedMask, EditedMetadata });
         keys[ArtifactGroup.Profile] = AppData.Key(new { Profile, Image, s.CoverageAngle });
-        keys[ArtifactGroup.Orientation] = AppData.Key(new { Mask = keys[ArtifactGroup.Mask], Profile = keys[ArtifactGroup.Profile], s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
+        keys[ArtifactGroup.Orientation] = AppData.Key(new { Image, s.CenteredDisk, Profile = keys[ArtifactGroup.Profile], s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
         // Date/site changes do not change the contents of an imported source workbook.
         keys[ArtifactGroup.Irradiance] = s.ImportPath.Length > 0
             ? AppData.Key(new { Weather, s.ImportWindow, s.ImportIntervalMinutes, s.Zone })
@@ -53,7 +59,7 @@ public sealed class InputDependencies
         keys[ArtifactGroup.Solar] = AppData.Key(new { Raw = keys[ArtifactGroup.Irradiance], s.Start, s.End, s.Zone, s.Latitude, s.Longitude, s.Elevation, s.Substeps });
         keys[ArtifactGroup.SunPath] = AppData.Key(new { Solar = keys[ArtifactGroup.Solar], Camera = keys[ArtifactGroup.Orientation], s.Zone });
         keys[ArtifactGroup.Transposition] = AppData.Key(new { Solar = keys[ArtifactGroup.Solar], s.PanelTilt, s.PanelAzimuth, s.Isotropic });
-        keys[ArtifactGroup.Shading] = AppData.Key(new { Panel = keys[ArtifactGroup.Transposition], Camera = keys[ArtifactGroup.Orientation] });
+        keys[ArtifactGroup.Shading] = AppData.Key(new { Panel = keys[ArtifactGroup.Transposition], Camera = keys[ArtifactGroup.Orientation], Mask = keys[ArtifactGroup.Mask] });
         Keys = keys;
     }
     public static InputDependencies Capture(UserSettings s, InputDependencies? previous = null, bool refresh = true) => new(s, previous, refresh);
@@ -61,7 +67,8 @@ public sealed class InputDependencies
 
     public static ArtifactGroup WithDependents(ArtifactGroup groups)
     {
-        if ((groups & (ArtifactGroup.Profile | ArtifactGroup.Mask)) != 0) groups |= PoseChain;
+        if ((groups & ArtifactGroup.Mask) != 0) groups |= ArtifactGroup.Shading;
+        if ((groups & ArtifactGroup.Profile) != 0) groups |= PoseChain;
         if ((groups & ArtifactGroup.Orientation) != 0) groups |= PoseChain;
         if ((groups & ArtifactGroup.Irradiance) != 0) groups |= WeatherChain;
         if ((groups & ArtifactGroup.Solar) != 0) groups |= GeometryChain;
@@ -72,7 +79,9 @@ public sealed class InputDependencies
     public static ArtifactGroup ForField(string field, UserSettings settings) => field switch
     {
         "SkyImage" => ArtifactGroup.Profile | ArtifactGroup.Mask | PoseChain,
-        "Model" or "Resolution" or "CenteredDisk" => ArtifactGroup.Mask | PoseChain,
+        "Model" or "Resolution" => ArtifactGroup.Mask | ArtifactGroup.Shading,
+        "CenteredDisk" => ArtifactGroup.Mask | PoseChain,
+        "SelectedMaskId" => ArtifactGroup.Mask | ArtifactGroup.Shading,
         "ProfilePath" or "CoverageAngle" => ArtifactGroup.Profile | PoseChain,
         "BottomAzimuth" or "CameraTilt" or "CameraRoll" => PoseChain,
         "PanelTilt" or "PanelAzimuth" or "Isotropic" => PanelChain,

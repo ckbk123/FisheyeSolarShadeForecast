@@ -1,8 +1,10 @@
 # ApplicationFrontend
 
-The current frontend owns UI input, sequencing, cache coordination and rendering. Calibration, masking, irradiance intervals, solar geometry, transposition, shading and their native exports are owned by the existing libraries. See [current architecture](../../docs/APPLICATION_ARCHITECTURE.md) and [running and output formats](RUNNING.md).
+The current frontend has Solar Irradiance and PV Autonomy workspaces. It owns UI input, sequencing, cache coordination and rendering. Calibration, masking, irradiance intervals, solar geometry, transposition, shading, PV/battery simulation and their native exports are owned by the libraries. See [current architecture](../../docs/APPLICATION_ARCHITECTURE.md) and [running and output formats](RUNNING.md).
 
-Each calculation automatically saves numbered stage outputs under the top-level `Debug Data` folder. Irradiance intervals determine every downstream result's cadence. The current APIs are documented in the architecture page; the material below is preserved as an **archived initial design**, including superseded gaps and export behavior.
+Each explicit Solar Irradiance update saves affected numbered stage outputs under the one current top-level `Debug Data` dataset. PV Autonomy adds an optional `07-battery` result after a separate evaluation. Irradiance intervals determine every downstream result's cadence. The current APIs are documented in the architecture page; the material below is preserved as an **archived initial design**, including superseded gaps and export behavior.
+
+The mask preview now opens a separate modal paint window through **Edit mask**. Black marks obstruction; white marks open sky. The editor has native-pixel brush size, opacity and zoom sliders, pan, undo/redo and reset. Saving creates a named immutable variant under `Data/Masks`, preserving the AI source mask; the mask dropdown selects the variant used for shading. The main app owns variant persistence, result invalidation and export provenance. Exact accepted studies, including matching optional PV results, can be restored from `Data/AcceptedResults` without rerunning their scientific calculations. See [running and output formats](RUNNING.md) for the current workflow.
 
 ## Archived initial workflow and implementation evaluation
 
