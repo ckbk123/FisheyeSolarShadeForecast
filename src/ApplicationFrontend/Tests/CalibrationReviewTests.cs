@@ -234,6 +234,7 @@ public sealed class CalibrationReviewTests
         Assert.NotNull(review.Note); Assert.Contains("unavailable", review.Summary);
         Assert.NotNull(review.Preview(Assert.Single(review.Report.Images)));
         var picker = IrradianceWorkspace.CameraProfilePicker();
-        Assert.Contains("camera parameters", picker.Title); Assert.Contains("*.json;*.yml;*.yaml", picker.Filter);
+        Assert.Contains("camera parameters", picker.Title); Assert.Contains("*.json", picker.Filter);
+        Assert.DoesNotContain("*.yml", picker.Filter); Assert.DoesNotContain("*.yaml", picker.Filter);
     }
 }
