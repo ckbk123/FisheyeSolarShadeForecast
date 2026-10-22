@@ -40,7 +40,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private UpdateState updateState { get => controller.State; set => controller.State = value; }
     private readonly TextBlock updateIndicator = Label("● Update required", 13);
     private readonly Button update = new() { Content = "Update results" };
-    private readonly Button refreshData = new() { Content = "Refresh data & update" };
+    private readonly Button refreshData = new() { Content = "Download weather again & update" };
+    private readonly TextBlock weatherSource = Label("", 11);
+    private readonly TextBlock lastWeatherResult = Label("", 11);
+    private readonly Button chooseWeatherFile = new() { Content = "Choose XLSX / CSV file" };
     private readonly Button stop = new() { Content = "Stop", IsEnabled = false };
     private Evaluation? completed { get => controller.Completed; set => controller.Completed = value; }
     private readonly Dictionary<string, TextBox> fields = new();
@@ -152,9 +155,18 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         zone.SelectionChanged += (_, _) => { if (!loading && !settings.UseSystemTimeZone && zone.SelectedValue is string z) { settings.Zone = z; zone.ToolTip = (zone.SelectedItem as TimeZoneInfo)?.DisplayName; Changed(); } };
         inputs.Children.Add(Label("Turn off automatic to choose. Named regions follow daylight saving; fixed UTC offsets never change. Coordinates select the weather location.", 11));
         Field(inputs, "Start date · DD.MM.YYYY", "Start"); Field(inputs, "End date · inclusive · DD.MM.YYYY", "End");
-        provider = Combo(inputs, "Irradiance service", ["NASA POWER", "Open-Meteo · ERA5"]); provider.SelectionChanged += (_, _) => { if (!loading) { settings.Provider = provider.SelectedIndex; Changed(); } };
-        var dataButtons = new WrapPanel(); dataButtons.Children.Add(Button("Import XLSX / CSV", PickImport)); dataButtons.Children.Add(Button("Use API", () => { settings.ImportPath = ""; Changed(); status.Text = "API selected · click Update results"; })); inputs.Children.Add(dataButtons);
+        provider = Combo(inputs, "Weather data source", ["NASA POWER", "Open-Meteo · ERA5", "Import XLSX / CSV"]);
+        System.Windows.Automation.AutomationProperties.SetName(provider, "Weather data source");
+        provider.SelectionChanged += (_, _) =>
+        {
+            if (loading) return;
+            if (provider.SelectedIndex == 2) { if (string.IsNullOrEmpty(settings.ImportPath)) PickImport(); }
+            else if (provider.SelectedIndex >= 0) { settings.Provider = provider.SelectedIndex; settings.ImportPath = ""; Changed(); }
+            RefreshWeatherSource();
+        };
+        chooseWeatherFile.Click += (_, _) => PickImport(); inputs.Children.Add(chooseWeatherFile); inputs.Children.Add(weatherSource); inputs.Children.Add(lastWeatherResult);
         inputs.Children.Add(Label("Import: timestamp, direct horizontal (BHI), diffuse horizontal (DHI), in W/m². Native metadata sets the intervals; otherwise choose their duration and label below.", 11));
+        inputs.Children.Add(Label("Example CSV header: Timestamp,BHI,DHI\n2025-05-15T12:00:00+07:00,500,100\nA total-only (GHI) measurement cannot supply both components. Example/Irradiance includes a workbook.", 11));
         window = Combo(inputs, "Imported rows represent", ["Preceding interval · end labels", "Following interval · start labels", "Centered interval"]); window.SelectionChanged += (_, _) => { if (!loading) { settings.ImportWindow = window.SelectedIndex; Changed(); } };
         Field(inputs, "Import interval, minutes (without metadata)", "ImportIntervalMinutes");
         Section(tuning, "TUNE YOUR PANEL");
@@ -178,7 +190,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         tuning.Children.Add(updateIndicator);
         var runButtons = new WrapPanel(); runButtons.Children.Add(update); runButtons.Children.Add(stop); tuning.Children.Add(runButtons);
         tuning.Children.Add(refreshData);
-        tuning.Children.Add(Label("Edit your inputs, then click Update results.", 11));
+        tuning.Children.Add(Label("Update results reuses matching weather data. Download weather again bypasses the weather cache; camera calibration and masks are reused when unchanged.", 11));
 
         var right = new Grid(); Grid.SetColumn(right, 2); body.Children.Add(right);
         right.RowDefinitions.Add(new() { Height = new GridLength(350) }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new());
@@ -309,6 +321,19 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         RefreshMaskChoices();
         calibrationInfo.Text = string.IsNullOrEmpty(settings.ProfilePath) ? "No camera profile selected" : "Profile: " + Path.GetFileName(settings.ProfilePath);
         loading = false;
+        RefreshWeatherSource();
+    }
+    private void RefreshWeatherSource()
+    {
+        bool imported = !string.IsNullOrEmpty(settings.ImportPath), previous = loading; loading = true;
+        provider.SelectedIndex = imported ? 2 : settings.Provider;
+        chooseWeatherFile.Visibility = imported ? Visibility.Visible : Visibility.Collapsed;
+        window.IsEnabled = fields["ImportIntervalMinutes"].IsEnabled = imported;
+        weatherSource.Text = imported ? "Selected file: " + Path.GetFileName(settings.ImportPath) + "\nUpdate results rereads changed files. No weather download is used."
+            : "Matching weather data is reused locally. Download weather again requests a fresh copy from the selected provider.";
+        weatherSource.ToolTip = imported ? PortablePaths.Resolve(settings.ImportPath) : null;
+        loading = previous;
+        RefreshButtons();
     }
     private void PopulateImages()
     {
@@ -569,7 +594,11 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private void RefreshButtons()
     {
         update.IsEnabled = refreshData.IsEnabled = !controller.DependentBusy && !updating && !calibrating && InputProblem() == null;
-        update.ToolTip = refreshData.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : null;
+        refreshData.IsEnabled &= string.IsNullOrEmpty(settings.ImportPath);
+        update.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : "Recalculate changed inputs; reuse matching weather, calibration and masks.";
+        refreshData.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : string.IsNullOrEmpty(settings.ImportPath)
+            ? "Download fresh weather from the selected provider, then update. Unchanged calibration and masks are reused."
+            : "Imported file selected: use Update results to reread it. There is no weather download to refresh.";
         stop.IsEnabled = updating && pending?.IsCancellationRequested == false;
         controller.RefreshSource();
         export.IsEnabled = !controller.Verifying && !exporting && !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null &&
@@ -651,6 +680,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private void PresentResult(Evaluation result, bool restored)
     {
         completed = result; chart.Opacity = 1; beforeEnergy.Opacity = afterEnergy.Opacity = reduction.Opacity = 1;
+        ShowWeatherOrigin(result);
         if (result.Mask != null) ShowMask(result.Mask);
         ShowCardinals(result.Cardinals); ShowSunPath(result.SunPath);
         chart.SetData(result.Run.Rows, TimeZoneSelection.Resolve(result.Settings.Zone));
@@ -732,7 +762,21 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private void PickCalibrationFolder() { var p = new OpenFolderDialog { Title = "Choose checkerboard photographs" }; if (p.ShowDialog(owner) == true) { settings.CalibrationFolder = PortablePaths.Store(p.FolderName); LoadFields(); Changed(); } }
     private void PickSkyFolder() { var p = new OpenFolderDialog { Title = "Choose the folder containing your sky photograph" }; if (p.ShowDialog(owner) == true) { settings.SkyFolder = PortablePaths.Store(p.FolderName); settings.SkyImage = ""; settings.SelectedMaskId = null; LoadFields(); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } }
     private void PickProfile() { var p = new OpenFileDialog { Filter = "Camera profile|*.json;*.yml;*.yaml" }; if (p.ShowDialog(owner) == true) { settings.ProfilePath = PortablePaths.Store(p.FileName); settings.CoverageAngle = 0; LoadFields(); Changed(); } }
-    private void PickImport() { var p = new OpenFileDialog { Filter = "Horizontal irradiance|*.xlsx;*.csv" }; if (p.ShowDialog(owner) == true) { settings.ImportPath = PortablePaths.Store(p.FileName); Changed(); status.Text = "Imported source selected · check dates, site, time zone and source interval metadata"; detail.Text = p.FileName; } }
+    private void PickImport() { var p = new OpenFileDialog { Title = "Choose horizontal irradiance: timestamp, BHI and DHI in W/m²", Filter = "Horizontal irradiance|*.xlsx;*.csv" }; if (p.ShowDialog(owner) == true) SelectWeatherFile(p.FileName); else RefreshWeatherSource(); }
+    public void SelectWeatherFile(string path)
+    { settings.ImportPath = PortablePaths.Store(path); Changed(); RefreshWeatherSource(); status.Text = "Imported source selected · check dates, site, time zone and source interval metadata"; detail.Text = path; }
+    private void ShowWeatherOrigin(Evaluation result)
+    {
+        RefreshWeatherSource();
+        string origin = "Source origin unavailable";
+        try
+        {
+            var manifest = result.DebugDirectory is { } directory ? AppData.Read<DebugDataRun.Manifest>(Path.Combine(directory, "run.json")) : null;
+            if (manifest?.Stages.TryGetValue("03-irradiance", out var stage) == true) origin = stage.Origin;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { }
+        lastWeatherResult.Text = $"Last result: {origin}. Source: {result.Raw.Source}. Dataset timestamp: {result.Raw.FetchedUtc.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
+    }
     private async Task Calibrate()
     {
         if (calibrating || updating || controller.DependentBusy) return;
