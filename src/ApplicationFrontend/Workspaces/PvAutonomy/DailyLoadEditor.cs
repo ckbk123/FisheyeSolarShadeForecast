@@ -25,7 +25,7 @@ public sealed class DailyLoadEditor : UserControl
         footer.Children.Add(PvAutonomyWorkspace.Text("Same consumption every hour · Wh", 11));
         var fill = new StackPanel(); var constant = new TextBox { Width = 80, Padding = new(5), HorizontalAlignment = HorizontalAlignment.Left, ToolTip = "Energy for each one-hour slot. For example, 100 Wh per hour gives 2400 Wh per day." };
         System.Windows.Automation.AutomationProperties.SetName(constant, "Constant hourly consumption in Wh");
-        fill.Children.Add(constant); fill.Children.Add(PvAutonomyWorkspace.Text("Example: 100 Wh each hour = 2400 Wh/day.\nApplying replaces all 24 values below.", 11));
+        fill.Children.Add(constant); fill.Children.Add(PvAutonomyWorkspace.Text("Example: 100 Wh each hour = 2400 Wh/day.\nApplying replaces all 24 hourly values.", 11));
         fill.Children.Add(PvAutonomyWorkspace.Button("Apply to all 24 hours", () =>
         {
             try { if (PvSettingsDraft.Number(constant.Text, "Consumption") < 0) throw new ArgumentException("Consumption cannot be negative."); SetValues(Enumerable.Repeat(constant.Text, 24).ToArray()); Edited?.Invoke(Values); error.Text = ""; }
