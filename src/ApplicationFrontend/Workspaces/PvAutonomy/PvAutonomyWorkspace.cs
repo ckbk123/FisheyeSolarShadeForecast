@@ -25,7 +25,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
     public PvAutonomyWorkspace(Window owner, IrradianceWorkspaceController source, PvWorkspaceController controller, Func<Task> recheck, Action goToSource)
     {
         this.owner = owner; this.source = source; Controller = controller; this.recheck = recheck;
-        var actions = new StackPanel { Orientation = Orientation.Horizontal };
+        var actions = new WrapPanel();
         actions.Children.Add(Button("Example system", () => { Controller.SetDraft(PvSettingsDraft.Example()); LoadFields(); }));
         actions.Children.Add(Button("Help", ShowHelp)); export = Button("Export PV results", async () =>
         {
@@ -37,11 +37,15 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         var sourceBar = new DockPanel { Margin = new(0, 0, 0, 8) }; DockPanel.SetDock(sourceBar, Dock.Top); root.Children.Add(sourceBar);
         sourceBar.Children.Add(sourceText);
         status.Margin = new(0, 7, 0, 0); DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
-        var columns = new Grid { MinWidth = 950, MinHeight = 600 }; columns.ColumnDefinitions.Add(new() { Width = new(280) }); columns.ColumnDefinitions.Add(new() { Width = new(14) }); columns.ColumnDefinitions.Add(new());
-        root.Children.Add(new WorkspaceViewport(columns));
+        var columns = new Grid();
         var left = new Border { Background = Brushes.White, Child = load }; columns.Children.Add(left);
-        var right = new DockPanel { Background = Brushes.White, Margin = new(0), LastChildFill = true }; Grid.SetColumn(right, 2); columns.Children.Add(right);
-        var top = new StackPanel { Margin = new(12, 8, 12, 0) }; DockPanel.SetDock(top, Dock.Top); right.Children.Add(top);
+        var right = new Grid { Background = Brushes.White }; columns.Children.Add(right);
+        right.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        right.RowDefinitions.Add(new() { MinHeight = 220 });
+        right.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        root.Children.Add(new WorkspaceViewport(columns, left, right, sidebarWidth: 300, contentMinimumWidth: 500,
+            sidebarMinimumHeight: 600, contentMinimumHeight: 600));
+        var top = new StackPanel { Margin = new(12, 8, 12, 0) }; right.Children.Add(top);
         top.Children.Add(Text("PV System Autonomy", 21));
         top.Children.Add(Text("Check whether your panel and battery can supply the daily consumption during this study.", 11));
         top.ToolTip = "Evaluate energy supply and battery charge over the study period.";
@@ -65,7 +69,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         Legend(legend, "Load demand · Wh", PvSystemChart.LoadBrush, b => chart.ShowLoad = b);
         Legend(legend, "PV available · Wh", PvSystemChart.PvBrush, b => chart.ShowPv = b);
         Legend(legend, "Battery charge · %", PvSystemChart.SocBrush, b => chart.ShowSoc = b);
-        var bottom = new StackPanel { Margin = new(12, 0, 12, 8) }; DockPanel.SetDock(bottom, Dock.Bottom); right.Children.Add(bottom);
+        var bottom = new StackPanel { Margin = new(12, 0, 12, 8) }; Grid.SetRow(bottom, 2); right.Children.Add(bottom);
         var navigation = new WrapPanel(); bottom.Children.Add(navigation);
         navigation.Children.Add(Button("Full period", chart.Reset)); navigation.Children.Add(day);
         navigation.Children.Add(Button("←", () => MoveDay(-1)));
@@ -74,7 +78,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         navigation.Children.Add(Button("First shortfall", () => { if (Controller.Result?.Summary.FirstShortfallIntervalStart is { } start) { day.SelectedDate = start.Date; chart.Day(start.Date); } }));
         navigation.Children.Add(Button("Hourly values", ShowTable));
         hover.MinHeight = 34; bottom.Children.Add(hover); chart.Hover += value => hover.Text = value;
-        chart.Margin = new(10, 0, 10, 0); right.Children.Add(chart);
+        chart.Margin = new(10, 0, 10, 0); Grid.SetRow(chart, 1); right.Children.Add(chart);
         load.Edited += values => Controller.SetDraft(Controller.Draft with { Load = values });
         Controller.Changed += OnChanged; source.SourceChanged += OnSourceChanged; owner.Activated += OnActivated;
         LoadFields(); Refresh();
@@ -128,8 +132,9 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         foreach (var (title, property, format) in new[] { ("Start", "Start", "yyyy-MM-dd HH:mm zzz"), ("End", "End", "yyyy-MM-dd HH:mm zzz"),
             ("Partial hour", "IsPartialHour", ""), ("Consumption · Wh", "LoadWh", "0.###"), ("PV available · Wh", "PvWh", "0.###"), ("End battery charge · %", "EndSocPercent", "0.###"), ("Unmet consumption · Wh", "UnmetLoadWh", "0.###") })
             table.Columns.Add(new DataGridTextColumn { Header = title, Binding = new System.Windows.Data.Binding(property) { StringFormat = format } });
-        new Window { Owner = owner, Title = Controller.IsCurrent ? "PV Autonomy · Hourly values" : "PV Autonomy · Previous hourly values (stale)",
-            Content = table, Width = 1000, Height = 550, WindowStartupLocation = WindowStartupLocation.CenterOwner }.ShowDialog();
+        var dialog = new Window { Owner = owner, Title = Controller.IsCurrent ? "PV Autonomy · Hourly values" : "PV Autonomy · Previous hourly values (stale)",
+            Content = table, Width = 1000, Height = 550, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        WindowWorkArea.FitToOwner(dialog, owner); dialog.ShowDialog();
     }
     private void ShowHelp() => HelpWindow.Open(ref helpWindow, owner, "PV Autonomy · Help",
         "1. Complete and update Solar Irradiance.\n2. Enter 24 hourly consumption values in Wh. They repeat by study-local hour (DST days can have 23 or 25 hours).\n3. Enter panel area, efficiencies, battery capacity in Wh and charge at the study start. Click Evaluate system.\n\nThe graph overlays load demand and PV energy available on the Wh axis, with battery charge on the fixed 0–100% axis. Red marks mean unmet load, even if charge recovered before the hour ended. Hover for actual interval bounds and duration. Zooming never resets the battery.\n\nConversion losses apply to PV only. Battery charge/discharge is ideal, all capacity is accessible, and power limits, ageing and temperature effects are omitted. Results describe the supplied study period only.\n\nExport PV results saves CSV, JSON and XLSX, including inputs, assumptions and the full irradiance source in JSON. Settings are restored on restart; results require an explicit evaluation."

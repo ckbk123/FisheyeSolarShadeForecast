@@ -28,18 +28,14 @@ public sealed class CalibrationReviewWindow : Window
         Title = "Checkerboard calibration review";
         if (string.Equals(Environment.GetEnvironmentVariable("SOLARSHADE_VALIDATION_MONITOR"), "secondary", StringComparison.OrdinalIgnoreCase))
             ShowActivated = false;
-        Width = Math.Min(900, SystemParameters.WorkArea.Width); Height = Math.Min(760, SystemParameters.WorkArea.Height);
-        if (owner != null)
-        {
-            Owner = owner;
-            double OwnerExtent(double actual, double requested, double fallback) => double.IsFinite(actual) && actual > 0 ? actual
-                : double.IsFinite(requested) && requested > 0 ? requested : fallback;
-            Width = Math.Min(Width, OwnerExtent(owner.ActualWidth, owner.Width, Width));
-            Height = Math.Min(Height, OwnerExtent(owner.ActualHeight, owner.Height, Height));
-        }
+        Width = 900; Height = 760;
+        if (owner != null) WindowWorkArea.FitToOwner(this, owner);
+        else WindowWorkArea.FitOnStartup(this);
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        var root = new DockPanel { Margin = new(16) }; Content = root;
-        var header = new StackPanel(); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
+        var root = new StackPanel { Margin = new(16) };
+        Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        var header = new StackPanel(); root.Children.Add(header);
         header.Children.Add(IrradianceWorkspace.Label(review.Summary, 18));
         header.Children.Add(IrradianceWorkspace.Label(review.Report.Failure is { } error
             ? "Calibration could not complete: " + error : "Colored corner markers show the detected inner corners.", 13));
@@ -50,7 +46,8 @@ public sealed class CalibrationReviewWindow : Window
         photos.ItemsSource = review.Report.Images.Select(i => new PhotoChoice(i)).ToArray();
         photos.Margin = new(0, 6, 0, 8); header.Children.Add(photos);
         header.Children.Add(feedback);
-        var footer = new StackPanel { Margin = new(0, 8, 0, 0) }; DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
+        root.Children.Add(new Border { Height = 360, Margin = new(0, 8, 0, 0), Background = Brushes.Black, Child = preview });
+        var footer = new StackPanel { Margin = new(0, 8, 0, 0) }; root.Children.Add(footer);
         footer.Children.Add(IrradianceWorkspace.Label("Saved review and diagnostics", 12));
         footer.Children.Add(new TextBox { Text = review.Directory, IsReadOnly = true, TextWrapping = TextWrapping.Wrap });
         var buttons = new WrapPanel { Margin = new(0, 6, 0, 0) }; footer.Children.Add(buttons);
@@ -64,7 +61,6 @@ public sealed class CalibrationReviewWindow : Window
         buttons.Children.Add(open);
         var close = new Button { Content = "Close review", Padding = new(10, 5, 10, 5), Margin = new(8, 0, 0, 0), IsCancel = true };
         close.Click += (_, _) => Close(); buttons.Children.Add(close);
-        root.Children.Add(new Border { Margin = new(0, 8, 0, 0), Background = Brushes.Black, Child = preview });
         photos.SelectionChanged += (_, _) => ShowPhoto();
         photos.SelectedIndex = review.Report.Images.Count > 0 ? 0 : -1;
         if (photos.SelectedIndex < 0) feedback.Text = "No supported photos reached checkerboard detection. Check the folder and board settings.";

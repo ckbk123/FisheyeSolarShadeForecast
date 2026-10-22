@@ -12,9 +12,11 @@ public sealed class ResponsiveLayoutTests
 {
     [Theory]
     [InlineData(1440, 960)]
-    [InlineData(1080, 720)]
-    [InlineData(800, 600)]
-    [InlineData(760, 540)]
+    [InlineData(1280, 680)]
+    [InlineData(1024, 544)]
+    [InlineData(853, 453)]
+    [InlineData(640, 340)]
+    [InlineData(480, 320)]
     public void IrradiancePlotAndUpdateRemainReachableAfterShrinking(double width, double height) => Sta(async () =>
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
@@ -24,6 +26,7 @@ public sealed class ResponsiveLayoutTests
             window.Show(); window.Calculate(); await Until(() => !window.UpdatingForTest);
             var completed = window.Completed; Assert.NotNull(completed);
             window.Width = width; window.Height = height; window.UpdateLayout();
+            AssertActionsVisible(window.Irradiance.Actions, window);
             var chart = Descendants<IrradianceChart>(window).Single();
             chart.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
             AssertVisibleInsideWorkspace(chart, window.Irradiance);
@@ -37,7 +40,7 @@ public sealed class ResponsiveLayoutTests
                 button.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
                 AssertVisibleInsideWorkspace(button, window.Irradiance);
             }
-            foreach (string property in new[] { "Latitude", "Start" })
+            foreach (string property in new[] { "Latitude", "Start", "PanelTilt", "PanelAzimuth" })
             {
                 var field = Descendants<TextBox>(window.Irradiance).Single(b => Equals(b.Tag, property));
                 field.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
@@ -54,9 +57,11 @@ public sealed class ResponsiveLayoutTests
 
     [Theory]
     [InlineData(1440, 960)]
-    [InlineData(1080, 720)]
-    [InlineData(800, 600)]
-    [InlineData(760, 540)]
+    [InlineData(1280, 680)]
+    [InlineData(1024, 544)]
+    [InlineData(853, 453)]
+    [InlineData(640, 340)]
+    [InlineData(480, 320)]
     public void PvPlotAndSystemControlsRemainReachableAfterShrinking(double width, double height) => Sta(async () =>
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
@@ -70,6 +75,7 @@ public sealed class ResponsiveLayoutTests
             Assert.True(pv.Controller.IsCurrent);
             var result = pv.Controller.Result;
             window.Width = width; window.Height = height; window.UpdateLayout();
+            AssertActionsVisible(pv.Actions, window);
             pv.Chart.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
             AssertVisibleInsideWorkspace(pv.Chart, pv); Assert.True(pv.Chart.ActualHeight >= 140);
             Capture(window, $"pv-{width}-{height}");
@@ -89,12 +95,69 @@ public sealed class ResponsiveLayoutTests
         void Check(FrameworkElement viewport)
         {
             var bounds = element.TransformToAncestor(viewport).TransformBounds(new Rect(element.RenderSize));
-            Assert.True(bounds.Top >= -1 && bounds.Bottom <= viewport.ActualHeight + 1,
+            // A chart can be taller than a very short high-DPI desktop. Its finite canvas must
+            // remain scrollable and intersect the visible area; ordinary controls fit completely.
+            bool tallChart = element is IrradianceChart or PvSystemChart && bounds.Height > viewport.ActualHeight;
+            Assert.True(tallChart ? bounds.Top < viewport.ActualHeight && bounds.Bottom > 0
+                : bounds.Top >= -1 && bounds.Bottom <= viewport.ActualHeight + 1,
                 $"{element.GetType().Name} vertical bounds {bounds} exceed {viewport.GetType().Name} height {viewport.ActualHeight}.");
             Assert.True(bounds.Left >= -1 && bounds.Right <= viewport.ActualWidth + 1,
                 $"{element.GetType().Name} horizontal bounds {bounds} exceed {viewport.GetType().Name} width {viewport.ActualWidth}.");
         }
     }
+    private static void AssertActionsVisible(FrameworkElement actions, Window window)
+    {
+        foreach (var button in Descendants<Button>(actions))
+        {
+            var bounds = button.TransformToAncestor(window).TransformBounds(new Rect(button.RenderSize));
+            Assert.True(bounds.Left >= 0 && bounds.Right <= window.ActualWidth && bounds.Top >= 0 && bounds.Bottom <= window.ActualHeight,
+                $"Header action {button.Content} is clipped: {bounds} in {window.ActualWidth} × {window.ActualHeight}.");
+        }
+    }
+
+    [Theory]
+    [InlineData(1280, 680, 1)]
+    [InlineData(1280, 680, 1.25)]
+    [InlineData(1280, 680, 1.5)]
+    [InlineData(1280, 680, 2)]
+    public void PanesReflowWithinScaled720pWorkArea(double physicalWidth, double physicalHeight, double scale) => Sta(() =>
+    {
+        // A deterministic logical-size simulation; the user's monitor scaling is never changed.
+        var sidebar = new Border { Child = new ScrollViewer { Content = new Border { Height = 1400 } } };
+        var result = new Grid(); result.RowDefinitions.Add(new() { Height = GridLength.Auto }); result.RowDefinitions.Add(new());
+        var commands = new WrapPanel();
+        for (int i = 0; i < 8; i++) commands.Children.Add(new Button { Content = "Study command", Width = 130, Height = 34 });
+        result.Children.Add(commands);
+        var plot = new IrradianceChart(); Grid.SetRow(plot, 1); result.Children.Add(plot);
+        var surface = new Grid(); surface.Children.Add(sidebar); surface.Children.Add(result);
+        var viewport = new WorkspaceViewport(surface, sidebar, result);
+        double width = physicalWidth / scale - 48, height = physicalHeight / scale - 150;
+        for (int i = 0; i < 3; i++)
+        {
+            viewport.Measure(new Size(width, height)); viewport.Arrange(new Rect(0, 0, width, height)); viewport.UpdateLayout();
+        }
+        Assert.True(viewport.ScrollableWidth < 1);
+        Assert.True(double.IsFinite(plot.ActualHeight) && plot.ActualHeight >= 180);
+        Assert.True(double.IsFinite(plot.ActualWidth) && plot.ActualWidth > 0);
+        Assert.Equal(width < 862 ? 2 : 0, Grid.GetRow(result));
+        Assert.True(result.ActualHeight >= commands.ActualHeight + plot.ActualHeight);
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public void OwnedDialogsFitTheOwnersScaledDesktop() => Sta(() =>
+    {
+        var owner = new Window { Width = 640, Height = 340, ShowActivated = false };
+        _ = new System.Windows.Interop.WindowInteropHelper(owner).EnsureHandle();
+        var dialog = new Window { Width = 1000, Height = 700, MinWidth = 760, MinHeight = 540 };
+        WindowWorkArea.FitToOwner(dialog, owner);
+        Assert.Equal(640, dialog.Width); Assert.Equal(340, dialog.Height);
+        Assert.True(dialog.MinWidth <= dialog.Width && dialog.MinHeight <= dialog.Height);
+        Assert.Same(owner, dialog.Owner); Assert.False(dialog.ShowActivated);
+        Assert.Equal(WindowStartupLocation.CenterOwner, dialog.WindowStartupLocation);
+        dialog.Close(); owner.Close();
+        return Task.CompletedTask;
+    });
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
     {
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)

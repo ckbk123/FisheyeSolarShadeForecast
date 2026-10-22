@@ -47,14 +47,17 @@ public sealed class MaskEditorWindow : Window
         maskBitmap = new(width, height, 96, 96, PixelFormats.Gray8, null);
         maskImage = new() { Source = maskBitmap, Width = width, Height = height, Stretch = Stretch.None, Opacity = .55,
             IsHitTestVisible = false };
-        Title = "Edit sky mask"; Width = 1200; Height = 850; MinWidth = 760; MinHeight = 560;
+        Title = "Edit sky mask"; Width = 1200; Height = 850; MinWidth = 480; MinHeight = 320;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = new SolidColorBrush(Color.FromRgb(26, 39, 46));
         Foreground = Brushes.White;
 
-        var root = new DockPanel(); Content = root;
+        var root = new StackPanel();
+        var viewport = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Content = viewport;
         var top = new WrapPanel { Margin = new(12, 10, 12, 6), VerticalAlignment = VerticalAlignment.Center };
-        DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
+        root.Children.Add(top);
         black = new RadioButton { Content = "Black · obstruction", IsChecked = true, Margin = new(4, 7, 16, 7), GroupName = "paint", Foreground = Brushes.White };
         white = new RadioButton { Content = "White · open sky", Margin = new(4, 7, 18, 7), GroupName = "paint", Foreground = Brushes.White };
         top.Children.Add(black); top.Children.Add(white);
@@ -87,21 +90,26 @@ public sealed class MaskEditorWindow : Window
         top.Children.Add(Button("Reset", () => { document.Reset(); Redraw(); }));
         var guide = new TextBlock { Text = "Green circle: detected lens edge. Camera calibration may cover less of the image; paint outside its coverage may not affect the calculation.",
             Margin = new(16, 0, 16, 7), TextWrapping = TextWrapping.Wrap, Foreground = Brushes.LightGray };
-        DockPanel.SetDock(guide, Dock.Top); root.Children.Add(guide);
+        root.Children.Add(guide);
 
-        var bottom = new DockPanel { Margin = new(12, 6, 12, 10) };
-        DockPanel.SetDock(bottom, Dock.Bottom); root.Children.Add(bottom);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        DockPanel.SetDock(actions, Dock.Right); bottom.Children.Add(actions);
+        var bottom = new StackPanel { Margin = new(12, 6, 12, 10) };
+        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
         actions.Children.Add(Button("Cancel", Close)); actions.Children.Add(Button("Save as new mask", SaveMask));
-        bottom.Children.Add(Label("Name"));
-        name = new TextBox { Text = request.SuggestedName, MinWidth = 250, MaxWidth = 460, Margin = new(8, 0, 14, 0),
-            VerticalContentAlignment = VerticalAlignment.Center }; bottom.Children.Add(name);
+        var nameRow = new DockPanel(); bottom.Children.Add(nameRow);
+        nameRow.Children.Add(Label("Name"));
+        name = new TextBox { Text = request.SuggestedName, MinWidth = 120, Margin = new(8, 0, 14, 0),
+            VerticalContentAlignment = VerticalAlignment.Center }; nameRow.Children.Add(name);
+        bottom.Children.Add(actions);
 
         scroll = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = Brushes.Black,
-            CanContentScroll = false, PanningMode = PanningMode.None };
-        root.Children.Add(scroll);
+            CanContentScroll = false, PanningMode = PanningMode.None, Height = 300 };
+        root.Children.Add(scroll); root.Children.Add(bottom);
+        void FitViewport() => scroll.Height = Math.Max(260, viewport.ViewportHeight - top.ActualHeight
+            - guide.ActualHeight - bottom.ActualHeight - top.Margin.Top - top.Margin.Bottom
+            - guide.Margin.Top - guide.Margin.Bottom - bottom.Margin.Top - bottom.Margin.Bottom);
+        viewport.ScrollChanged += (_, e) => { if (ReferenceEquals(e.Source, viewport) && (e.ViewportWidthChange != 0 || e.ViewportHeightChange != 0)) FitViewport(); };
+        viewport.Loaded += (_, _) => FitViewport();
         canvas = new Grid { Width = width, Height = height, Cursor = Cursors.Cross, Background = Brushes.Transparent };
         canvas.Children.Add(new Image { Source = photoBitmap, Width = width, Height = height, Stretch = Stretch.None, IsHitTestVisible = false });
         canvas.Children.Add(maskImage);
