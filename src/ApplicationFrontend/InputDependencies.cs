@@ -31,8 +31,9 @@ public sealed class InputDependencies
     public SourceIdentity Weather { get; }
     public SourceIdentity EditedMask { get; }
     public SourceIdentity EditedMetadata { get; }
+    public SourceIdentity MaskAncestor { get; }
     public IReadOnlyDictionary<ArtifactGroup, string> Keys { get; }
-    public IEnumerable<string> SourcePaths => new[] { Image.Path, Profile.Path, Weather.Path, EditedMask.Path, EditedMetadata.Path }.Where(p => p.Length > 0);
+    public IEnumerable<string> SourcePaths => new[] { Image.Path, Profile.Path, Weather.Path, EditedMask.Path, EditedMetadata.Path, MaskAncestor.Path }.Where(p => p.Length > 0);
     public static readonly ArtifactGroup[] Groups = Enum.GetValues<ArtifactGroup>().Where(g => g is not (ArtifactGroup.None or ArtifactGroup.All)).ToArray();
     public const ArtifactGroup WeatherChain = ArtifactGroup.Irradiance | ArtifactGroup.Solar | ArtifactGroup.SunPath | ArtifactGroup.Transposition | ArtifactGroup.Shading;
     public const ArtifactGroup GeometryChain = WeatherChain & ~ArtifactGroup.Irradiance;
@@ -48,10 +49,14 @@ public sealed class InputDependencies
             : Path.GetDirectoryName(ManualMaskStore.VariantPngPath(Image.Content, s.SelectedMaskId))!;
         EditedMask = SourceIdentity.Read(variantFolder.Length == 0 ? "" : Path.Combine(variantFolder, "sky-mask.png"), previous?.EditedMask, refresh);
         EditedMetadata = SourceIdentity.Read(variantFolder.Length == 0 ? "" : Path.Combine(variantFolder, "variant.json"), previous?.EditedMetadata, refresh);
+        var variant = variantFolder.Length == 0 ? null : AppData.Read<MaskVariant>(Path.Combine(variantFolder, "variant.json"));
+        MaskAncestor = SourceIdentity.Read(variant == null ? "" : ManualMaskStore.SourcePngPath(Image.Content, variant), previous?.MaskAncestor, refresh);
+        // Imported masks carry their own measured photo disk, independently of the AI controls.
+        string? importedGeometry = variant?.IsImported == true ? AppData.Key(variant.BaseMask.Disk) : null;
         var keys = new Dictionary<ArtifactGroup, string>();
-        keys[ArtifactGroup.Mask] = AppData.Key(new { Image, s.Model, s.Resolution, s.CenteredDisk, s.SelectedMaskId, EditedMask, EditedMetadata });
+        keys[ArtifactGroup.Mask] = AppData.Key(new { Image, s.Model, s.Resolution, s.CenteredDisk, s.SelectedMaskId, EditedMask, EditedMetadata, MaskAncestor });
         keys[ArtifactGroup.Profile] = AppData.Key(new { Profile, Image, s.CoverageAngle });
-        keys[ArtifactGroup.Orientation] = AppData.Key(new { Image, s.CenteredDisk, Profile = keys[ArtifactGroup.Profile], s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
+        keys[ArtifactGroup.Orientation] = AppData.Key(new { Image, s.CenteredDisk, importedGeometry, Profile = keys[ArtifactGroup.Profile], s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
         // Date/site changes do not change the contents of an imported source workbook.
         keys[ArtifactGroup.Irradiance] = s.ImportPath.Length > 0
             ? AppData.Key(new { Weather, s.ImportWindow, s.ImportIntervalMinutes, s.Zone })

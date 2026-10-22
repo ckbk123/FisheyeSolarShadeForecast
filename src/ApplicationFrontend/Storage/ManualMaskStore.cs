@@ -7,7 +7,17 @@ using SolarShade.SkyPhotoMasking;
 namespace SolarShade.Desktop;
 
 public sealed record MaskVariant(string Id, string Label, DateTimeOffset CreatedUtc, string PhotoSha256,
-    string PngSha256, string AiAncestorSha256, string? ParentId, SkyMaskResult BaseMask);
+    string PngSha256, string AiAncestorSha256, string? ParentId, SkyMaskResult BaseMask)
+{
+    public string Source { get; init; } = "Edited";
+    public string? ImportedFileName { get; init; }
+    public string? ImportedFileSha256 { get; init; }
+    public string? ImportedAncestorSha256 { get; init; }
+    public bool ImportInverted { get; init; }
+    public bool IsImported => ImportedAncestorSha256 != null;
+    public string AncestorSha256 => ImportedAncestorSha256 ?? AiAncestorSha256;
+    public string Description => IsImported ? $"{Source} · {Label} · no AI" : $"Edited: {Label} · based on {BaseMask.Model}";
+}
 
 /// <summary>Immutable edited masks. IDs are safe path components; metadata and pixels are checked on every load.</summary>
 public static class ManualMaskStore
@@ -15,12 +25,13 @@ public static class ManualMaskStore
     private static readonly Regex ValidId = new("^mask-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{12}$", RegexOptions.Compiled);
     private static string PhotoFolder(string photoHash)
     { CheckHash(photoHash); return Path.Combine(AppData.PathFor("Masks"), photoHash); }
-    private static string AncestorPath(string photoHash, string ancestorHash)
-    { CheckHash(ancestorHash); return Path.Combine(PhotoFolder(photoHash), "AI", ancestorHash, "sky-mask.png"); }
+    private static string AncestorPath(string photoHash, string ancestorHash, bool imported = false)
+    { CheckHash(ancestorHash); return Path.Combine(PhotoFolder(photoHash), imported ? "Imported" : "AI", ancestorHash, "sky-mask.png"); }
     public static string PhotoHash(string photoPath) => AppData.FileKey(PortablePaths.Resolve(photoPath));
+    public static string SourcePngPath(string photoHash, MaskVariant variant) => AncestorPath(photoHash, variant.AncestorSha256, variant.IsImported);
     public static bool IsCompatible(MaskVariant variant, UserSettings settings) =>
-        variant.BaseMask.Model == settings.Model && variant.BaseMask.InputSize == settings.Resolution &&
-        string.Equals(variant.BaseMask.DiskMethod, settings.CenteredDisk ? "Centered" : "Auto", StringComparison.OrdinalIgnoreCase);
+        variant.IsImported || (variant.BaseMask.Model == settings.Model && variant.BaseMask.InputSize == settings.Resolution &&
+        string.Equals(variant.BaseMask.DiskMethod, settings.CenteredDisk ? "Centered" : "Auto", StringComparison.OrdinalIgnoreCase));
     public static string VariantPngPath(string photoHash, string id)
     {
         CheckId(id); return Path.Combine(PhotoFolder(photoHash), id, "sky-mask.png");
@@ -49,9 +60,9 @@ public static class ManualMaskStore
             throw new InvalidDataException("Edited mask metadata does not match this photo.");
         byte[] png = File.ReadAllBytes(Path.Combine(folder, "sky-mask.png"));
         if (Convert.ToHexString(SHA256.HashData(png)) != variant.PngSha256) throw new InvalidDataException("Edited mask pixels have changed.");
-        string ancestor = AncestorPath(hash, variant.AiAncestorSha256);
-        if (!File.Exists(ancestor) || AppData.FileKey(ancestor) != variant.AiAncestorSha256)
-            throw new InvalidDataException("The immutable AI source mask is missing or changed.");
+        string ancestor = AncestorPath(hash, variant.AncestorSha256, variant.IsImported);
+        if (!File.Exists(ancestor) || AppData.FileKey(ancestor) != variant.AncestorSha256)
+            throw new InvalidDataException("The immutable source mask is missing or changed.");
         Validate(png, variant.BaseMask);
         return (variant, png);
     }
@@ -65,28 +76,56 @@ public static class ManualMaskStore
     public static MaskVariant Save(string photoPath, SkyMaskResult baseMask, string aiAncestorHash,
         string? parentId, string label, byte[] png, byte[]? aiAncestorPng = null)
     {
+        // An edit of an imported mask retains its imported ancestor; no AI source is required.
+        MaskVariant? importedParent = parentId == null ? null : Load(photoPath, parentId).Variant;
+        if (importedParent?.IsImported == true)
+            return Publish(photoPath, baseMask, label, png, importedParent.AncestorSha256, parentId,
+                File.ReadAllBytes(AncestorPath(PhotoHash(photoPath), importedParent.AncestorSha256, true)),
+                importedParent with { Source = "Edited" });
+        aiAncestorPng ??= LoadAncestor(photoPath, aiAncestorHash);
+        return Publish(photoPath, baseMask, label, png, aiAncestorHash, parentId, aiAncestorPng);
+    }
+    public static MaskVariant Import(string photoPath, string maskPath, string label, bool inverted = false,
+        bool centeredDisk = false)
+    {
+        photoPath = PortablePaths.Resolve(photoPath); maskPath = PortablePaths.Resolve(maskPath);
+        string photoHash = PhotoHash(photoPath), sourceHash = AppData.FileKey(maskPath);
+        var mask = SkyMaskImporter.Import(photoPath, maskPath, inverted, centeredDisk ? DiskDetection.Centered : DiskDetection.Auto);
+        if (PhotoHash(photoPath) != photoHash || AppData.FileKey(maskPath) != sourceHash)
+            throw new IOException("The photo or mask changed during import. Choose the file again.");
+        string ancestorHash = Convert.ToHexString(SHA256.HashData(mask.Png));
+        var imported = new MaskVariant("", label, DateTimeOffset.UtcNow, photoHash, ancestorHash, "", null, mask)
+        { Source = "Imported", ImportedFileName = Path.GetFileName(maskPath), ImportedFileSha256 = sourceHash,
+            ImportedAncestorSha256 = ancestorHash, ImportInverted = inverted };
+        return Publish(photoPath, mask, label, mask.Png, ancestorHash, null, mask.Png, imported);
+    }
+    private static MaskVariant Publish(string photoPath, SkyMaskResult baseMask, string label, byte[] png,
+        string ancestorHash, string? parentId, byte[] ancestorPng, MaskVariant? imported = null)
+    {
         string hash = PhotoHash(photoPath);
+        if (imported != null && imported.PhotoSha256 != hash)
+            throw new IOException("The photograph changed while saving the mask. Choose the photo again.");
         if (string.IsNullOrWhiteSpace(label) || label.Length > 100) throw new ArgumentException("Enter a mask name of 1–100 characters.");
-        if (!Regex.IsMatch(aiAncestorHash, "^[A-F0-9]{64}$")) throw new ArgumentException("AI ancestor hash is invalid.");
+        CheckHash(ancestorHash);
         if (parentId != null) CheckId(parentId);
         Validate(png, baseMask);
-        if (aiAncestorPng == null) aiAncestorPng = LoadAncestor(photoPath, aiAncestorHash);
-        if (Convert.ToHexString(SHA256.HashData(aiAncestorPng)) != aiAncestorHash)
-            throw new InvalidDataException("AI source mask bytes do not match the recorded hash.");
-        Validate(aiAncestorPng, baseMask, enforceOutside: false);
-        string ancestorPath = AncestorPath(hash, aiAncestorHash);
+        if (Convert.ToHexString(SHA256.HashData(ancestorPng)) != ancestorHash)
+            throw new InvalidDataException("Source mask bytes do not match the recorded hash.");
+        Validate(ancestorPng, baseMask, enforceOutside: false);
+        string ancestorPath = AncestorPath(hash, ancestorHash, imported != null);
         if (File.Exists(ancestorPath))
-        { if (AppData.FileKey(ancestorPath) != aiAncestorHash) throw new InvalidDataException("The immutable AI source mask has changed."); }
+        { if (AppData.FileKey(ancestorPath) != ancestorHash) throw new InvalidDataException("The immutable source mask has changed."); }
         else
         {
             Directory.CreateDirectory(Path.GetDirectoryName(ancestorPath)!);
             string ancestorTemp = ancestorPath + "." + Guid.NewGuid().ToString("N") + ".partial";
-            try { File.WriteAllBytes(ancestorTemp, aiAncestorPng); File.Move(ancestorTemp, ancestorPath); }
+            try { File.WriteAllBytes(ancestorTemp, ancestorPng); File.Move(ancestorTemp, ancestorPath); }
             finally { if (File.Exists(ancestorTemp)) File.Delete(ancestorTemp); }
         }
         string id = "mask-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ") + "-" + Guid.NewGuid().ToString("N")[..12];
-        var variant = new MaskVariant(id, label.Trim(), DateTimeOffset.UtcNow, hash,
-            Convert.ToHexString(SHA256.HashData(png)), aiAncestorHash, parentId, baseMask with { Png = [] });
+        var variant = (imported ?? new MaskVariant("", "", default, "", "", ancestorHash, null, baseMask)) with
+        { Id = id, Label = label.Trim(), CreatedUtc = DateTimeOffset.UtcNow, PhotoSha256 = hash,
+            PngSha256 = Convert.ToHexString(SHA256.HashData(png)), ParentId = parentId, BaseMask = baseMask with { Png = [] } };
         string parent = PhotoFolder(hash); Directory.CreateDirectory(parent);
         string temporary = Path.Combine(parent, "." + id + ".partial");
         string destination = Path.Combine(parent, id);
@@ -107,7 +146,7 @@ public static class ManualMaskStore
     {
         using var decoded = Cv2.ImDecode(png, ImreadModes.Grayscale);
         if (decoded.Empty() || decoded.Width != metadata.Width || decoded.Height != metadata.Height)
-            throw new InvalidDataException("Edited mask dimensions differ from the AI source.");
+            throw new InvalidDataException("Mask dimensions differ from the source photo.");
         var disk = metadata.Disk;
         int width = decoded.Width, height = decoded.Height;
         var rowBytes = new byte[width];
