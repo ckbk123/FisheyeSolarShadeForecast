@@ -14,10 +14,11 @@ public static class PortablePaths
         return relative.Replace('\\', '/');
     }
 
-    public static UserSettings Map(UserSettings settings, Func<string, string> map) => settings with
+    public static UserSettings Map(UserSettings settings, Func<string, string> map, bool includeRemembered = true) => settings with
     {
         CalibrationFolder = map(settings.CalibrationFolder), SkyFolder = map(settings.SkyFolder),
-        SkyImage = map(settings.SkyImage), ProfilePath = map(settings.ProfilePath), ImportPath = map(settings.ImportPath)
+        SkyImage = map(settings.SkyImage), ProfilePath = map(settings.ProfilePath), ImportPath = map(settings.ImportPath),
+        RememberedImportPath = includeRemembered ? map(settings.RememberedImportPath) : settings.RememberedImportPath
     };
 
     public static UserSettings Example()

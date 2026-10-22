@@ -44,7 +44,7 @@ public sealed class InputDependencies
     {
         Image = SourceIdentity.Read(s.SkyImage, previous?.Image, refresh);
         Profile = SourceIdentity.Read(s.ProfilePath, previous?.Profile, refresh);
-        Weather = SourceIdentity.Read(s.ImportPath, previous?.Weather, refresh);
+        Weather = SourceIdentity.Read(WeatherSourceSelection.ActiveImportPath(s), previous?.Weather, refresh);
         string variantFolder = s.SelectedMaskId == null || Image.Content is "" or "missing" or "unreadable" ? ""
             : Path.GetDirectoryName(ManualMaskStore.VariantPngPath(Image.Content, s.SelectedMaskId))!;
         EditedMask = SourceIdentity.Read(variantFolder.Length == 0 ? "" : Path.Combine(variantFolder, "sky-mask.png"), previous?.EditedMask, refresh);
@@ -58,9 +58,10 @@ public sealed class InputDependencies
         keys[ArtifactGroup.Profile] = AppData.Key(new { Profile, Image, s.CoverageAngle });
         keys[ArtifactGroup.Orientation] = AppData.Key(new { Image, s.CenteredDisk, importedGeometry, Profile = keys[ArtifactGroup.Profile], s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
         // Date/site changes do not change the contents of an imported source workbook.
-        keys[ArtifactGroup.Irradiance] = s.ImportPath.Length > 0
-            ? AppData.Key(new { Weather, s.ImportWindow, s.ImportIntervalMinutes, s.Zone })
-            : AppData.Key(new { s.Provider, s.Start, s.End, s.Latitude, s.Longitude, s.Zone });
+        bool services = WeatherSourceSelection.UsesServices(s);
+        keys[ArtifactGroup.Irradiance] = !services
+            ? AppData.Key(new { UseDataServices = false, Weather, s.ImportWindow, s.ImportIntervalMinutes, s.Zone })
+            : AppData.Key(new { UseDataServices = true, s.Provider, s.Start, s.End, s.Latitude, s.Longitude, s.Zone });
         keys[ArtifactGroup.Solar] = AppData.Key(new { Raw = keys[ArtifactGroup.Irradiance], s.Start, s.End, s.Zone, s.Latitude, s.Longitude, s.Elevation, s.Substeps });
         keys[ArtifactGroup.SunPath] = AppData.Key(new { Solar = keys[ArtifactGroup.Solar], Camera = keys[ArtifactGroup.Orientation], s.Zone });
         keys[ArtifactGroup.Transposition] = AppData.Key(new { Solar = keys[ArtifactGroup.Solar], s.PanelTilt, s.PanelAzimuth, s.Isotropic });
@@ -90,11 +91,11 @@ public sealed class InputDependencies
         "ProfilePath" or "CoverageAngle" => ArtifactGroup.Profile | PoseChain,
         "BottomAzimuth" or "CameraTilt" or "CameraRoll" => PoseChain,
         "PanelTilt" or "PanelAzimuth" or "Isotropic" => PanelChain,
-        "Latitude" or "Longitude" or "Start" or "End" => settings.ImportPath.Length > 0 ? GeometryChain : WeatherChain,
+        "Latitude" or "Longitude" or "Start" or "End" => !WeatherSourceSelection.UsesServices(settings) ? GeometryChain : WeatherChain,
         "Elevation" or "Substeps" => GeometryChain,
-        "Zone" or "ImportPath" => WeatherChain,
-        "ImportWindow" or "ImportIntervalMinutes" => settings.ImportPath.Length > 0 ? WeatherChain : ArtifactGroup.None,
-        "Provider" => settings.ImportPath.Length == 0 ? WeatherChain : ArtifactGroup.None,
+        "Zone" or "ImportPath" or "UseDataServices" => WeatherChain,
+        "ImportWindow" or "ImportIntervalMinutes" => !WeatherSourceSelection.UsesServices(settings) ? WeatherChain : ArtifactGroup.None,
+        "Provider" => WeatherSourceSelection.UsesServices(settings) ? WeatherChain : ArtifactGroup.None,
         _ => ArtifactGroup.None // View preferences and future calibration setup do not alter a loaded profile.
     };
 

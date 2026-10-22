@@ -46,6 +46,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private readonly TextBlock weatherSource = Label("", 11);
     private readonly TextBlock lastWeatherResult = Label("", 11);
     private readonly Button chooseWeatherFile = new() { Content = "Choose XLSX / CSV file" };
+    private readonly WeatherSourceSwitch weatherMode = new();
+    private readonly StackPanel serviceWeatherControls = new(), importWeatherControls = new();
     private readonly Button stop = new() { Content = "Stop", IsEnabled = false };
     private Evaluation? completed { get => controller.Completed; set => controller.Completed = value; }
     private readonly Dictionary<string, TextBox> fields = new();
@@ -96,7 +98,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             Dispatcher.BeginInvoke(() => { Interlocked.Exchange(ref sourceCheckQueued, 0); if (!closing) RecheckSources(); });
         });
         systemZone = systemZoneProvider ?? TimeZoneSelection.CurrentSystemZone;
-        settings = AppData.ReadSettings() ?? PortablePaths.Example();
+        settings = WeatherSourceSelection.Normalize(AppData.ReadSettings() ?? PortablePaths.Example());
         TimeZoneSelection.ApplySystemZone(settings, systemZone());
         AddStyles();
         var root = new DockPanel(); Content = root;
@@ -177,20 +179,22 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         inputs.Children.Add(Label("Turn off automatic to choose. Named regions follow daylight saving; fixed UTC offsets never change. Coordinates select the weather location.", 11));
         Section(inputs, "04  HISTORICAL DATA");
         Field(inputs, "Start date · DD.MM.YYYY", "Start"); Field(inputs, "End date · inclusive · DD.MM.YYYY", "End");
-        provider = Combo(inputs, "Weather data source", ["NASA POWER", "Open-Meteo · ERA5", "Import XLSX / CSV"]);
+        inputs.Children.Add(weatherMode);
+        weatherMode.Checked += (_, _) => SelectWeatherMode(true);
+        weatherMode.Unchecked += (_, _) => SelectWeatherMode(false);
+        inputs.Children.Add(serviceWeatherControls); inputs.Children.Add(importWeatherControls);
+        provider = Combo(serviceWeatherControls, "Weather data service", ["NASA POWER", "Open-Meteo · ERA5"]);
         System.Windows.Automation.AutomationProperties.SetName(provider, "Weather data source");
         provider.SelectionChanged += (_, _) =>
         {
-            if (loading) return;
-            if (provider.SelectedIndex == 2) { if (string.IsNullOrEmpty(settings.ImportPath)) PickImport(); }
-            else if (provider.SelectedIndex >= 0) { settings.Provider = provider.SelectedIndex; settings.ImportPath = ""; Changed(); }
-            RefreshWeatherSource();
+            if (!loading && provider.SelectedIndex >= 0) { settings.Provider = provider.SelectedIndex; Changed(); }
         };
-        chooseWeatherFile.Click += (_, _) => PickImport(); inputs.Children.Add(chooseWeatherFile); inputs.Children.Add(weatherSource); inputs.Children.Add(lastWeatherResult);
-        inputs.Children.Add(Label("Import: timestamp, direct horizontal (BHI), diffuse horizontal (DHI), in W/m². Native metadata sets the intervals; otherwise choose their duration and label below.", 11));
-        inputs.Children.Add(Label("Example CSV header: Timestamp,BHI,DHI\n2025-05-15T12:00:00+07:00,500,100\nA total-only (GHI) measurement cannot supply both components. Example/Irradiance includes a workbook.", 11));
-        window = Combo(inputs, "Imported rows represent", ["Preceding interval · end labels", "Following interval · start labels", "Centered interval"]); window.SelectionChanged += (_, _) => { if (!loading) { settings.ImportWindow = window.SelectedIndex; Changed(); } };
-        Field(inputs, "Import interval, minutes (without metadata)", "ImportIntervalMinutes");
+        chooseWeatherFile.Click += (_, _) => PickImport(); importWeatherControls.Children.Add(chooseWeatherFile);
+        importWeatherControls.Children.Add(Label("Import: timestamp, direct horizontal (BHI), diffuse horizontal (DHI), in W/m². Native metadata sets the intervals; otherwise choose their duration and label below.", 11));
+        importWeatherControls.Children.Add(Label("Example CSV header: Timestamp,BHI,DHI\n2025-05-15T12:00:00+07:00,500,100\nA total-only (GHI) measurement cannot supply both components. Example/Irradiance includes a workbook.", 11));
+        window = Combo(importWeatherControls, "Imported rows represent", ["Preceding interval · end labels", "Following interval · start labels", "Centered interval"]); window.SelectionChanged += (_, _) => { if (!loading) { settings.ImportWindow = window.SelectedIndex; Changed(); } };
+        Field(importWeatherControls, "Import interval, minutes (without metadata)", "ImportIntervalMinutes");
+        inputs.Children.Add(weatherSource); inputs.Children.Add(lastWeatherResult);
         isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; inputs.Children.Add(isotropic);
         inputs.Children.Add(Label("Neither diffuse model is always the lower estimate. The result depends on weather, panel direction and the mask.", 11));
         inputs.Children.Add(tuning);
@@ -352,15 +356,25 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     }
     private void RefreshWeatherSource()
     {
-        bool imported = !string.IsNullOrEmpty(settings.ImportPath), previous = loading; loading = true;
-        provider.SelectedIndex = imported ? 2 : settings.Provider;
-        chooseWeatherFile.Visibility = imported ? Visibility.Visible : Visibility.Collapsed;
-        window.IsEnabled = fields["ImportIntervalMinutes"].IsEnabled = imported;
-        weatherSource.Text = imported ? "Selected file: " + Path.GetFileName(settings.ImportPath) + "\nUpdate results rereads changed files. No weather download is used."
+        bool imported = !WeatherSourceSelection.UsesServices(settings), previous = loading; loading = true;
+        weatherMode.IsChecked = !imported; weatherMode.Content = imported ? "Import Own Excel" : "Use Data Services";
+        System.Windows.Automation.AutomationProperties.SetName(weatherMode, (string)weatherMode.Content);
+        weatherMode.ToolTip = "Switch right to use a weather data service, or left to import your Excel or CSV file.";
+        provider.SelectedIndex = settings.Provider;
+        serviceWeatherControls.Visibility = imported ? Visibility.Collapsed : Visibility.Visible;
+        importWeatherControls.Visibility = imported ? Visibility.Visible : Visibility.Collapsed;
+        weatherSource.Text = imported ? string.IsNullOrWhiteSpace(settings.ImportPath) ? "Choose an Excel or CSV file to enable Update results."
+            : "Selected file: " + Path.GetFileName(settings.ImportPath) + "\nUpdate results rereads changed files. No weather download is used."
             : "Matching weather data is reused locally. Download weather again requests a fresh copy from the selected provider.";
-        weatherSource.ToolTip = imported ? PortablePaths.Resolve(settings.ImportPath) : null;
+        weatherSource.ToolTip = imported && !string.IsNullOrWhiteSpace(settings.ImportPath) ? PortablePaths.Resolve(settings.ImportPath) : null;
         loading = previous;
         RefreshButtons();
+    }
+    public void SelectWeatherMode(bool useServices)
+    {
+        if (loading) return;
+        WeatherSourceSelection.SetMode(settings, useServices);
+        Changed(); RefreshWeatherSource();
     }
     private void PopulateImages()
     {
@@ -549,7 +563,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                 {
                     // A calculation may already be waiting, or the user may have edited
                     // other fields. Merge only preserved paths that are still selected.
-                    foreach (string name in new[] { "CalibrationFolder", "SkyFolder", "SkyImage", "ProfilePath", "ImportPath" })
+                    foreach (string name in new[] { "CalibrationFolder", "SkyFolder", "SkyImage", "ProfilePath", "ImportPath", "RememberedImportPath" })
                     {
                         var property = typeof(UserSettings).GetProperty(name)!;
                         if (Equals(property.GetValue(settings), property.GetValue(snapshot)))
@@ -637,9 +651,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private void RefreshButtons()
     {
         update.IsEnabled = refreshData.IsEnabled = !controller.DependentBusy && !updating && !calibrating && InputProblem() == null;
-        refreshData.IsEnabled &= string.IsNullOrEmpty(settings.ImportPath);
+        refreshData.IsEnabled &= WeatherSourceSelection.UsesServices(settings);
         update.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : "Recalculate changed inputs; reuse matching weather, calibration and masks.";
-        refreshData.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : string.IsNullOrEmpty(settings.ImportPath)
+        refreshData.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : WeatherSourceSelection.UsesServices(settings)
             ? "Download fresh weather from the selected provider, then update. Unchanged calibration and masks are reused."
             : "Imported file selected: use Update results to reread it. There is no weather download to refresh.";
         stop.IsEnabled = updating && pending?.IsCancellationRequested == false;
@@ -930,7 +944,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     }
     private void PickImport() { var p = new OpenFileDialog { Title = "Choose horizontal irradiance: timestamp, BHI and DHI in W/m²", Filter = "Horizontal irradiance|*.xlsx;*.csv" }; if (p.ShowDialog(owner) == true) SelectWeatherFile(p.FileName); else RefreshWeatherSource(); }
     public void SelectWeatherFile(string path)
-    { settings.ImportPath = PortablePaths.Store(path); Changed(); RefreshWeatherSource(); status.Text = "Imported source selected · check dates, site, time zone and source interval metadata"; detail.Text = path; }
+    { WeatherSourceSelection.SelectFile(settings, path); Changed(); RefreshWeatherSource(); status.Text = "Imported source selected · check dates, site, time zone and source interval metadata"; detail.Text = path; }
     private void ShowWeatherOrigin(Evaluation result)
     {
         RefreshWeatherSource();
