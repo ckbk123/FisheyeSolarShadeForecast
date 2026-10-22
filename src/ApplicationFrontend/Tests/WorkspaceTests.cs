@@ -109,8 +109,10 @@ public sealed class WorkspaceTests
         Assert.False(Directory.Exists(optional.DirectoryPath)); Assert.False(Directory.Exists(optional.DirectoryPath + ".pending"));
     }
 
-    [Fact]
-    public async Task OptionalStorePreservesUnrecognizedFiles()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OptionalStorePreservesUnrecognizedFiles(bool readOnly)
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
         var evaluation = await service.Evaluate(fixture.Settings, false, _ => { }, null, CancellationToken.None);
@@ -118,8 +120,131 @@ public sealed class WorkspaceTests
         var optional = service.CreateDependentStore("07-test", "test-v1", "result.json");
         Directory.CreateDirectory(optional.DirectoryPath);
         File.WriteAllText(Path.Combine(optional.DirectoryPath, "user.txt"), "keep");
-        Assert.Throws<IOException>(() => optional.Publish(source, "a", dir => File.WriteAllText(Path.Combine(dir, "result.json"), "{}")));
-        Assert.Equal("keep", File.ReadAllText(Path.Combine(optional.DirectoryPath, "user.txt")));
-        Assert.True(evaluation.ManagedDebugRun!.HasCompleteDataset);
+        if (readOnly) SetDirectoryReadOnly(optional.DirectoryPath, true);
+        var attributes = File.GetAttributes(optional.DirectoryPath);
+        try
+        {
+            Assert.Throws<IOException>(() => optional.Publish(source, "a", dir => File.WriteAllText(Path.Combine(dir, "result.json"), "{}")));
+            Assert.Equal("keep", File.ReadAllText(Path.Combine(optional.DirectoryPath, "user.txt")));
+            Assert.Throws<IOException>(optional.Invalidate);
+            Assert.Equal("keep", File.ReadAllText(Path.Combine(optional.DirectoryPath, "user.txt")));
+            Assert.Equal(attributes, File.GetAttributes(optional.DirectoryPath));
+            Assert.True(evaluation.ManagedDebugRun!.HasCompleteDataset);
+        }
+        finally { if (Directory.Exists(optional.DirectoryPath)) SetDirectoryReadOnly(optional.DirectoryPath, false); }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task OptionalPublicationRecoversEmptyFolders(bool pending, bool readOnly)
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var evaluation = await service.Evaluate(fixture.Settings, false, _ => { }, null, CancellationToken.None);
+        var source = IrradianceReadiness.Inspect(service, evaluation).Snapshot!;
+        string manifest = Path.Combine(fixture.Debug, "run.json"), before = AppData.FileKey(manifest);
+        var optional = service.CreateDependentStore("07-test", "test-v1", "result.json");
+        string folder = optional.DirectoryPath + (pending ? ".pending" : "");
+        Directory.CreateDirectory(folder); if (readOnly) SetDirectoryReadOnly(folder, true);
+        try
+        {
+            optional.Publish(source, "a", dir => File.WriteAllText(Path.Combine(dir, "result.json"), "{}"));
+            Assert.True(optional.IsCurrent(source, "a"));
+            Assert.Equal("{}", File.ReadAllText(Path.Combine(optional.DirectoryPath, "result.json")));
+            Assert.False(Directory.Exists(optional.DirectoryPath + ".pending"));
+            Assert.Equal(before, AppData.FileKey(manifest)); Assert.True(evaluation.ManagedDebugRun!.HasCompleteDataset);
+        }
+        finally { if (Directory.Exists(folder)) SetDirectoryReadOnly(folder, false); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OptionalInvalidationRecoversAnEmptyFolder(bool readOnly)
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var optional = service.CreateDependentStore("07-test", "test-v1", "result.json");
+        Directory.CreateDirectory(optional.DirectoryPath);
+        if (readOnly) SetDirectoryReadOnly(optional.DirectoryPath, true);
+        try { optional.Invalidate(); Assert.False(Directory.Exists(optional.DirectoryPath)); }
+        finally { if (Directory.Exists(optional.DirectoryPath)) SetDirectoryReadOnly(optional.DirectoryPath, false); }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task OptionalStorePreservesUnknownEmptyChildDirectories(bool pending, bool readOnly)
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var evaluation = await service.Evaluate(fixture.Settings, false, _ => { }, null, CancellationToken.None);
+        var source = IrradianceReadiness.Inspect(service, evaluation).Snapshot!;
+        var optional = service.CreateDependentStore("07-test", "test-v1", "result.json");
+        string folder = optional.DirectoryPath + (pending ? ".pending" : ""), child = Path.Combine(folder, "user-folder");
+        Directory.CreateDirectory(child);
+        if (readOnly) SetDirectoryReadOnly(folder, true);
+        var attributes = File.GetAttributes(folder);
+        try
+        {
+            Assert.Throws<IOException>(() => optional.Publish(source, "a", dir => File.WriteAllText(Path.Combine(dir, "result.json"), "{}")));
+            if (!pending) Assert.Throws<IOException>(optional.Invalidate);
+            Assert.True(Directory.Exists(child)); Assert.Empty(Directory.EnumerateFileSystemEntries(child));
+            Assert.False(File.Exists(Path.Combine(folder, "result.json")));
+            Assert.Equal(attributes, File.GetAttributes(folder));
+            Assert.True(evaluation.ManagedDebugRun!.HasCompleteDataset);
+        }
+        finally { if (Directory.Exists(folder)) SetDirectoryReadOnly(folder, false); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OwnedReadOnlyResultsCanBeReplacedOrInvalidated(bool invalidate)
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var evaluation = await service.Evaluate(fixture.Settings, false, _ => { }, null, CancellationToken.None);
+        var source = IrradianceReadiness.Inspect(service, evaluation).Snapshot!;
+        string manifest = Path.Combine(fixture.Debug, "run.json"), before = AppData.FileKey(manifest);
+        var optional = service.CreateDependentStore("07-test", "test-v1", "result.json");
+        optional.Publish(source, "a", dir => File.WriteAllText(Path.Combine(dir, "result.json"), "{}"));
+        SetDirectoryReadOnly(optional.DirectoryPath, true);
+        try
+        {
+            if (invalidate) { optional.Invalidate(); Assert.False(Directory.Exists(optional.DirectoryPath)); }
+            else
+            {
+                optional.Publish(source, "b", dir => File.WriteAllText(Path.Combine(dir, "result.json"), "{\"updated\":true}"));
+                Assert.True(optional.IsCurrent(source, "b")); Assert.False(optional.IsCurrent(source, "a"));
+            }
+            Assert.Equal(before, AppData.FileKey(manifest)); Assert.True(evaluation.ManagedDebugRun!.HasCompleteDataset);
+        }
+        finally { if (Directory.Exists(optional.DirectoryPath)) SetDirectoryReadOnly(optional.DirectoryPath, false); }
+    }
+
+    private static void SetDirectoryReadOnly(string path, bool enabled) => File.SetAttributes(path,
+        enabled ? File.GetAttributes(path) | FileAttributes.ReadOnly : File.GetAttributes(path) & ~FileAttributes.ReadOnly);
+
+    [Fact]
+    public async Task FailedOwnedCleanupRestoresTheReadOnlyDirectoryAttribute()
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var evaluation = await service.Evaluate(fixture.Settings, false, _ => { }, null, CancellationToken.None);
+        var source = IrradianceReadiness.Inspect(service, evaluation).Snapshot!;
+        var optional = service.CreateDependentStore("07-test", "test-v1", "result.json");
+        optional.Publish(source, "a", dir => File.WriteAllText(Path.Combine(dir, "result.json"), "{}"));
+        SetDirectoryReadOnly(optional.DirectoryPath, true);
+        try
+        {
+            string output = Path.Combine(optional.DirectoryPath, "result.json");
+            using var locked = new FileStream(output, FileMode.Open, FileAccess.Read, FileShare.Read);
+            Assert.Throws<IOException>(optional.Invalidate);
+            Assert.True((File.GetAttributes(optional.DirectoryPath) & FileAttributes.ReadOnly) != 0);
+            Assert.Equal("{}", File.ReadAllText(output));
+            Assert.True(evaluation.ManagedDebugRun!.HasCompleteDataset);
+        }
+        finally { if (Directory.Exists(optional.DirectoryPath)) SetDirectoryReadOnly(optional.DirectoryPath, false); }
     }
 }
