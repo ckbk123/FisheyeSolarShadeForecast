@@ -80,8 +80,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private sealed record MaskChoice(string? Id, string Title, bool Imported = false) { public override string ToString() => Title; }
     private readonly IrradianceChart chart = new();
     private readonly Button export = new() { Content = "Export irradiance", IsEnabled = false };
-    private ComboBox provider = null!, model = null!, resolution = null!, images = null!, zone = null!, window = null!, quality = null!;
-    private CheckBox centered = null!, isotropic = null!, useSystemZone = null!;
+    private ComboBox provider = null!, model = null!, resolution = null!, images = null!, zone = null!, window = null!;
+    private CheckBox isotropic = null!, useSystemZone = null!;
     private DatePicker graphDay = null!;
     private readonly Brush ink = new SolidColorBrush(Color.FromRgb(25, 48, 58)), accent = new SolidColorBrush(Color.FromRgb(15, 125, 111));
     public IrradianceWorkspace(Window owner, IrradianceWorkspaceController controller, Func<TimeZoneInfo>? systemZoneProvider = null, bool loadExampleOnFirstRun = true)
@@ -137,7 +137,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         var calButtons = new WrapPanel(); calButtons.Children.Add(Button("Calibrate", async () => await Calibrate())); calButtons.Children.Add(Button("Load camera profile…", PickProfile));
         reviewCalibration.Click += (_, _) => { RefreshCalibrationReview(); ShowCalibrationReview(); }; calButtons.Children.Add(reviewCalibration);
         inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
-        inputs.Children.Add(Label("Load camera parameters: camera-profile.json includes coverage. Native calibration.yml/.yaml also needs a validated maximum incident angle in Advanced options. Calibrate saves reusable files under Data/Profiles and diagnostics under Debug Data/01-calibration.", 11));
+        inputs.Children.Add(Label("Load camera-profile.json for camera parameters and validated coverage. Calibrate saves this reusable profile under Data/Profiles and diagnostics under Debug Data/01-calibration.", 11));
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
         var imageButtons = new WrapPanel(); imageButtons.Children.Add(choosePhoto); imageButtons.Children.Add(importMask); inputs.Children.Add(imageButtons);
         choosePhoto.Click += (_, _) => PickSkyPhoto(); importMask.Click += (_, _) => PickMask();
@@ -151,7 +151,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         inputs.Children.Add(Label("Default: image bottom south (180°), camera looking straight up. Positive tilt points toward image top before additional roll.", 11));
         inputs.Children.Add(Label("True north means geographic north. Bearings increase clockwise: N 0°, E 90°, S 180°, W 270°. Use your compass's true-north setting; magnetic correction is not automatic.", 11));
         inputs.Children.Add(Label("Looking up: with bottom south and roll 0°, north is at the top, east on the left and west on the right. Arrows, sun paths and shading use this same orientation.", 11));
-        Section(inputs, "03  SITE & HISTORICAL DATA");
+        Section(inputs, "03  SITE LOCATION");
         Field(inputs, "Latitude, ° N (+) / S (−)", "Latitude"); Field(inputs, "Longitude, ° E (+) / W (−)", "Longitude"); Field(inputs, "Elevation above sea level, m", "Elevation");
         inputs.Children.Add(Label("Use decimal degrees, for example latitude 43.56 and longitude 1.48. Southern latitudes and western longitudes are negative.", 11));
         useSystemZone = new() { Content = "Use Windows time zone (automatic)", Margin = new(0, 8, 0, 4) };
@@ -171,6 +171,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         };
         zone.SelectionChanged += (_, _) => { if (!loading && !settings.UseSystemTimeZone && zone.SelectedValue is string z) { settings.Zone = z; zone.ToolTip = (zone.SelectedItem as TimeZoneInfo)?.DisplayName; Changed(); } };
         inputs.Children.Add(Label("Turn off automatic to choose. Named regions follow daylight saving; fixed UTC offsets never change. Coordinates select the weather location.", 11));
+        Section(inputs, "04  HISTORICAL DATA");
         Field(inputs, "Start date · DD.MM.YYYY", "Start"); Field(inputs, "End date · inclusive · DD.MM.YYYY", "End");
         provider = Combo(inputs, "Weather data source", ["NASA POWER", "Open-Meteo · ERA5", "Import XLSX / CSV"]);
         System.Windows.Automation.AutomationProperties.SetName(provider, "Weather data source");
@@ -186,22 +187,11 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         inputs.Children.Add(Label("Example CSV header: Timestamp,BHI,DHI\n2025-05-15T12:00:00+07:00,500,100\nA total-only (GHI) measurement cannot supply both components. Example/Irradiance includes a workbook.", 11));
         window = Combo(inputs, "Imported rows represent", ["Preceding interval · end labels", "Following interval · start labels", "Centered interval"]); window.SelectionChanged += (_, _) => { if (!loading) { settings.ImportWindow = window.SelectedIndex; Changed(); } };
         Field(inputs, "Import interval, minutes (without metadata)", "ImportIntervalMinutes");
-        Section(tuning, "TUNE YOUR PANEL");
+        isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; inputs.Children.Add(isotropic);
+        inputs.Children.Add(Label("Neither diffuse model is always the lower estimate. The result depends on weather, panel direction and the mask.", 11));
+        Section(tuning, "05  PANEL INSTALLATION");
         PanelSlider(tuning, "Tilt from horizontal, °", "PanelTilt", 90); PanelSlider(tuning, "Front azimuth, ° true north", "PanelAzimuth", 360);
         tuning.Children.Add(Label("N 0° · E 90° · S 180° · W 270°", 11));
-        var advanced = new StackPanel { Margin = new(0, 8, 0, 0) }; Field(advanced, "Camera roll around the lens axis, °", "CameraRoll");
-        advanced.Children.Add(Label("Leave roll at 0° when the bottom bearing already describes your image. Roll is separate from tilt. At bottom south and tilt 0°, +90° roll moves east from the left to the bottom of the preview.", 11));
-        Field(advanced, "Usable angle from lens axis, ° (0 = profile)", "CoverageAngle");
-        advanced.Children.Add(Label("0 uses the calibration profile's angular limit. This is a half-angle from the lens axis, not the full field of view. Unseen sky is assumed blocked; do not widen it to remove a loss.", 11));
-        var diskOptions = new StackPanel();
-        centered = new() { Content = "Assume the lens disk is centered", Margin = new(0, 8, 0, 8) }; centered.Checked += (_, _) => { if (!loading) { settings.CenteredDisk = true; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } }; centered.Unchecked += (_, _) => { if (!loading) { settings.CenteredDisk = false; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } }; diskOptions.Children.Add(centered);
-        diskOptions.Children.Add(Label("Normally leave this off: the photo determines the lens disk. Override only when you have checked that the disk is centered in the oriented image.", 11));
-        advanced.Children.Add(new Expander { Header = "Expert: lens disk override", Content = diskOptions });
-        quality = Combo(advanced, "Integration within each source interval", ["60 samples · accurate", "15 samples · quick preview"]); quality.SelectionChanged += (_, _) => { if (!loading) { settings.Substeps = quality.SelectedIndex == 1 ? 15 : 60; Changed(); } };
-        advanced.Children.Add(Label("Samples refine solar geometry inside each weather interval. They do not add weather measurements or change an hourly export to minute data.", 11));
-        isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; advanced.Children.Add(isotropic);
-        advanced.Children.Add(Label("Neither diffuse model is always the lower estimate. The result depends on weather, panel direction and the mask.", 11));
-        inputs.Children.Add(new Expander { Header = "Advanced settings", Content = advanced, Margin = new(0, 12, 0, 12) });
         update.Background = accent; update.Foreground = Brushes.White;
         System.Windows.Automation.AutomationProperties.SetAutomationId(update, "UpdateResults");
         System.Windows.Automation.AutomationProperties.SetAutomationId(refreshData, "RefreshData");
@@ -288,7 +278,16 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     }
     public static TextBlock Label(string text, double size = 13, Brush? brush = null) => new() { Text = text, FontSize = size, Foreground = brush ?? new SolidColorBrush(Color.FromRgb(73, 94, 104)), TextWrapping = TextWrapping.Wrap };
     private static StackPanel Metric(string name, TextBlock value, Brush color) { value.Foreground = color; var p = new StackPanel(); p.Children.Add(Label(name, 10)); p.Children.Add(value); return p; }
-    private static void Section(Panel parent, string text) { var t = Label(text, 12); t.FontWeight = FontWeights.SemiBold; t.Margin = new(0, 14, 0, 10); parent.Children.Add(t); }
+    private void Section(Panel parent, string text)
+    {
+        var title = Label(text, 14, ink); title.FontWeight = FontWeights.Bold;
+        parent.Children.Add(new Border
+        {
+            Child = title, Background = new SolidColorBrush(Color.FromRgb(235, 244, 242)),
+            BorderBrush = accent, BorderThickness = new(4, 0, 0, 0),
+            Padding = new(10, 8, 8, 8), Margin = new(0, 14, 0, 10)
+        });
+    }
     private Button Button(string text, Action click, bool primary = false) { var b = new Button { Content = text }; if (primary) { b.Background = accent; b.Foreground = Brushes.White; } b.Click += (_, _) => click(); return b; }
     private void Field(Panel parent, string label, string property) { parent.Children.Add(Label(label, 12)); var t = MakeField(property); parent.Children.Add(t); }
     private TextBox MakeField(string property)
@@ -335,7 +334,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     {
         loading = true; invalidFields.Clear();
         foreach (var (name, box) in fields) { box.ClearValue(Control.BorderBrushProperty); var value = typeof(UserSettings).GetProperty(name)!.GetValue(settings); box.Text = value is DateTime d ? d.ToString("dd.MM.yyyy") : Convert.ToString(value, CultureInfo.InvariantCulture); }
-        model.SelectedIndex = (int)settings.Model; resolution.SelectedIndex = settings.Resolution == 512 ? 1 : 0; provider.SelectedIndex = settings.Provider; UpdateTimeZoneControls(); window.SelectedIndex = settings.ImportWindow; quality.SelectedIndex = settings.Substeps == 15 ? 1 : 0; centered.IsChecked = settings.CenteredDisk; isotropic.IsChecked = settings.Isotropic;
+        model.SelectedIndex = (int)settings.Model; resolution.SelectedIndex = settings.Resolution == 512 ? 1 : 0; provider.SelectedIndex = settings.Provider; UpdateTimeZoneControls(); window.SelectedIndex = settings.ImportWindow; isotropic.IsChecked = settings.Isotropic;
         showSunPath.IsChecked = settings.ShowSunPath; maskPreview.ShowOverlay = settings.ShowSunPath;
         showCardinals.IsChecked = settings.ShowCardinalDirections; photo.ShowOverlay = settings.ShowCardinalDirections;
         PopulateImages(); graphDay.SelectedDate = settings.Start;
@@ -403,8 +402,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         try { maskChoice.ItemsSource = choices; maskChoice.SelectedItem = choices.First(c => c.Id == settings.SelectedMaskId); }
         finally { loading = previous; }
         bool imported = (maskChoice.SelectedItem as MaskChoice)?.Imported == true;
-        model.IsEnabled = resolution.IsEnabled = centered.IsEnabled = !imported;
-        model.ToolTip = resolution.ToolTip = centered.ToolTip = imported ? "The imported mask is used directly. Choose AI mask to use these settings." : null;
+        model.IsEnabled = resolution.IsEnabled = !imported;
+        model.ToolTip = resolution.ToolTip = imported ? "The imported mask is used directly. Choose AI mask to use these settings." : null;
     }
     private void SelectMaskChoice()
     {
@@ -851,11 +850,21 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private void PickSkyFolder() { var p = new OpenFolderDialog { Title = "Choose the folder containing your sky photograph" }; if (p.ShowDialog(owner) == true) { settings.SkyFolder = PortablePaths.Store(p.FolderName); settings.SkyImage = ""; settings.SelectedMaskId = null; LoadFields(); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } }
     public static OpenFileDialog CameraProfilePicker() => new()
     {
-        Title = "Load camera parameters · camera-profile.json or calibration.yml/.yaml",
-        Filter = "Camera parameters (*.json; *.yml; *.yaml)|*.json;*.yml;*.yaml",
+        Title = "Load camera parameters · camera-profile.json",
+        Filter = "Camera profiles (*.json)|*.json",
         InitialDirectory = Directory.Exists(Path.Combine(AppData.Root, "Profiles")) ? Path.Combine(AppData.Root, "Profiles") : AppData.Root
     };
-    private void PickProfile() { var p = CameraProfilePicker(); if (p.ShowDialog(owner) == true) { settings.ProfilePath = PortablePaths.Store(p.FileName); settings.CoverageAngle = 0; LoadFields(); Changed(); } }
+    private void PickProfile()
+    {
+        var picker = CameraProfilePicker(); if (picker.ShowDialog(owner) != true) return;
+        if (!Path.GetExtension(picker.FileName).Equals(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            status.Text = "Choose camera-profile.json";
+            detail.Text = "This file includes the validated lens coverage. For a native YAML calibration, choose its matching camera-profile.json or use Calibrate to create one.";
+            return;
+        }
+        settings.ProfilePath = PortablePaths.Store(picker.FileName); settings.CoverageAngle = 0; LoadFields(); Changed();
+    }
     private void RefreshCalibrationReview()
     {
         string? fingerprint = ProfileFingerprint();
@@ -955,8 +964,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     }
     private void ShowHelp()
     {
-        var text = "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles.\n\n2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading.\n\n3. Set camera pose, panel angles, site, dates and time zone. Dates include the complete end day. Positive camera tilt points toward image top before additional roll; bottom south = bearing 180°.\n\n4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the advanced isotropic option. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional.\n\nEach explicit update maintains one current Debug Data set beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files, fingerprints and the current status. Only a complete calculation is marked Complete; calibration or orientation alone is Partial. Unavailable stages are marked skipped. Edits remove affected files from the latest run, hide stale overlays and disable export. Camera rotation preserves the mask and numerical solar positions; panel edits preserve upstream files. Source-file changes are checked without recalculating. Close any locked diagnostic workbook and retry Update. Valid files are kept unchanged. Replacements are staged before publication. Verified old run folders are migrated after protecting selected inputs under Data/Inputs. Close the other SolarShade instance if this dataset is already in use.\n\nExport results copies the verified current debug files and adds a one-page Summary.pdf with the saved parameters and results. It creates a new scenario folder only after every file is ready. Export requires a complete shaded dataset; a baseline alone is insufficient. If inputs change during export, retry after Update results. Example/Irradiance holds the bundled input workbook; Example/Debug Data/reference-run holds a fixed library-generated reference run. Your current dataset uses the top-level Debug Data folder; the bundled reference stays unchanged.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches, extracted model weights and durable Profiles/Inputs. Keep these durable inputs when moving or backing up the application. Your own inputs may be anywhere. Data location:\n" + AppData.Root + "\n\nSolar Irradiance estimates historical direct + sky-diffuse irradiance. Once its complete shaded dataset is current, open PV Autonomy to enter a daily consumption profile, panel area and efficiencies, battery capacity and initial charge. Evaluate system computes hourly battery charge and unmet load for this study. First model use is slower; later panel edits reuse expensive work.";
-        text += "\n\nCoordinates and orientation: Enter decimal degrees, for example latitude 43.56, longitude 1.48. South and west coordinates are negative. True north is geographic north; magnetic-compass correction is not automatic. Bearings increase clockwise: N 0°, E 90°, S 180°, W 270°. Bottom bearing sets the image direction before additional roll. With roll 0 degrees, it is the direction at the image bottom. With an upward camera, bottom south and roll 0°, east appears left and west right because you are looking up. Camera roll is rotation around the lens axis, separate from tilt; leave it at 0° if the bottom bearing already describes the image. With bottom south and tilt 0°, +90° roll moves east from the left to the bottom. The usable incident angle is a half-angle from the lens axis, not the full FOV; 0 uses the profile limit.";
+        var text = "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles.\n\n2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading.\n\n3. Set camera pose, panel angles, site, dates and time zone. Dates include the complete end day. Positive camera tilt points toward image top before additional roll; bottom south = bearing 180°.\n\n4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the isotropic option in Historical Data. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional.\n\nEach explicit update maintains one current Debug Data set beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files, fingerprints and the current status. Only a complete calculation is marked Complete; calibration or orientation alone is Partial. Unavailable stages are marked skipped. Edits remove affected files from the latest run, hide stale overlays and disable export. Camera rotation preserves the mask and numerical solar positions; panel edits preserve upstream files. Source-file changes are checked without recalculating. Close any locked diagnostic workbook and retry Update. Valid files are kept unchanged. Replacements are staged before publication. Verified old run folders are migrated after protecting selected inputs under Data/Inputs. Close the other SolarShade instance if this dataset is already in use.\n\nExport results copies the verified current debug files and adds a one-page Summary.pdf with the saved parameters and results. It creates a new scenario folder only after every file is ready. Export requires a complete shaded dataset; a baseline alone is insufficient. If inputs change during export, retry after Update results. Example/Irradiance holds the bundled input workbook; Example/Debug Data/reference-run holds a fixed library-generated reference run. Your current dataset uses the top-level Debug Data folder; the bundled reference stays unchanged.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches, extracted model weights and durable Profiles/Inputs. Keep these durable inputs when moving or backing up the application. Your own inputs may be anywhere. Data location:\n" + AppData.Root + "\n\nSolar Irradiance estimates historical direct + sky-diffuse irradiance. Once its complete shaded dataset is current, open PV Autonomy to enter a daily consumption profile, panel area and efficiencies, battery capacity and initial charge. Evaluate system computes hourly battery charge and unmet load for this study. First model use is slower; later panel edits reuse expensive work.";
+        text += "\n\nCoordinates and orientation: Enter decimal degrees, for example latitude 43.56, longitude 1.48. South and west coordinates are negative. True north is geographic north; magnetic-compass correction is not automatic. Bearings increase clockwise: N 0°, E 90°, S 180°, W 270°. Bottom bearing sets the image direction before additional roll. With roll 0 degrees, it is the direction at the image bottom. With an upward camera, bottom south and roll 0°, east appears left and west right because you are looking up.";
         text += "\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.";
         text += "\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Original masks stay available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. Exports include mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Keep Data/Masks and Data/AcceptedResults when moving the application.";
         HelpWindow.Open(ref helpWindow, owner, "Using SolarShade · preview 0.2.0", text, panel =>

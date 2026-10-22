@@ -37,10 +37,16 @@ public sealed class ResponsiveLayoutTests
                 button.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
                 AssertVisibleInsideWorkspace(button, window.Irradiance);
             }
-            var advanced = Descendants<Expander>(window.Irradiance).Single(e => Equals(e.Header, "Advanced settings")); advanced.IsExpanded = true; window.UpdateLayout();
-            var field = Descendants<TextBox>(window.Irradiance).Single(b => Equals(b.Tag, "CoverageAngle"));
-            field.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
-            AssertVisibleInsideWorkspace(field, window.Irradiance);
+            foreach (string property in new[] { "Latitude", "Start" })
+            {
+                var field = Descendants<TextBox>(window.Irradiance).Single(b => Equals(b.Tag, property));
+                field.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
+                AssertVisibleInsideWorkspace(field, window.Irradiance);
+            }
+            var diffuse = Descendants<CheckBox>(window.Irradiance).Single(c => Equals(c.Content, "Use isotropic diffuse instead of Hay–Davies"));
+            diffuse.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
+            AssertVisibleInsideWorkspace(diffuse, window.Irradiance);
+            Capture(window, $"historical-data-{width}-{height}");
             Assert.Same(completed, window.Completed); Assert.True(window.ExportEnabledForTest);
         }
         finally { window.Close(); await window.InputsSettled; }
