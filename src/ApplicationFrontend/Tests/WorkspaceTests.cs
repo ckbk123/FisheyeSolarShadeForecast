@@ -226,4 +226,25 @@ public sealed class WorkspaceTests
 
     private static void SetDirectoryReadOnly(string path, bool enabled) => File.SetAttributes(path,
         enabled ? File.GetAttributes(path) | FileAttributes.ReadOnly : File.GetAttributes(path) & ~FileAttributes.ReadOnly);
+
+    [Fact]
+    public async Task FailedOwnedCleanupRestoresTheReadOnlyDirectoryAttribute()
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var evaluation = await service.Evaluate(fixture.Settings, false, _ => { }, null, CancellationToken.None);
+        var source = IrradianceReadiness.Inspect(service, evaluation).Snapshot!;
+        var optional = service.CreateDependentStore("07-test", "test-v1", "result.json");
+        optional.Publish(source, "a", dir => File.WriteAllText(Path.Combine(dir, "result.json"), "{}"));
+        SetDirectoryReadOnly(optional.DirectoryPath, true);
+        try
+        {
+            string output = Path.Combine(optional.DirectoryPath, "result.json");
+            using var locked = new FileStream(output, FileMode.Open, FileAccess.Read, FileShare.Read);
+            Assert.Throws<IOException>(optional.Invalidate);
+            Assert.True((File.GetAttributes(optional.DirectoryPath) & FileAttributes.ReadOnly) != 0);
+            Assert.Equal("{}", File.ReadAllText(output));
+            Assert.True(evaluation.ManagedDebugRun!.HasCompleteDataset);
+        }
+        finally { if (Directory.Exists(optional.DirectoryPath)) SetDirectoryReadOnly(optional.DirectoryPath, false); }
+    }
 }
