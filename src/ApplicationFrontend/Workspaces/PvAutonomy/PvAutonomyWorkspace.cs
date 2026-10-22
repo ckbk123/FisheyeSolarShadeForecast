@@ -34,9 +34,6 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
             if (dialog.ShowDialog(owner) == true) await Controller.ExportAsync(dialog.FolderName);
         }); actions.Children.Add(export); Actions = actions;
         var root = new DockPanel { Margin = new(16, 10, 16, 10) }; Content = root;
-        var sourceBar = new DockPanel { Margin = new(0, 0, 0, 8) }; DockPanel.SetDock(sourceBar, Dock.Top); root.Children.Add(sourceBar);
-        sourceBar.Children.Add(sourceText);
-        status.Margin = new(0, 7, 0, 0); DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
         var columns = new Grid();
         var left = new Border { Background = Brushes.White, Child = load }; columns.Children.Add(left);
         var right = new Grid { Background = Brushes.White }; columns.Children.Add(right);
@@ -46,6 +43,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         root.Children.Add(new WorkspaceViewport(columns, left, right, sidebarWidth: 300, contentMinimumWidth: 500,
             sidebarMinimumHeight: 600, contentMinimumHeight: 600));
         var top = new StackPanel { Margin = new(12, 8, 12, 0) }; right.Children.Add(top);
+        sourceText.Margin = new(0, 0, 0, 8); top.Children.Add(sourceText);
         top.Children.Add(Text("PV System Autonomy", 21));
         top.Children.Add(Text("Check whether your panel and battery can supply the daily consumption during this study.", 11));
         top.ToolTip = "Evaluate energy supply and battery charge over the study period.";
@@ -78,6 +76,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         navigation.Children.Add(Button("First shortfall", () => { if (Controller.Result?.Summary.FirstShortfallIntervalStart is { } start) { day.SelectedDate = start.Date; chart.Day(start.Date); } }));
         navigation.Children.Add(Button("Hourly values", ShowTable));
         hover.MinHeight = 34; bottom.Children.Add(hover); chart.Hover += value => hover.Text = value;
+        status.Margin = new(0, 7, 0, 0); bottom.Children.Add(status);
         chart.Margin = new(10, 0, 10, 0); Grid.SetRow(chart, 1); right.Children.Add(chart);
         load.Edited += values => Controller.SetDraft(Controller.Draft with { Load = values });
         Controller.Changed += OnChanged; source.SourceChanged += OnSourceChanged; owner.Activated += OnActivated;
