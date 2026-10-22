@@ -44,23 +44,44 @@ public sealed class OmniCalibCSharpPort
         detection = detection with { ImageWorkerCount = Math.Min(detection.ImageWorkerCount,
             PortHardwarePolicy.RecommendWorkers(Environment.ProcessorCount, PortHardwarePolicy.GetMemoryBudget())) };
         var previews = new ConcurrentDictionary<string, Mat>(StringComparer.OrdinalIgnoreCase);
+        var detections = new ConcurrentBag<CalibrationImageDetection>();
+        var output = Path.GetFullPath(outputDirectory);
+        var detectionDirectory = Path.Combine(output, "detections");
+        Directory.CreateDirectory(detectionDirectory);
+        string? failure = null;
         try
         {
             var stage = Stopwatch.StartNew();
-            var observations = new PortCheckerboardExtractor().Extract(imageDirectory, detection, (path, gray) =>
+            var observations = new PortCheckerboardExtractor().Extract(imageDirectory, detection, (path, gray, corners) =>
             {
+                string name = Path.GetFileName(path);
+                if (gray.Empty())
+                {
+                    detections.Add(new(name, path, false, 0, "Image could not be decoded.", null));
+                    return;
+                }
                 var scale = Math.Min(1.0, (double)previewMaxDimension / Math.Max(gray.Width, gray.Height));
-                var preview = new Mat();
+                using var preview = new Mat();
                 Cv2.Resize(gray, preview, new Size(Math.Max(1, (int)Math.Round(gray.Width * scale)),
                     Math.Max(1, (int)Math.Round(gray.Height * scale))), interpolation: InterpolationFlags.Area);
-                previews[path] = preview;
+                using var annotated = new Mat();
+                Cv2.CvtColor(preview, annotated, ColorConversionCodes.GRAY2BGR);
+                bool found = corners is { Length: > 0 };
+                if (found)
+                    Cv2.DrawChessboardCorners(annotated, new Size(detection.InnerColumns, detection.InnerRows),
+                        corners!.Select(p => new Point2f((float)(p.X * scale), (float)(p.Y * scale))).ToArray(), true);
+                string previewFile = Path.Combine("detections", name + ".png");
+                if (!Cv2.ImWrite(Path.Combine(output, previewFile), annotated))
+                    throw new IOException("Unable to write checkerboard preview for " + name);
+                detections.Add(new(name, path, found, corners?.Length ?? 0,
+                    found ? $"Detected {corners!.Length} inner corners." : "No complete checkerboard detected.", previewFile));
+                if (found) previews[path] = preview.Clone();
             });
             var detectMs = stage.Elapsed.TotalMilliseconds;
             stage.Restart();
             var solution = new OmniCalibrator().Solve(observations, solver);
             var solveMs = stage.Elapsed.TotalMilliseconds;
             stage.Restart();
-            var output = Path.GetFullPath(outputDirectory);
             var debug = Path.Combine(output, "debug");
             Directory.CreateDirectory(debug);
             var reference = solution.ToReferenceSolution(observations);
@@ -80,9 +101,25 @@ public sealed class OmniCalibCSharpPort
             return new OmniCalibRun(observations, solution, Path.Combine(output, "calibration.yml"), debug,
                 detectMs, solveMs, writeMs, total.Elapsed.TotalMilliseconds);
         }
+        catch (Exception ex)
+        {
+            failure = ex.GetBaseException().Message;
+            throw;
+        }
         finally
         {
             foreach (var preview in previews.Values) preview.Dispose();
+            // A read/geometry error can stop a worker before it emits feedback for its candidate.
+            // Distinguish these from photos on which a complete board was actually searched for.
+            var completedPaths = detections.Select(d => d.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (Directory.Exists(imageDirectory))
+                foreach (string path in Directory.EnumerateFiles(imageDirectory).Where(path =>
+                    new[] { ".jpg", ".jpeg", ".png" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)))
+                    if (!completedPaths.Contains(Path.GetFullPath(path)))
+                        detections.Add(new(Path.GetFileName(path), Path.GetFullPath(path), false, 0, "Detection did not complete. " + failure, null));
+            File.WriteAllText(Path.Combine(output, "checkerboard-detections.json"), JsonSerializer.Serialize(
+                new CalibrationDetectionReport(1, detection.InnerColumns, detection.InnerRows,
+                    detections.OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase).ToArray(), failure), JsonOptions));
         }
     }
 
@@ -94,8 +131,9 @@ public sealed class OmniCalibCSharpPort
     {
         var timings = new ConcurrentBag<CalibrationImageTiming>();
         var watch = Stopwatch.StartNew();
-        var observations = new PortCheckerboardExtractor().Extract(imageDirectory, settings, (path, gray) =>
+        var observations = new PortCheckerboardExtractor().Extract(imageDirectory, settings, (path, gray, corners) =>
         {
+            if (gray.Empty()) return;
             using var preview = new Mat();
             var scale = Math.Min(1.0, 1000.0 / Math.Max(gray.Width, gray.Height));
             Cv2.Resize(gray, preview, new Size((int)Math.Round(gray.Width * scale), (int)Math.Round(gray.Height * scale)),
@@ -182,7 +220,7 @@ internal sealed class PortCheckerboardExtractor
     // this lock prevents two simultaneous calibrations from changing it while
     // either one has OpenCV work in flight.
     public CalibrationObservationDocument Extract(string imageDirectory, CheckerboardDetectionSettings settings,
-        Action<string, Mat>? capturePreview = null, Action<CalibrationImageTiming>? profile = null)
+        Action<string, Mat, Point2f[]?>? capturePreview = null, Action<CalibrationImageTiming>? profile = null)
     {
         lock (OmniCalibCSharpPort.OpenCvExecutionLock)
         {
@@ -194,7 +232,7 @@ internal sealed class PortCheckerboardExtractor
 
     private static CalibrationObservationDocument ExtractCore(
         string imageDirectory,
-        CheckerboardDetectionSettings settings, Action<string, Mat>? capturePreview = null,
+        CheckerboardDetectionSettings settings, Action<string, Mat, Point2f[]?>? capturePreview = null,
         Action<CalibrationImageTiming>? profile = null)
     {
         if (!Directory.Exists(imageDirectory))
@@ -276,7 +314,7 @@ internal sealed class PortCheckerboardExtractor
     private static DetectionResult? DetectOne(
         string path,
         Size pattern,
-        CheckerboardDetectionSettings settings, Action<string, Mat>? capturePreview = null,
+        CheckerboardDetectionSettings settings, Action<string, Mat, Point2f[]?>? capturePreview = null,
         Action<CalibrationImageTiming>? profile = null)
     {
         var tick = Stopwatch.GetTimestamp();
@@ -286,6 +324,7 @@ internal sealed class PortCheckerboardExtractor
         var readMs = Mark(ref tick);
         if (gray.Empty())
         {
+            capturePreview?.Invoke(Path.GetFullPath(path), gray, null);
             profile?.Invoke(new(path, false, readMs, 0, 0, 0, 0, 0, 0, 0, 0));
             return null;
         }
@@ -334,6 +373,7 @@ internal sealed class PortCheckerboardExtractor
         tick = Stopwatch.GetTimestamp();
         if (!found)
         {
+            capturePreview?.Invoke(Path.GetFullPath(path), gray, null);
             profile?.Invoke(new(path, false, readMs, fullSharpenMs, resizeMs, smallSharpenMs,
                 classicMs, sbMs, 0, 0, 0, classicAttempts, sectorAttempts, exhaustiveAttempts));
             return null;
@@ -348,7 +388,7 @@ internal sealed class PortCheckerboardExtractor
             new TermCriteria(CriteriaTypes.Eps | CriteriaTypes.MaxIter, 50, settings.SubpixelEpsilon));
         var subpixelMs = Mark(ref tick);
 
-        capturePreview?.Invoke(Path.GetFullPath(path), gray);
+        capturePreview?.Invoke(Path.GetFullPath(path), gray, corners);
         var previewMs = Mark(ref tick);
         var hash = Convert.ToHexString(SHA256.HashData(encoded ?? File.ReadAllBytes(path))).ToLowerInvariant();
         var hashMs = Mark(ref tick);

@@ -13,6 +13,7 @@ using SolarShade.Shading;
 using SolarShade.MaskEditor;
 using Cv2 = OpenCvSharp.Cv2;
 using ImreadModes = OpenCvSharp.ImreadModes;
+using SolarShade.Calibration.Validation;
 
 namespace SolarShade.Desktop;
 
@@ -49,6 +50,11 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private readonly Dictionary<string, TextBox> fields = new();
     private readonly HashSet<string> invalidFields = new();
     private readonly TextBlock status = Label("Ready when you are", 13), detail = Label("Start with your data, or load the included example.", 12), maskInfo = Label("Choose a sky photo to begin", 12), calibrationInfo = Label("No camera profile selected", 11);
+    private readonly Button reviewCalibration = new() { Content = "Review checkerboard photos", IsEnabled = false };
+    private CalibrationReview? calibrationReview;
+    private CalibrationReviewWindow? calibrationReviewWindow;
+    private string? reviewedProfile;
+    private string? reviewedProfileFingerprint;
     private readonly TextBlock beforeEnergy = Label("—", 26), afterEnergy = Label("—", 26), reduction = Label("—", 26), hover = Label("Scroll to zoom · drag to pan · click Full period to reset", 11);
     private readonly TextBlock provenance = Label("Horizontal data is retained; both graph curves refer to the panel.", 11);
     private readonly ImageOverlayPreview photo = new();
@@ -127,7 +133,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         inputs.Children.Add(board);
         SmallField(board, 0, "Inner columns", "Columns"); SmallField(board, 1, "Inner rows", "Rows"); SmallField(board, 2, "Square, mm", "SquareMm");
         inputs.Children.Add(Label("Count inner corners, not squares: 7 × 10 squares → 6 × 9 corners.", 11));
-        var calButtons = new WrapPanel(); calButtons.Children.Add(Button("Calibrate", async () => await Calibrate())); calButtons.Children.Add(Button("Load profile", PickProfile)); inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
+        var calButtons = new WrapPanel(); calButtons.Children.Add(Button("Calibrate", async () => await Calibrate())); calButtons.Children.Add(Button("Load camera profile…", PickProfile));
+        reviewCalibration.Click += (_, _) => { RefreshCalibrationReview(); ShowCalibrationReview(); }; calButtons.Children.Add(reviewCalibration);
+        inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
+        inputs.Children.Add(Label("Load camera parameters: camera-profile.json includes coverage. Native calibration.yml/.yaml also needs a validated maximum incident angle in Advanced options. Calibrate saves reusable files under Data/Profiles and diagnostics under Debug Data/01-calibration.", 11));
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
         var imageButtons = new WrapPanel(); imageButtons.Children.Add(choosePhoto); imageButtons.Children.Add(importMask); inputs.Children.Add(imageButtons);
         choosePhoto.Click += (_, _) => PickSkyPhoto(); importMask.Click += (_, _) => PickMask();
@@ -263,6 +272,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         owner.ContentRendered -= OnContentRendered; owner.Activated -= OnActivated;
         SystemEvents.TimeChanged -= SystemTimeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged;
         sourceWatch.Dispose();
+        calibrationReviewWindow?.Close();
         controller.CommandsChanged -= OnCommandsChanged;
         try { AppData.SaveSettings(settings); } catch { }
         if (inputWork.IsCompleted) controller.Dispose();
@@ -329,7 +339,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         showCardinals.IsChecked = settings.ShowCardinalDirections; photo.ShowOverlay = settings.ShowCardinalDirections;
         PopulateImages(); graphDay.SelectedDate = settings.Start;
         RefreshMaskChoices();
-        calibrationInfo.Text = string.IsNullOrEmpty(settings.ProfilePath) ? "No camera profile selected" : "Profile: " + Path.GetFileName(settings.ProfilePath);
+        RefreshCalibrationReview();
         loading = false;
         RefreshWeatherSource();
     }
@@ -541,6 +551,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                     WatchSources(); SaveInputs();
                 }
                 if (observedRevision != revision) return;
+                if (refreshSources || reviewedProfile != settings.ProfilePath) RefreshCalibrationReview();
                 uiInputs = InputDependencies.Capture(settings, uiInputs, false);
                 if (refreshSources && result.changed != ArtifactGroup.None)
                 {
@@ -837,7 +848,56 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
     }
     private void PickSkyFolder() { var p = new OpenFolderDialog { Title = "Choose the folder containing your sky photograph" }; if (p.ShowDialog(owner) == true) { settings.SkyFolder = PortablePaths.Store(p.FolderName); settings.SkyImage = ""; settings.SelectedMaskId = null; LoadFields(); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } }
-    private void PickProfile() { var p = new OpenFileDialog { Filter = "Camera profile|*.json;*.yml;*.yaml" }; if (p.ShowDialog(owner) == true) { settings.ProfilePath = PortablePaths.Store(p.FileName); settings.CoverageAngle = 0; LoadFields(); Changed(); } }
+    public static OpenFileDialog CameraProfilePicker() => new()
+    {
+        Title = "Load camera parameters · camera-profile.json or calibration.yml/.yaml",
+        Filter = "Camera parameters (*.json; *.yml; *.yaml)|*.json;*.yml;*.yaml",
+        InitialDirectory = Directory.Exists(Path.Combine(AppData.Root, "Profiles")) ? Path.Combine(AppData.Root, "Profiles") : AppData.Root
+    };
+    private void PickProfile() { var p = CameraProfilePicker(); if (p.ShowDialog(owner) == true) { settings.ProfilePath = PortablePaths.Store(p.FileName); settings.CoverageAngle = 0; LoadFields(); Changed(); } }
+    private void RefreshCalibrationReview()
+    {
+        string? fingerprint = ProfileFingerprint();
+        CalibrationReview? savedReview = null;
+        if (calibrationReview?.Report.Failure != null && reviewedProfile == settings.ProfilePath && fingerprint == reviewedProfileFingerprint)
+        {
+            var failed = CalibrationReview.TryLoad(calibrationReview.Directory);
+            if (failed?.EvidenceFingerprint == calibrationReview.EvidenceFingerprint) savedReview = failed;
+        }
+        savedReview ??= string.IsNullOrWhiteSpace(settings.ProfilePath) ? null : CalibrationReview.ForProfile(settings.ProfilePath);
+        if (savedReview == null && calibrationReview != null && fingerprint == reviewedProfileFingerprint)
+        {
+            var previous = CalibrationReview.TryLoad(calibrationReview.Directory);
+            // Identical relocated profiles may retain their original, still verified sibling evidence.
+            if (fingerprint != null && previous?.EvidenceFingerprint == calibrationReview.EvidenceFingerprint &&
+                previous.MatchesProfile(settings.ProfilePath)) savedReview = previous;
+        }
+        calibrationReview = savedReview;
+        reviewedProfile = settings.ProfilePath;
+        reviewedProfileFingerprint = fingerprint;
+        reviewCalibration.IsEnabled = calibrationReview != null;
+        calibrationInfo.Text = string.IsNullOrWhiteSpace(settings.ProfilePath) ? "No camera profile selected" :
+            "Camera profile: " + settings.ProfilePath;
+        if (calibrationReview != null) calibrationInfo.Text += "\n" + calibrationReview.Summary;
+        if (calibrationReview?.FitSummary != null) calibrationInfo.Text += "\n" + calibrationReview.FitSummary;
+        if (calibrationReview?.Report.Failure != null) calibrationInfo.Text += "\nLast calibration failed; open the review for details.";
+        calibrationInfo.ToolTip = string.IsNullOrWhiteSpace(settings.ProfilePath) ? null : PortablePaths.Resolve(settings.ProfilePath);
+    }
+    private string? ProfileFingerprint()
+    {
+        if (string.IsNullOrWhiteSpace(settings.ProfilePath)) return null;
+        try { return AppData.FileKey(PortablePaths.Resolve(settings.ProfilePath)); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+    private void ShowCalibrationReview()
+    {
+        if (calibrationReview == null) return;
+        calibrationReviewWindow?.Close();
+        var dialog = new CalibrationReviewWindow(calibrationReview, owner);
+        calibrationReviewWindow = dialog;
+        dialog.Closed += (_, _) => { if (calibrationReviewWindow == dialog) calibrationReviewWindow = null; };
+        dialog.Show();
+    }
     private void PickImport() { var p = new OpenFileDialog { Title = "Choose horizontal irradiance: timestamp, BHI and DHI in W/m²", Filter = "Horizontal irradiance|*.xlsx;*.csv" }; if (p.ShowDialog(owner) == true) SelectWeatherFile(p.FileName); else RefreshWeatherSource(); }
     public void SelectWeatherFile(string path)
     { settings.ImportPath = PortablePaths.Store(path); Changed(); RefreshWeatherSource(); status.Text = "Imported source selected · check dates, site, time zone and source interval metadata"; detail.Text = path; }
@@ -866,9 +926,20 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         try
         {
             var result = await services.Calibrate(snapshot); if (closing) return;
+            calibrationReview = CalibrationReview.TryLoad(Path.GetDirectoryName(result.Path)!);
+            reviewCalibration.IsEnabled = calibrationReview != null;
             if (settings.CalibrationFolder != snapshot.CalibrationFolder || settings.Columns != snapshot.Columns || settings.Rows != snapshot.Rows || settings.SquareMm != snapshot.SquareMm)
-            { status.Text = "Calibration saved for the previous board inputs"; detail.Text = result.Path; return; }
-            settings.ProfilePath = PortablePaths.Store(result.Path); settings.CoverageAngle = 0; LoadFields(); calibrationInfo.Text = result.Details + "\nCoverage is provisional from fitted observations."; status.Text = "Calibration saved"; Changed();
+            { status.Text = "Calibration saved for the previous board inputs"; detail.Text = result.Path; ShowCalibrationReview(); return; }
+            settings.ProfilePath = PortablePaths.Store(result.Path); settings.CoverageAngle = 0; LoadFields(); status.Text = "Calibration saved"; detail.Text = result.Path; Changed(); ShowCalibrationReview();
+        }
+        catch (CalibrationReviewException ex)
+        {
+            if (closing) return;
+            calibrationReview = CalibrationReview.TryLoad(ex.DiagnosticsDirectory); reviewCalibration.IsEnabled = calibrationReview != null;
+            reviewedProfile = settings.ProfilePath;
+            reviewedProfileFingerprint = ProfileFingerprint();
+            RefreshCalibrationReview();
+            ShowError(ex); ShowCalibrationReview();
         }
         catch (Exception ex) { ShowError(ex); }
         finally { calibrating = false; if (!closing) { if (updateState == UpdateState.Updating) RefreshInputState(); else RefreshButtons(); } }
@@ -903,6 +974,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         catch (Exception ex) { MessageBox.Show(owner, ex.Message, "Saved studies could not be cleared", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
     public Evaluation? Completed => completed;
+    public CalibrationReview? CalibrationReviewForTest => calibrationReview;
     public Task<(CalibrationProfile Profile, string Path, string Details)> CalibrateForTest(UserSettings inputs) => services.Calibrate(inputs);
     public void SetProfileForTest(string path) { settings.ProfilePath = PortablePaths.Store(path); settings.CoverageAngle = 0; LoadFields(); Changed(); }
     public void SelectSkyPhotoForTest(string path) => SelectSkyPhoto(path);
