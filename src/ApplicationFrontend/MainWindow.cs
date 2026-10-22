@@ -40,6 +40,8 @@ public sealed class MainWindow : Window
         header.SizeChanged += (_, _) =>
         {
             bool narrow = header.ActualWidth < 850;
+            // The native title bar still identifies the app; reserve short, narrow windows for actions.
+            title.Visibility = header.ActualWidth < 600 ? Visibility.Collapsed : Visibility.Visible;
             if (narrow == stackedHeader) return;
             stackedHeader = narrow;
             Grid.SetColumn(actions, narrow ? 0 : 1); Grid.SetRow(actions, narrow ? 1 : 0);
@@ -52,13 +54,15 @@ public sealed class MainWindow : Window
         var pvService = new PvEvaluationService(IrradianceController);
         PvAutonomy = new(this, IrradianceController, new(IrradianceController, pvService), Irradiance.RecheckSourcesAsync, () => host.Select("irradiance"));
         host.Register(new("pv", "PV Autonomy", PvAutonomy, PvAutonomy.Actions));
-        var availability = Label("", 11); availability.Margin = new(20, 3, 0, 3); DockPanel.SetDock(availability, Dock.Top);
-        root.Children.Insert(1, availability);
+        var availability = Label("", 11); availability.Margin = new(20, 3, 20, 3);
+        var availabilityViewport = new ScrollViewer { Content = availability, MaxHeight = 42,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        DockPanel.SetDock(availabilityViewport, Dock.Top); root.Children.Insert(1, availabilityViewport);
         void RefreshAvailability()
         {
             var state = IrradianceController.Source; host.SetAvailability("pv", state.IsReady, state.Reason);
             availability.Text = state.IsReady ? "" : "PV Autonomy · " + state.Reason;
-            availability.Visibility = state.IsReady ? Visibility.Collapsed : Visibility.Visible;
+            availabilityViewport.Visibility = state.IsReady ? Visibility.Collapsed : Visibility.Visible;
         }
         IrradianceController.SourceChanged += (_, _) => RefreshAvailability(); RefreshAvailability();
         host.ActiveChanged += (_, _) => actions.Content = host.Active?.Actions;

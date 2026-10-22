@@ -4,6 +4,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.IO;
 using SolarShade.Desktop;
+using SolarShade.Calibration.Solver;
+using SolarShade.MaskEditor;
 using Xunit;
 using static ManualUpdateTests;
 
@@ -158,6 +160,93 @@ public sealed class ResponsiveLayoutTests
         dialog.Close(); owner.Close();
         return Task.CompletedTask;
     });
+
+    [Theory]
+    [InlineData(480, 320)]
+    [InlineData(640, 340)]
+    public void MaskEditorCommandsRemainReachableInASmallHiddenLayout(double width, double height) => Sta(async () =>
+    {
+        byte[] pixels = Enumerable.Repeat((byte)255, 32 * 32).ToArray();
+        var bitmap = BitmapSource.Create(32, 32, 96, 96, PixelFormats.Gray8, null, pixels, 32);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = new MemoryStream(); encoder.Save(stream); byte[] png = stream.ToArray();
+        var editor = new MaskEditorWindow(new(png, png, 16, 16, 15, "Review mask", (_, _) => true));
+        try
+        {
+            var viewport = Assert.IsType<ScrollViewer>(editor.Content);
+            await LayoutHidden(viewport, width - 16, height - 40);
+            Assert.True(viewport.ScrollableHeight > 0); Assert.True(viewport.ScrollableWidth < 1);
+            var save = Descendants<Button>(viewport).Single(b => Equals(b.Content, "Save as new mask"));
+            viewport.ScrollToBottom(); await LayoutHidden(viewport, width - 16, height - 40);
+            AssertVisibleInsideWorkspace(save, viewport);
+            var name = Descendants<TextBox>(viewport).Single(); AssertVisibleInsideWorkspace(name, viewport);
+            viewport.ScrollToTop(); await LayoutHidden(viewport, width - 16, height - 40);
+            var paint = Descendants<RadioButton>(viewport).First(); AssertVisibleInsideWorkspace(paint, viewport);
+            Assert.False(editor.IsVisible);
+        }
+        finally { editor.Close(); }
+    });
+
+    [Theory]
+    [InlineData(480, 320)]
+    [InlineData(640, 340)]
+    public void CalibrationReviewCommandsRemainReachableWithLongDiagnostics(double width, double height) => Sta(async () =>
+    {
+        string diagnostics = string.Join("\n", Enumerable.Repeat("Checkerboard detection could not find the requested inner corners in this photograph.", 12));
+        var review = new CalibrationReview("C:\\Studies\\Calibration diagnostics", new(1, 6, 9, [], diagnostics), diagnostics);
+        var window = new CalibrationReviewWindow(review);
+        try
+        {
+            var viewport = Assert.IsType<ScrollViewer>(window.Content);
+            await LayoutHidden(viewport, width - 16, height - 40);
+            Assert.True(viewport.ScrollableHeight > 0); Assert.True(viewport.ScrollableWidth < 1);
+            viewport.ScrollToBottom(); await LayoutHidden(viewport, width - 16, height - 40);
+            foreach (var button in Descendants<Button>(viewport)) AssertVisibleInsideWorkspace(button, viewport);
+            AssertVisibleInsideWorkspace(Descendants<TextBox>(viewport).Single(), viewport);
+            Assert.False(window.IsVisible);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
+    public void LongFailureAndAvailabilityMessagesDoNotConsumeTheHiddenWorkspace() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        string failure = string.Join("\n", Enumerable.Repeat("A long source diagnostic explains why this study could not be calculated.", 30));
+        using var service = new AppServices(fixture.Debug, (_, _, _) => throw new InvalidOperationException(failure));
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try
+        {
+            window.Calculate(); await Until(() => !window.UpdatingForTest);
+            Assert.Equal(UpdateState.Failed, window.UpdateStateForTest);
+            var root = Assert.IsAssignableFrom<FrameworkElement>(window.Content);
+            await LayoutHidden(root, 464, 280);
+            var availability = Descendants<TextBlock>(root).Single(t => t.Text.StartsWith("PV Autonomy · ", StringComparison.Ordinal));
+            availability.Text += "\n" + failure;
+            await LayoutHidden(root, 464, 280);
+            var viewport = Descendants<WorkspaceViewport>(window.Irradiance).Single();
+            Assert.True(viewport.ActualHeight >= 32, $"Only {viewport.ActualHeight} pixels remain for study controls.");
+            var message = Descendants<TextBlock>(window.Irradiance).Single(t => t.Text == failure);
+            var footer = Ancestors<ScrollViewer>(message).First();
+            Assert.True(footer.ScrollableHeight > 0); Assert.True(footer.ActualHeight <= 80);
+            Assert.True(footer.ViewportHeight > 0); Assert.False(window.IsVisible);
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
+    private static async Task LayoutHidden(FrameworkElement surface, double width, double height)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            surface.Measure(new Size(width, height)); surface.Arrange(new Rect(0, 0, width, height)); surface.UpdateLayout();
+            await Task.Delay(1);
+        }
+    }
+    private static IEnumerable<T> Ancestors<T>(DependencyObject element) where T : DependencyObject
+    {
+        for (DependencyObject? current = VisualTreeHelper.GetParent(element); current != null; current = VisualTreeHelper.GetParent(current))
+            if (current is T ancestor) yield return ancestor;
+    }
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
     {
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
