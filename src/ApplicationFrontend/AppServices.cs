@@ -634,7 +634,14 @@ public sealed class AppServices : IIrradianceService
                     return (stage.Profile, Path.Combine(durable, "camera-profile.json"),
                         $"{calibration.UsedImageCount} boards · RMSE {calibration.RmsError:F2} px · fitted coverage {calibration.MaximumIncidentAngleDegrees:F2}°");
                 }
-                catch (Exception ex) { debug.Status(ex is OperationCanceledException ? "Cancelled" : "Failed", ex.Message); throw; }
+                catch (Exception ex)
+                {
+                    debug.Status(ex is OperationCanceledException ? "Cancelled" : "Failed", ex.Message);
+                    if (ex is CalibrationReviewException review)
+                        throw new CalibrationReviewException(review.Message,
+                            DebugDataStore.Preserve(review.DiagnosticsDirectory, "CalibrationReviews"), review);
+                    throw;
+                }
             });
             }
             finally { NativeGate.Release(); }

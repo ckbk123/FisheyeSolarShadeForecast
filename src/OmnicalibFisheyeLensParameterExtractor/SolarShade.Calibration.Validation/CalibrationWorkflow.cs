@@ -43,6 +43,21 @@ public static class CalibrationWorkflow
             return new(profile, run with { YamlPath = Path.Combine(debugDirectory, "calibration.yml"),
                 DebugDirectory = Path.Combine(debugDirectory, "debug") }, report, artifacts.AsReadOnly());
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Test existence in the catch body: the solver's finally writes this report during unwinding.
+            if (!File.Exists(Path.Combine(staging, "checkerboard-detections.json"))) throw;
+            // Failed fits still have useful detector feedback. Retain it without publishing a camera profile.
+            foreach (string source in Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories)
+                .Where(path => Path.GetFileName(path) == "checkerboard-detections.json" ||
+                    Path.GetRelativePath(staging, path).StartsWith("detections" + Path.DirectorySeparatorChar, StringComparison.Ordinal)))
+            {
+                string destination = Path.Combine(debugDirectory, Path.GetRelativePath(staging, source));
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(source, destination, true);
+            }
+            throw new CalibrationReviewException(ex.GetBaseException().Message, debugDirectory, ex);
+        }
         finally
         {
             // The uniquely named staging directory is created by this invocation under its checked absolute destination.
