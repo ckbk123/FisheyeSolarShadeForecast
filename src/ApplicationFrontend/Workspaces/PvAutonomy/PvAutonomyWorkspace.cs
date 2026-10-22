@@ -8,6 +8,7 @@ namespace SolarShade.Desktop;
 public sealed class PvAutonomyWorkspace : UserControl, IDisposable
 {
     private readonly Window owner;
+    private HelpWindow? helpWindow;
     private readonly IrradianceWorkspaceController source;
     private readonly Func<Task> recheck;
     private readonly TextBlock sourceText = Text(""), status = Text(""), summary = Text("", 15), details = Text("", 11), hover = Text("Scroll to zoom · drag to pan. Red marks identify intervals with unmet load.", 11);
@@ -128,9 +129,9 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         new Window { Owner = owner, Title = Controller.IsCurrent ? "PV Autonomy · Hourly values" : "PV Autonomy · Previous hourly values (stale)",
             Content = table, Width = 1000, Height = 550, WindowStartupLocation = WindowStartupLocation.CenterOwner }.ShowDialog();
     }
-    private void ShowHelp() => MessageBox.Show(owner,
-        "1. Complete and update Solar Irradiance.\n2. Enter 24 hourly consumption values in Wh. They repeat by study-local hour (DST days can have 23 or 25 hours).\n3. Enter panel area, efficiencies, battery capacity in Wh and charge at the study start. Click Evaluate system.\n\nThe graph overlays load demand and PV energy available on the Wh axis, with battery charge on the fixed 0–100% axis. Red marks mean unmet load, even if charge recovered before the hour ended. Hover for actual interval bounds and duration. Zooming never resets the battery.\n\nConversion losses apply to PV only. Battery charge/discharge is ideal, all capacity is accessible, and power limits, ageing and temperature effects are omitted. Results describe the supplied study period only.\n\nExport PV results saves CSV, JSON and XLSX, including inputs, assumptions and the full irradiance source in JSON. Settings are restored on restart; results require an explicit evaluation.",
-        "PV Autonomy · Help", MessageBoxButton.OK, MessageBoxImage.Information);
+    private void ShowHelp() => HelpWindow.Open(ref helpWindow, owner, "PV Autonomy · Help",
+        "1. Complete and update Solar Irradiance.\n2. Enter 24 hourly consumption values in Wh. They repeat by study-local hour (DST days can have 23 or 25 hours).\n3. Enter panel area, efficiencies, battery capacity in Wh and charge at the study start. Click Evaluate system.\n\nThe graph overlays load demand and PV energy available on the Wh axis, with battery charge on the fixed 0–100% axis. Red marks mean unmet load, even if charge recovered before the hour ended. Hover for actual interval bounds and duration. Zooming never resets the battery.\n\nConversion losses apply to PV only. Battery charge/discharge is ideal, all capacity is accessible, and power limits, ageing and temperature effects are omitted. Results describe the supplied study period only.\n\nExport PV results saves CSV, JSON and XLSX, including inputs, assumptions and the full irradiance source in JSON. Settings are restored on restart; results require an explicit evaluation."
+        );
     internal static TextBlock Text(string value, double size = 12) => new() { Text = value, FontSize = size, TextWrapping = TextWrapping.Wrap, Margin = new(0, 2, 0, 2), Foreground = Brushes.DarkSlateGray };
     internal static Button Button(string label, Action action)
     {
