@@ -34,18 +34,20 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         }); actions.Children.Add(export); Actions = actions;
         var root = new DockPanel { Margin = new(16, 10, 16, 10) }; Content = root;
         var sourceBar = new DockPanel { Margin = new(0, 0, 0, 8) }; DockPanel.SetDock(sourceBar, Dock.Top); root.Children.Add(sourceBar);
-        var go = Button("Go to irradiance", goToSource); DockPanel.SetDock(go, Dock.Right); sourceBar.Children.Add(go); sourceBar.Children.Add(sourceText);
+        sourceBar.Children.Add(sourceText);
         status.Margin = new(0, 7, 0, 0); DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
-        var columns = new Grid(); columns.ColumnDefinitions.Add(new() { Width = new(280) }); columns.ColumnDefinitions.Add(new() { Width = new(14) }); columns.ColumnDefinitions.Add(new()); root.Children.Add(columns);
+        var columns = new Grid { MinWidth = 950, MinHeight = 600 }; columns.ColumnDefinitions.Add(new() { Width = new(280) }); columns.ColumnDefinitions.Add(new() { Width = new(14) }); columns.ColumnDefinitions.Add(new());
+        root.Children.Add(new WorkspaceViewport(columns));
         var left = new Border { Background = Brushes.White, Child = load }; columns.Children.Add(left);
         var right = new DockPanel { Background = Brushes.White, Margin = new(0), LastChildFill = true }; Grid.SetColumn(right, 2); columns.Children.Add(right);
         var top = new StackPanel { Margin = new(12, 8, 12, 0) }; DockPanel.SetDock(top, Dock.Top); right.Children.Add(top);
         top.Children.Add(Text("PV System Autonomy", 21));
+        top.Children.Add(Text("Check whether your panel and battery can supply the daily consumption during this study.", 11));
         top.ToolTip = "Evaluate energy supply and battery charge over the study period.";
         var settings = new WrapPanel(); top.Children.Add(settings);
         AddField(settings, "Panel area · m²", d => d.Area, (d, v) => d with { Area = v });
         AddField(settings, "Panel efficiency · %", d => d.PanelEfficiency, (d, v) => d with { PanelEfficiency = v });
-        AddField(settings, "Conversion · %", d => d.ConversionEfficiency, (d, v) => d with { ConversionEfficiency = v });
+        AddField(settings, "PV conversion efficiency · %", d => d.ConversionEfficiency, (d, v) => d with { ConversionEfficiency = v });
         AddField(settings, "Battery capacity · Wh", d => d.Capacity, (d, v) => d with { Capacity = v });
         AddField(settings, "Initial charge · %", d => d.InitialSoc, (d, v) => d with { InitialSoc = v });
         fields[4].ToolTip = "Charge at the start of the entire study, not the displayed day.";
@@ -61,7 +63,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         var legend = new WrapPanel(); top.Children.Add(legend);
         Legend(legend, "Load demand · Wh", PvSystemChart.LoadBrush, b => chart.ShowLoad = b);
         Legend(legend, "PV available · Wh", PvSystemChart.PvBrush, b => chart.ShowPv = b);
-        Legend(legend, "Battery SoC · %", PvSystemChart.SocBrush, b => chart.ShowSoc = b);
+        Legend(legend, "Battery charge · %", PvSystemChart.SocBrush, b => chart.ShowSoc = b);
         var bottom = new StackPanel { Margin = new(12, 0, 12, 8) }; DockPanel.SetDock(bottom, Dock.Bottom); right.Children.Add(bottom);
         var navigation = new WrapPanel(); bottom.Children.Add(navigation);
         navigation.Children.Add(Button("Full period", chart.Reset)); navigation.Children.Add(day);
@@ -111,11 +113,11 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         if (Controller.Result is { } result)
         {
             var s = result.Summary;
-            summary.Text = $"{(Controller.IsCurrent ? "" : "Previous · ")}Minimum SoC {s.MinimumSocPercent:0.#}%    Final {result.Hours[^1].EndSocPercent:0.#}%    Unmet {s.UnmetLoadWh:0.##} Wh";
+            summary.Text = $"{(Controller.IsCurrent ? "" : "Previous · ")}Minimum battery charge {s.MinimumSocPercent:0.#}%    Final charge {result.Hours[^1].EndSocPercent:0.#}%    Unmet consumption {s.UnmetLoadWh:0.##} Wh";
             details.Text = $"PV available {s.PvWh:0.##} Wh · Load demand {s.LoadWh:0.##} Wh · Served {s.ServedLoadWh:0.##} Wh · Curtailed {s.CurtailedWh:0.##} Wh\n{s.HoursContainingShortfall} intervals contain unmet load. First: {s.FirstShortfallIntervalStart?.ToString("yyyy-MM-dd HH:mm zzz") ?? "none"}.\nMinimum charge includes subhour steps and the initial charge. The first shortfall identifies an interval, not an exact outage instant.\n{result.Assumptions}\nConservative shading assumptions carry through from Solar Irradiance. No unmet load in this study does not guarantee supply in unseen weather.";
             day.DisplayDateStart = result.Hours[0].Start.Date; day.DisplayDateEnd = result.Hours[^1].Start.Date;
         }
-        else summary.Text = "Minimum SoC —    Final SoC —    Unmet energy —";
+        else summary.Text = "Minimum battery charge —    Final charge —    Unmet consumption —";
     }
     private void ShowTable()
     {
@@ -123,7 +125,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         var table = new DataGrid { IsReadOnly = true, AutoGenerateColumns = false, EnableRowVirtualization = true, EnableColumnVirtualization = true,
             ItemsSource = result.Hours, CanUserAddRows = false };
         foreach (var (title, property, format) in new[] { ("Start", "Start", "yyyy-MM-dd HH:mm zzz"), ("End", "End", "yyyy-MM-dd HH:mm zzz"),
-            ("Partial hour", "IsPartialHour", ""), ("Load · Wh", "LoadWh", "0.###"), ("PV · Wh", "PvWh", "0.###"), ("End SoC · %", "EndSocPercent", "0.###"), ("Unmet · Wh", "UnmetLoadWh", "0.###") })
+            ("Partial hour", "IsPartialHour", ""), ("Consumption · Wh", "LoadWh", "0.###"), ("PV available · Wh", "PvWh", "0.###"), ("End battery charge · %", "EndSocPercent", "0.###"), ("Unmet consumption · Wh", "UnmetLoadWh", "0.###") })
             table.Columns.Add(new DataGridTextColumn { Header = title, Binding = new System.Windows.Data.Binding(property) { StringFormat = format } });
         new Window { Owner = owner, Title = Controller.IsCurrent ? "PV Autonomy · Hourly values" : "PV Autonomy · Previous hourly values (stale)",
             Content = table, Width = 1000, Height = 550, WindowStartupLocation = WindowStartupLocation.CenterOwner }.ShowDialog();
