@@ -133,8 +133,26 @@ public sealed class DependentResultStore
     private static void RemoveOwned(string path)
     {
         DebugDataStore.SafePath(path);
-        if (!File.Exists(Path.Combine(path, ".owner")) || File.ReadAllText(Path.Combine(path, ".owner")) != Owner)
+        bool empty = !Directory.EnumerateFileSystemEntries(path).Any();
+        if (!empty && (!File.Exists(Path.Combine(path, ".owner")) || File.ReadAllText(Path.Combine(path, ".owner")) != Owner))
             throw new IOException("Unrecognized optional-result folder; it was preserved: " + path);
-        DebugDataStore.DeleteTree(Path.GetDirectoryName(path)!, path);
+        var attributes = File.GetAttributes(path);
+        bool readOnly = (attributes & FileAttributes.ReadOnly) != 0;
+        try
+        {
+            // A read-only directory can survive cleanup after its ownership marker is removed.
+            // Change only this verified empty/owned root, never unknown files or child folders.
+            if (readOnly) File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
+            // Nonrecursive deletion also preserves any entry that arrives after the empty check.
+            if (empty) Directory.Delete(path, recursive: false);
+            else DebugDataStore.DeleteTree(Path.GetDirectoryName(path)!, path);
+        }
+        catch
+        {
+            if (readOnly && Directory.Exists(path))
+                try { File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            throw;
+        }
     }
 }
