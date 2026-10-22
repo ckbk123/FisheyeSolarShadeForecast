@@ -90,7 +90,10 @@ read all parts. Reused artifacts are identified in run.json and remain unchanged
 The owning libraries save these scientific artifacts from their return values;
 the frontend only sequences the calls and records run status.
 
-Export results copies a complete successful run to a new scenario folder.
+Export data opens a selection and destination dialog. Irradiance (.xlsx) exports
+six columns for the full completed period: timeseries, direct, diffuse (with the
+selected diffuse model), both shading factors, and final shaded total. Full
+diagnostics remain here; the export is saved in a new scenario folder.
 Example/Irradiance holds the bundled input workbook. Example/Debug Data/reference-run
 holds a fixed library-generated example. Current outputs are saved here.
 Keep Data/Profiles and Data/Inputs when moving or backing up the application.

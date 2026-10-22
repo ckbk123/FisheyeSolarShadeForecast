@@ -9,6 +9,8 @@ namespace SolarShade.Irradiance;
 public sealed record ScientificSheet(string Name, IReadOnlyList<string> Headers, IEnumerable<object?[]> Rows)
 {
     public Action<ScientificRowWriter, CancellationToken>? WriteRows { get; init; }
+    /// <summary>Optional Excel character widths, one per column; otherwise every column uses width 28.</summary>
+    public IReadOnlyList<double>? ColumnWidths { get; init; }
 }
 public static class ScientificWorkbook
 {
@@ -23,8 +25,12 @@ public static class ScientificWorkbook
         if (sheets.Count == 0 || sheets.Select(s => s.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != sheets.Count)
             throw new ArgumentException("Unique worksheet names required.");
         foreach (var s in sheets)
+        {
             if (s.Name.Length is < 1 or > 31 || s.Name.IndexOfAny(['[',']',':','*','?','/','\\']) >= 0 || s.Headers.Count is < 1 or > 16384)
                 throw new ArgumentException("Invalid worksheet name or column count.");
+            if (s.ColumnWidths is { } widths && (widths.Count != s.Headers.Count || widths.Any(width => !double.IsFinite(width) || width <= 0 || width > 255)))
+                throw new ArgumentException("Column widths must match the headers and be finite values greater than zero and no more than 255.");
+        }
         XmlConvert.VerifyXmlChars(metadata);
         path = Path.GetFullPath(path); Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         string temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -50,7 +56,19 @@ public static class ScientificWorkbook
                     xml.WriteStartElement("worksheet", Ns);
                     xml.WriteStartElement("sheetViews"); xml.WriteStartElement("sheetView"); xml.WriteAttributeString("workbookViewId", "0");
                     xml.WriteStartElement("pane"); xml.WriteAttributeString("ySplit", "1"); xml.WriteAttributeString("topLeftCell", "A2"); xml.WriteAttributeString("state", "frozen"); xml.WriteEndElement(); xml.WriteEndElement(); xml.WriteEndElement();
-                    xml.WriteStartElement("cols"); xml.WriteStartElement("col"); xml.WriteAttributeString("min", "1"); xml.WriteAttributeString("max", sheet.Headers.Count.ToString()); xml.WriteAttributeString("width", "28"); xml.WriteAttributeString("customWidth", "1"); xml.WriteEndElement(); xml.WriteEndElement();
+                    xml.WriteStartElement("cols");
+                    void ColumnWidth(int first, int last, double width)
+                    {
+                        xml.WriteStartElement("col");
+                        xml.WriteAttributeString("min", first.ToString(CultureInfo.InvariantCulture));
+                        xml.WriteAttributeString("max", last.ToString(CultureInfo.InvariantCulture));
+                        xml.WriteAttributeString("width", width.ToString(CultureInfo.InvariantCulture));
+                        xml.WriteAttributeString("customWidth", "1"); xml.WriteEndElement();
+                    }
+                    if (sheet.ColumnWidths is { } widths)
+                        for (int col = 0; col < widths.Count; col++) ColumnWidth(col + 1, col + 1, widths[col]);
+                    else ColumnWidth(1, sheet.Headers.Count, 28);
+                    xml.WriteEndElement();
                     xml.WriteStartElement("sheetData");
                     int rowNumber = 0;
                     void Row(object?[] values, bool header)
