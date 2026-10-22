@@ -24,6 +24,7 @@ internal static class AcceptedResultVault
             Software = AppServices.SoftwareFingerprint,
             Photo = sources.Image.Content, Profile = sources.Profile.Content, Weather = sources.Weather.Content,
             Mask = sources.EditedMask.Content, MaskMetadata = sources.EditedMetadata.Content, s.SelectedMaskId,
+            MaskAncestor = sources.MaskAncestor.Content,
             s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle,
             s.BottomAzimuth, s.CameraTilt, s.CameraRoll, s.PanelTilt, s.PanelAzimuth,
             s.Latitude, s.Longitude, s.Elevation, s.Start, s.End, s.Zone,

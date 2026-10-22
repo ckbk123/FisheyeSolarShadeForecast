@@ -67,8 +67,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private readonly Button editMask = new() { Content = "Edit mask", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Right,
         VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(6) };
     private readonly Button savedStudies = new() { Content = "Saved studies" };
+    private readonly Button choosePhoto = new() { Content = "Choose sky photo…", Margin = new(0, 4, 6, 4), Padding = new(10, 6, 10, 6) };
+    private readonly Button importMask = new() { Content = "Import existing mask…", Margin = new(0, 4, 6, 4), Padding = new(10, 6, 10, 6) };
     private readonly ComboBox maskChoice = new() { MinWidth = 220 };
-    private sealed record MaskChoice(string? Id, string Title) { public override string ToString() => Title; }
+    private sealed record MaskChoice(string? Id, string Title, bool Imported = false) { public override string ToString() => Title; }
     private readonly IrradianceChart chart = new();
     private readonly Button export = new() { Content = "Export irradiance", IsEnabled = false };
     private ComboBox provider = null!, model = null!, resolution = null!, images = null!, zone = null!, window = null!, quality = null!;
@@ -127,6 +129,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         inputs.Children.Add(Label("Count inner corners, not squares: 7 × 10 squares → 6 × 9 corners.", 11));
         var calButtons = new WrapPanel(); calButtons.Children.Add(Button("Calibrate", async () => await Calibrate())); calButtons.Children.Add(Button("Load profile", PickProfile)); inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
+        var imageButtons = new WrapPanel(); imageButtons.Children.Add(choosePhoto); imageButtons.Children.Add(importMask); inputs.Children.Add(imageButtons);
+        choosePhoto.Click += (_, _) => PickSkyPhoto(); importMask.Click += (_, _) => PickMask();
+        importMask.ToolTip = "Use an existing black-and-white PNG without AI segmentation. White is open sky and black is obstruction; inversion is an explicit import option.";
+        inputs.Children.Add(Label("Choose the photograph first. Import a ready-made black-and-white mask to skip AI segmentation.", 11));
         images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) { settings.SkyImage = Path.Combine(settings.SkyFolder, name); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } };
         model = Combo(inputs, "Sky segmentation", Enum.GetNames<SkyModel>()); model.SelectionChanged += (_, _) => { if (!loading && model.SelectedIndex >= 0) { settings.Model = (SkyModel)model.SelectedIndex; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
         resolution = Combo(inputs, "Mask resolution", ["1024 · original quality", "512 · faster"]); resolution.SelectionChanged += (_, _) => { if (!loading) { settings.Resolution = resolution.SelectedIndex == 1 ? 512 : 1024; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
@@ -229,6 +235,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         
         settings = services.PrepareInputs(settings);
         LoadFields();
+        ShowSelectedMaskPreview();
         services.ObserveInputs(settings, refreshSources: true);
         uiInputs = InputDependencies.Capture(settings);
         WatchSources();
@@ -374,8 +381,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             {
                 string hash = ManualMaskStore.PhotoHash(settings.SkyImage);
                 choices.AddRange(ManualMaskStore.List(hash).Select(v => new MaskChoice(v.Id,
-                    $"{v.Label} · {v.CreatedUtc.ToLocalTime():g} · {v.BaseMask.Model}" +
-                    (ManualMaskStore.IsCompatible(v, settings) ? "" : " · use original AI settings"))));
+                    $"{v.Label} · {v.CreatedUtc.ToLocalTime():g} · {(v.IsImported ? v.Source + " · no AI" : v.BaseMask.Model)}" +
+                    (ManualMaskStore.IsCompatible(v, settings) ? "" : " · use original AI settings"), v.IsImported)));
             }
         }
         catch (Exception ex) { detail.Text = "Could not list saved masks: " + ex.Message; }
@@ -384,6 +391,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         bool previous = loading; loading = true;
         try { maskChoice.ItemsSource = choices; maskChoice.SelectedItem = choices.First(c => c.Id == settings.SelectedMaskId); }
         finally { loading = previous; }
+        bool imported = (maskChoice.SelectedItem as MaskChoice)?.Imported == true;
+        model.IsEnabled = resolution.IsEnabled = centered.IsEnabled = !imported;
+        model.ToolTip = resolution.ToolTip = centered.ToolTip = imported ? "The imported mask is used directly. Choose AI mask to use these settings." : null;
     }
     private void SelectMaskChoice()
     {
@@ -415,6 +425,14 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             if (settings.SelectedMaskId == null)
             {
                 if (AppServices.LoadCachedAiMask(settings) is { } ai) ShowMask(ai);
+                else if (File.Exists(PortablePaths.Resolve(settings.SkyImage)))
+                {
+                    using var unmaskedPhoto = Cv2.ImRead(PortablePaths.Resolve(settings.SkyImage), ImreadModes.Color);
+                    if (unmaskedPhoto.Empty()) throw new InvalidDataException("The selected photograph could not be decoded.");
+                    displayedPhoto = AppServices.Preview(unmaskedPhoto);
+                    photo.SetImage(Bitmap(displayedPhoto), unmaskedPhoto.Width, unmaskedPhoto.Height);
+                    maskInfo.Text = "Photo selected · Update results for AI, or import an existing mask";
+                }
                 return;
             }
             var (variant, png) = ManualMaskStore.Load(settings.SkyImage, settings.SelectedMaskId);
@@ -425,7 +443,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             if (original.Empty() || original.Width != variant.BaseMask.Width || original.Height != variant.BaseMask.Height)
                 throw new InvalidDataException("Saved mask and selected photo dimensions differ.");
             ShowMask(new MaskAsset(AppServices.Preview(original), AppServices.Preview(binary), variant.BaseMask with { Png = png },
-                $"Edited: {variant.Label} · based on {variant.BaseMask.Model}", variant));
+                variant.Description, variant));
         }
         catch (Exception ex) { ShowError(ex); }
     }
@@ -607,6 +625,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         export.IsEnabled = !controller.Verifying && !exporting && !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null &&
             services.IsCurrent(completed) && completed.ManagedDebugRun?.HasCompleteDataset == true;
         editMask.IsEnabled = displayedAsset != null && !updating && !calibrating && !exporting;
+        choosePhoto.IsEnabled = !calibrating && !exporting;
+        importMask.IsEnabled = !updating && !calibrating && !exporting && File.Exists(PortablePaths.Resolve(settings.SkyImage));
         savedStudies.IsEnabled = !updating && !calibrating && !exporting && !controller.DependentBusy && !controller.Verifying;
     }
     public void StopUpdate()
@@ -763,6 +783,59 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         try { File.AppendAllText(AppData.PathFor("errors.log"), DateTimeOffset.Now + " " + ex + Environment.NewLine); } catch { }
     }
     private void PickCalibrationFolder() { var p = new OpenFolderDialog { Title = "Choose checkerboard photographs" }; if (p.ShowDialog(owner) == true) { settings.CalibrationFolder = PortablePaths.Store(p.FolderName); LoadFields(); Changed(); } }
+    private void PickSkyPhoto()
+    {
+        var pick = new OpenFileDialog { Title = "Choose a sky photograph", Filter = "Sky photographs|*.jpg;*.jpeg;*.png" };
+        if (pick.ShowDialog(owner) == true) SelectSkyPhoto(pick.FileName);
+    }
+    private void SelectSkyPhoto(string path)
+    {
+        settings.SkyImage = PortablePaths.Store(path); settings.SkyFolder = PortablePaths.Store(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        RestorePhotoMaskSelection(); LoadFields(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
+    }
+    private void PickMask()
+    {
+        var pick = new OpenFileDialog { Title = "Import an existing mask without AI", Filter = "Black-and-white PNG|*.png" };
+        if (pick.ShowDialog(owner) != true) return;
+        var dialog = new Window { Owner = owner, Title = "Import existing mask · no AI", Width = 510, SizeToContent = SizeToContent.Height,
+            ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var panel = new StackPanel { Margin = new(20) }; dialog.Content = panel;
+        panel.Children.Add(Label("Photo: " + Path.GetFileName(settings.SkyImage), 13));
+        panel.Children.Add(Label("Mask: " + Path.GetFileName(pick.FileName), 13));
+        panel.Children.Add(Label("Use the same pixel dimensions as the oriented photo. Gray, colored and transparent pixels are rejected. Pixels outside the photo's lens disk become black.", 12));
+        panel.Children.Add(Label("Mask name", 12)); var name = new TextBox { Text = Path.GetFileNameWithoutExtension(pick.FileName), MaxLength = 100 }; panel.Children.Add(name);
+        var polarity = Combo(panel, "Meaning of the source pixels", ["White = open sky; black = obstruction", "Black = open sky; white = obstruction (invert)"]); polarity.SelectedIndex = 0;
+        var disk = Combo(panel, "Lens disk in the photograph", ["Detect from photo", "Centered full disk"]); disk.SelectedIndex = settings.CenteredDisk ? 1 : 0;
+        var error = Label("", 12); error.Foreground = Brushes.Firebrick; panel.Children.Add(error);
+        var commands = new WrapPanel(); panel.Children.Add(commands);
+        bool importing = false;
+        dialog.Closing += (_, e) => e.Cancel = importing;
+        commands.Children.Add(Button("Import and select mask", async () =>
+        {
+            string photoPath = settings.SkyImage, label = name.Text; bool inverted = polarity.SelectedIndex == 1, centeredDisk = disk.SelectedIndex == 1;
+            importing = true; panel.IsEnabled = false; error.Text = "Checking and importing mask…";
+            try
+            {
+                var variant = await Task.Run(() => ManualMaskStore.Import(photoPath, pick.FileName, label, inverted, centeredDisk));
+                if (closing || settings.SkyImage != photoPath) throw new IOException("The selected photo changed. Choose the mask again.");
+                SelectImportedMask(variant); importing = false; dialog.Close();
+            }
+            catch (Exception ex) { error.Text = ex.Message; }
+            finally { importing = false; panel.IsEnabled = true; }
+        }));
+        commands.Children.Add(Button("Cancel", dialog.Close)); dialog.ShowDialog();
+    }
+    private MaskVariant ImportExistingMask(string path, string label, bool inverted, bool centeredDisk)
+    {
+        var variant = ManualMaskStore.Import(settings.SkyImage, path, label, inverted, centeredDisk);
+        SelectImportedMask(variant); return variant;
+    }
+    private void SelectImportedMask(MaskVariant variant)
+    {
+        settings.SelectedMaskId = variant.Id;
+        settings.LastMaskByPhoto = new(settings.LastMaskByPhoto) { [variant.PhotoSha256] = variant.Id };
+        Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
+    }
     private void PickSkyFolder() { var p = new OpenFolderDialog { Title = "Choose the folder containing your sky photograph" }; if (p.ShowDialog(owner) == true) { settings.SkyFolder = PortablePaths.Store(p.FolderName); settings.SkyImage = ""; settings.SelectedMaskId = null; LoadFields(); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } }
     private void PickProfile() { var p = new OpenFileDialog { Filter = "Camera profile|*.json;*.yml;*.yaml" }; if (p.ShowDialog(owner) == true) { settings.ProfilePath = PortablePaths.Store(p.FileName); settings.CoverageAngle = 0; LoadFields(); Changed(); } }
     private void PickImport() { var p = new OpenFileDialog { Title = "Choose horizontal irradiance: timestamp, BHI and DHI in W/m²", Filter = "Horizontal irradiance|*.xlsx;*.csv" }; if (p.ShowDialog(owner) == true) SelectWeatherFile(p.FileName); else RefreshWeatherSource(); }
@@ -812,7 +885,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     {
         var text = "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles.\n\n2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading.\n\n3. Set camera pose, panel angles, site, dates and time zone. Dates include the complete end day. Positive camera tilt points toward image top before additional roll; bottom south = bearing 180°.\n\n4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the advanced isotropic option. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional.\n\nEach explicit update maintains one current Debug Data set beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files, fingerprints and the current status. Only a complete calculation is marked Complete; calibration or orientation alone is Partial. Unavailable stages are marked skipped. Edits remove affected files from the latest run, hide stale overlays and disable export. Camera rotation preserves the mask and numerical solar positions; panel edits preserve upstream files. Source-file changes are checked without recalculating. Close any locked diagnostic workbook and retry Update. Valid files are kept unchanged. Replacements are staged before publication. Verified old run folders are migrated after protecting selected inputs under Data/Inputs. Close the other SolarShade instance if this dataset is already in use.\n\nExport results copies the verified current debug files and adds a one-page Summary.pdf with the saved parameters and results. It creates a new scenario folder only after every file is ready. Export requires a complete shaded dataset; a baseline alone is insufficient. If inputs change during export, retry after Update results. Example/Irradiance holds the bundled input workbook; Example/Debug Data/reference-run holds a fixed library-generated reference run. Your current dataset uses the top-level Debug Data folder; the bundled reference stays unchanged.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches, extracted model weights and durable Profiles/Inputs. Keep these durable inputs when moving or backing up the application. Your own inputs may be anywhere. Data location:\n" + AppData.Root + "\n\nSolar Irradiance estimates historical direct + sky-diffuse irradiance. Once its complete shaded dataset is current, open PV Autonomy to enter a daily consumption profile, panel area and efficiencies, battery capacity and initial charge. Evaluate system computes hourly battery charge and unmet load for this study. First model use is slower; later panel edits reuse expensive work.";
         text += "\n\nCoordinates and orientation: Enter decimal degrees, for example latitude 43.56, longitude 1.48. South and west coordinates are negative. True north is geographic north; magnetic-compass correction is not automatic. Bearings increase clockwise: N 0°, E 90°, S 180°, W 270°. Bottom bearing sets the image direction before additional roll. With roll 0 degrees, it is the direction at the image bottom. With an upward camera, bottom south and roll 0°, east appears left and west right because you are looking up. Camera roll is rotation around the lens axis, separate from tilt; leave it at 0° if the bottom bearing already describes the image. With bottom south and tilt 0°, +90° roll moves east from the left to the bottom. The usable incident angle is a half-angle from the lens axis, not the full FOV; 0 uses the profile limit.";
-        text += "\n\nMask editing: After an update generates the AI mask, click Edit mask on its preview. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. The original AI mask stays available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. Exports include mask-provenance.json. Keep Data/Masks and Data/AcceptedResults when moving the application.";
+        text += "\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.";
+        text += "\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Original masks stay available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. Exports include mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Keep Data/Masks and Data/AcceptedResults when moving the application.";
         var dialog = new Window { Owner = owner, Title = "Using SolarShade · preview 0.2.0", Width = 740, Height = 700, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         var panel = new StackPanel { Margin = new(22) }; panel.Children.Add(Label(text, 14)); panel.Children.Add(Button("Third-party notices", () => { using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Notices")!; using var reader = new StreamReader(stream); var notice = new Window { Owner = dialog, Title = "Third-party notices", Width = 720, Height = 540, Content = new TextBox { Text = reader.ReadToEnd(), IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } }; notice.ShowDialog(); })); dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; dialog.ShowDialog();
     }
@@ -831,6 +905,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     public Evaluation? Completed => completed;
     public Task<(CalibrationProfile Profile, string Path, string Details)> CalibrateForTest(UserSettings inputs) => services.Calibrate(inputs);
     public void SetProfileForTest(string path) { settings.ProfilePath = PortablePaths.Store(path); settings.CoverageAngle = 0; LoadFields(); Changed(); }
+    public void SelectSkyPhotoForTest(string path) => SelectSkyPhoto(path);
+    public MaskVariant ImportMaskForTest(string path, string label, bool inverted = false, bool centeredDisk = true) => ImportExistingMask(path, label, inverted, centeredDisk);
+    public void SelectMaskForTest(string? id) => maskChoice.SelectedItem = maskChoice.Items.Cast<MaskChoice>().Single(c => c.Id == id);
     public void Calculate() => Begin(false);
     public void SetTimeZoneForTest(bool automatic, string zoneId)
     { useSystemZone.IsChecked = automatic; if (!automatic) zone.SelectedValue = zoneId; }

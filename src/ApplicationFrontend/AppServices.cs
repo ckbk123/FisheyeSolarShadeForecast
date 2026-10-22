@@ -139,7 +139,7 @@ public sealed class AppServices : IIrradianceService
                 using var binary = Cv2.ImDecode(maskResult.Png, ImreadModes.Grayscale);
                 asset = new(Preview(original), Preview(binary), maskResult,
                     variant == null ? $"{maskResult.Width} × {maskResult.Height} · {maskResult.Model} · AI mask"
-                        : $"Edited: {variant.Label} · based on {variant.BaseMask.Model}", variant);
+                        : variant.Description, variant);
             }
             currentInputs = InputDependencies.Capture(settings);
             accepted = result with { Mask = asset };
@@ -218,7 +218,7 @@ public sealed class AppServices : IIrradianceService
                 debug = new(Storage, persisted, verifiedInputs: dependencies); tracked = new(debug, dependencies, linked); activeRun = tracked;
             }
             var timer = Stopwatch.StartNew();
-            var (activeMask, activeProfile, activeCardinals) = await PrepareImageStages(s, debug, progress, onMask, onCardinals, ct);
+            var (activeMask, activeProfile, activeCardinals) = await PrepareImageStages(s, debug, progress, onMask, onCardinals, ct, dependencies.Keys[ArtifactGroup.Mask]);
             var zone = TimeZoneSelection.Resolve(s.Zone);
             string nextRaw = dependencies.Keys[ArtifactGroup.Irradiance];
             debug.RecordInput("irradiance-request", new { Fingerprint = nextRaw });
@@ -423,7 +423,7 @@ public sealed class AppServices : IIrradianceService
 
     private async Task<(MaskAsset? Mask, CalibrationProfile? Profile, CardinalDirectionOverlayResult? Cardinals)> PrepareImageStages(
         UserSettings s, DebugDataRun debug, Action<string> progress, Action<MaskAsset>? onMask,
-        Action<CardinalDirectionOverlayResult?>? onCardinals, CancellationToken ct)
+        Action<CardinalDirectionOverlayResult?>? onCardinals, CancellationToken ct, string? selectedMaskFingerprint = null)
     {
             MaskAsset? activeMask = null;
             if (!string.IsNullOrEmpty(s.SkyImage))
@@ -431,8 +431,8 @@ public sealed class AppServices : IIrradianceService
                 string imageHash = AppData.FileKey(s.SkyImage);
                 string aiMaskKey = AppData.Key(new { Image = imageHash, s.Model, s.Resolution, s.CenteredDisk,
                     Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = AppServices.MaskCacheSchema });
-                string nextMask = s.SelectedMaskId == null ? aiMaskKey : AppData.Key(new { Ai = aiMaskKey, s.SelectedMaskId,
-                    Edited = AppData.FileKey(ManualMaskStore.VariantPngPath(imageHash, s.SelectedMaskId)) });
+                string nextMask = s.SelectedMaskId == null ? aiMaskKey
+                    : selectedMaskFingerprint ?? InputDependencies.Capture(s).Keys[ArtifactGroup.Mask];
                 debug.RecordInput("sky-mask", new { Fingerprint = nextMask });
                 bool reusedMask = mask != null && maskKey == nextMask;
                 string maskOrigin = reusedMask ? "Reused in-memory mask" : "Computed or loaded validated mask cache";
@@ -454,7 +454,7 @@ public sealed class AppServices : IIrradianceService
                                 if (!ManualMaskStore.IsCompatible(variant, s))
                                     throw new InvalidDataException("This edited mask was made with different AI model, resolution or disk settings. Select its original settings or choose another mask.");
                                 result = variant.BaseMask with { Png = edited };
-                                maskOrigin = "Edited manually · " + variant.Label;
+                                maskOrigin = variant.Description;
                             }
                             else if (File.Exists(Path.Combine(cache, "sky-mask.png")) && File.Exists(Path.Combine(cache, "mask-details.json")))
                             { result = SkyMaskExporter.Load(cache); maskOrigin = "Reused validated disk mask cache"; }
@@ -477,7 +477,7 @@ public sealed class AppServices : IIrradianceService
                             using var binary = Cv2.ImDecode(result.Png, ImreadModes.Grayscale);
                             return new MaskAsset(Preview(image), Preview(binary), result,
                                 variant == null ? $"{result.Width} × {result.Height} · {result.Model} · {result.ExecutionProvider} · AI mask"
-                                    : $"{result.Width} × {result.Height} · edited: {variant.Label} · based on {result.Model}", variant);
+                                    : $"{result.Width} × {result.Height} · {variant.Description}", variant);
                         }, CancellationToken.None);
                         ct.ThrowIfCancellationRequested(); mask = next; maskKey = nextMask;
                     }
@@ -488,9 +488,14 @@ public sealed class AppServices : IIrradianceService
                 {
                     var files = SkyMaskExporter.Export(activeMask.Result, directory, maskOrigin, ct).ToList();
                     string provenance = Path.Combine(directory, "mask-provenance.json");
-                    AppData.Write(provenance, new { Source = activeMask.Variant == null ? "AI" : "Edited",
+                    AppData.Write(provenance, new { Source = activeMask.Variant?.Source ?? "AI",
                         VariantId = activeMask.Variant?.Id, Label = activeMask.Variant?.Label,
-                        AiAncestorSha256 = activeMask.AiAncestorSha256,
+                        AiAncestorSha256 = activeMask.Variant?.IsImported == true ? null : activeMask.AiAncestorSha256,
+                        ImportedFileName = activeMask.Variant?.ImportedFileName,
+                        ImportedFileSha256 = activeMask.Variant?.ImportedFileSha256,
+                        ImportedAncestorSha256 = activeMask.Variant?.ImportedAncestorSha256,
+                        ImportInverted = activeMask.Variant?.ImportInverted,
+                        PixelConvention = "255 = open sky; 0 = obstruction or outside lens; no automatic inversion",
                         ParentVariantId = activeMask.Variant?.ParentId,
                         ActiveMaskSha256 = Convert.ToHexString(SHA256.HashData(activeMask.Png)) });
                     files.Add(provenance); return files;
