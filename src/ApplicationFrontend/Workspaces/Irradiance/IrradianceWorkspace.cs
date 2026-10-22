@@ -206,7 +206,6 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         tuning.Children.Add(refreshData);
         tuning.Children.Add(Label("Update results reuses matching weather data. Download weather again bypasses the weather cache; camera calibration and masks are reused when unchanged.", 11));
 
-<<<<<<< HEAD
         var right = new Grid(); body.Children.Add(right);
         root.Children.Add(new WorkspaceViewport(body, inputHost, right));
         right.RowDefinitions.Add(new() { Height = GridLength.Auto }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new() { Height = GridLength.Auto });
@@ -214,13 +213,6 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         var previewHeader = new WrapPanel { Margin = new(12, 8, 12, 6) }; preview.Children.Add(previewHeader);
         var previewTitle = Label("SKY PHOTO  /  MASK", 14); previewTitle.Margin = new(4, 4, 12, 4); previewHeader.Children.Add(previewTitle);
         previewHeader.Children.Add(showCardinals);
-=======
-        var right = new Grid(); Grid.SetColumn(right, 2); body.Children.Add(right);
-        right.RowDefinitions.Add(new() { Height = new GridLength(2, GridUnitType.Star), MinHeight = 240, MaxHeight = 350 }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new() { Height = new GridLength(3, GridUnitType.Star), MinHeight = 390 });
-        var preview = new Grid { Background = Brushes.White }; right.Children.Add(preview); preview.RowDefinitions.Add(new() { Height = new GridLength(42) }); preview.RowDefinitions.Add(new()); preview.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var previewHeader = new DockPanel(); preview.Children.Add(previewHeader);
-        DockPanel.SetDock(showCardinals, Dock.Right); previewHeader.Children.Add(showCardinals);
->>>>>>> origin/main
         showCardinals.Checked += (_, _) => SetCardinalVisibility(); showCardinals.Unchecked += (_, _) => SetCardinalVisibility();
         showCardinals.ToolTip = "Show compass bearings at the calibrated image boundary. Uses the same heading, tilt and roll as sun paths and shading. Visibility does not recalculate.";
         previewHeader.Children.Add(showSunPath);
@@ -231,14 +223,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         var maskPane = new Grid(); maskPane.Children.Add(maskPreview); maskPane.Children.Add(editMask);
         var maskBorder = new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = maskPane }; Grid.SetColumn(maskBorder, 2); pair.Children.Add(maskBorder);
         editMask.Click += (_, _) => OpenMaskEditor();
-<<<<<<< HEAD
         var previewInfo = new StackPanel { Margin = new(16, 6, 16, 10) };
-        var previewLabels = new StackPanel(); previewLabels.Children.Add(maskInfo); previewLabels.Children.Add(sunPathInfo); previewLabels.Children.Add(cardinalInfo); previewInfo.Children.Add(previewLabels);
-=======
-        var previewInfo = new Grid { Margin = new(16, 3, 8, 0) }; previewInfo.ColumnDefinitions.Add(new()); previewInfo.ColumnDefinitions.Add(new());
         var previewLabels = new StackPanel(); previewLabels.Children.Add(fieldOfViewInfo); previewLabels.Children.Add(maskInfo); previewLabels.Children.Add(sunPathInfo); previewLabels.Children.Add(cardinalInfo); previewInfo.Children.Add(previewLabels);
         System.Windows.Automation.AutomationProperties.SetAutomationId(fieldOfViewInfo, "SkyPhotoFieldOfView");
->>>>>>> origin/main
         var maskPicker = new StackPanel(); maskPicker.Children.Add(Label("Mask for calculation", 11)); maskPicker.Children.Add(maskChoice);
         maskChoice.SelectionChanged += (_, _) => SelectMaskChoice(); previewInfo.Children.Add(maskPicker);
         Grid.SetRow(previewInfo, 2); preview.Children.Add(previewInfo);
