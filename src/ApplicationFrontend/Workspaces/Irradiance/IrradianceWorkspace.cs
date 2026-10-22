@@ -125,9 +125,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         var body = new Grid { Margin = new(16, 12, 16, 0), MinWidth = 950, MinHeight = 640 }; body.ColumnDefinitions.Add(new() { Width = new GridLength(348) }); body.ColumnDefinitions.Add(new() { Width = new GridLength(14) }); body.ColumnDefinitions.Add(new());
         root.Children.Add(new WorkspaceViewport(body));
         var inputs = new StackPanel { Margin = new(14) };
-        var inputHost = new DockPanel { Background = Brushes.White }; body.Children.Add(inputHost);
-        var tuning = new StackPanel { Margin = new(14, 0, 14, 8) }; DockPanel.SetDock(tuning, Dock.Bottom); inputHost.Children.Add(tuning);
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs, Background = Brushes.White }; inputHost.Children.Add(scroll);
+        var inputHost = new Border { Background = Brushes.White }; body.Children.Add(inputHost);
+        var tuning = new StackPanel { Margin = new(0, 0, 0, 8) };
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs, Background = Brushes.White }; inputHost.Child = scroll;
         Section(inputs, "01  IMAGES & CALIBRATION");
         PathField(inputs, "Calibration folder", "CalibrationFolder", () => PickCalibrationFolder());
         var board = new Grid(); for (int i = 0; i < 3; i++) board.ColumnDefinitions.Add(new());
@@ -189,6 +189,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         Field(inputs, "Import interval, minutes (without metadata)", "ImportIntervalMinutes");
         isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; inputs.Children.Add(isotropic);
         inputs.Children.Add(Label("Neither diffuse model is always the lower estimate. The result depends on weather, panel direction and the mask.", 11));
+        inputs.Children.Add(tuning);
         Section(tuning, "05  PANEL INSTALLATION");
         PanelSlider(tuning, "Tilt from horizontal, °", "PanelTilt", 90); PanelSlider(tuning, "Front azimuth, ° true north", "PanelAzimuth", 360);
         tuning.Children.Add(Label("N 0° · E 90° · S 180° · W 270°", 11));
