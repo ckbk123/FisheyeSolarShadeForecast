@@ -22,9 +22,11 @@ public sealed class DailyLoadEditor : UserControl
         var footer = new StackPanel(); DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         footer.Children.Add(total);
         footer.Children.Add(PvAutonomyWorkspace.Button("Paste 24 values", () => TryPaste(Clipboard.GetText())));
-        var fill = new DockPanel(); var constant = new TextBox { Width = 80, Padding = new(5), ToolTip = "Constant consumption in Wh for every hour" };
+        footer.Children.Add(PvAutonomyWorkspace.Text("Same consumption every hour · Wh", 11));
+        var fill = new StackPanel(); var constant = new TextBox { Width = 80, Padding = new(5), HorizontalAlignment = HorizontalAlignment.Left, ToolTip = "Energy for each one-hour slot. For example, 100 Wh per hour gives 2400 Wh per nominal 24-hour day. Daylight-saving days may have 23 or 25 hours." };
         System.Windows.Automation.AutomationProperties.SetName(constant, "Constant hourly consumption in Wh");
-        fill.Children.Add(constant); fill.Children.Add(PvAutonomyWorkspace.Button("Fill all hours", () =>
+        fill.Children.Add(constant); fill.Children.Add(PvAutonomyWorkspace.Text("Example: 100 Wh each hour = 2400 Wh per nominal 24-hour day.\nApplying replaces all 24 hourly values.", 11));
+        fill.Children.Add(PvAutonomyWorkspace.Button("Apply to all 24 hours", () =>
         {
             try { if (PvSettingsDraft.Number(constant.Text, "Consumption") < 0) throw new ArgumentException("Consumption cannot be negative."); SetValues(Enumerable.Repeat(constant.Text, 24).ToArray()); Edited?.Invoke(Values); error.Text = ""; }
             catch (ArgumentException ex) { error.Text = ex.Message; }
