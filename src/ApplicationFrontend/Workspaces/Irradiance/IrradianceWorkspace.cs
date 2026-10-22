@@ -42,6 +42,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private readonly Button update = new() { Content = "Update results" };
     private readonly Button refreshData = new() { Content = "Download weather again & update" };
     private readonly TextBlock weatherSource = Label("", 11);
+    private readonly TextBlock lastWeatherResult = Label("", 11);
     private readonly Button chooseWeatherFile = new() { Content = "Choose XLSX / CSV file" };
     private readonly Button stop = new() { Content = "Stop", IsEnabled = false };
     private Evaluation? completed { get => controller.Completed; set => controller.Completed = value; }
@@ -160,7 +161,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             else if (provider.SelectedIndex >= 0) { settings.Provider = provider.SelectedIndex; settings.ImportPath = ""; Changed(); }
             RefreshWeatherSource();
         };
-        chooseWeatherFile.Click += (_, _) => PickImport(); inputs.Children.Add(chooseWeatherFile); inputs.Children.Add(weatherSource);
+        chooseWeatherFile.Click += (_, _) => PickImport(); inputs.Children.Add(chooseWeatherFile); inputs.Children.Add(weatherSource); inputs.Children.Add(lastWeatherResult);
         inputs.Children.Add(Label("Import: timestamp, direct horizontal (BHI), diffuse horizontal (DHI), in W/m². Native metadata sets the intervals; otherwise choose their duration and label below.", 11));
         inputs.Children.Add(Label("Example CSV header: Timestamp,BHI,DHI\n2025-05-15T12:00:00+07:00,500,100\nA total-only (GHI) measurement cannot supply both components. Example/Irradiance includes a workbook.", 11));
         window = Combo(inputs, "Imported rows represent", ["Preceding interval · end labels", "Following interval · start labels", "Centered interval"]); window.SelectionChanged += (_, _) => { if (!loading) { settings.ImportWindow = window.SelectedIndex; Changed(); } };
@@ -763,7 +764,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             if (manifest?.Stages.TryGetValue("03-irradiance", out var stage) == true) origin = stage.Origin;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { }
-        weatherSource.Text += $"\nLast result: {origin}. Source: {result.Raw.Source}. Retrieved {result.Raw.FetchedUtc:yyyy-MM-dd HH:mm} UTC.";
+        lastWeatherResult.Text = $"Last result: {origin}. Source: {result.Raw.Source}. Dataset timestamp: {result.Raw.FetchedUtc:yyyy-MM-dd HH:mm} UTC.";
     }
     private async Task Calibrate()
     {

@@ -30,6 +30,8 @@ public sealed class WeatherControlsTests
             owner.Calculate(); await Until(() => !owner.UpdatingForTest);
             double first = owner.Completed!.Run.BeforeEnergy;
             Assert.Contains(controls.OfType<TextBlock>(), b => b.Text.Contains("Last result: Imported"));
+            owner.SetProfileForTest(fixture.Settings.ProfilePath);
+            Assert.Contains(controls.OfType<TextBlock>(), b => b.Text.Contains("Last result: Imported"));
             source.SelectedIndex = 0;
             Assert.Empty(owner.IrradianceController.Settings.ImportPath);
             Assert.True(refresh.IsEnabled); Assert.Equal(1, fixture.Runs);
@@ -40,7 +42,8 @@ public sealed class WeatherControlsTests
             await owner.RecheckSourcesAsync(); owner.Calculate(); await Until(() => !owner.UpdatingForTest);
             Assert.Equal(2 * first, owner.Completed!.Run.BeforeEnergy, 6);
             Assert.Equal(fixture.Settings.ImportPath, owner.Completed.Settings.ImportPath);
-            Assert.Contains(controls.OfType<TextBlock>(), b => b.Text.Contains("Selected file: weather.csv") && b.Text.Contains("Retrieved"));
+            Assert.Contains(controls.OfType<TextBlock>(), b => b.Text.Contains("Selected file: weather.csv"));
+            Assert.Contains(controls.OfType<TextBlock>(), b => b.Text.Contains("Last result: Imported") && b.Text.Contains("Dataset timestamp:"));
         }
         finally { owner.Close(); }
     });
