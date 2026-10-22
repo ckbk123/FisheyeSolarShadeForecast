@@ -6,6 +6,9 @@ No separate .NET installation is required. The first launch/model use can take
 longer while Windows extracts the bundled runtime and model.
 
 1. Open Solar Irradiance. Load the example or select your study inputs.
+   Choose sky photo selects a photograph directly. Import existing mask accepts
+   an opaque, exact black/white grayscale PNG at the oriented photo dimensions
+   without AI. Choose white or black for open sky, name the mask, then import it.
 2. Click Update results. Editing inputs alone does not calculate.
    Use Edit mask on the mask preview to paint a new black/white variant in a
    separate window. Adjust mask opacity and zoom while editing, then save.
@@ -19,7 +22,7 @@ The 24 load values repeat by local hour throughout the entire study. The battery
 is not reset at midnight. No unmet load in historical data does not guarantee
 supply during future weather. See Help for the model assumptions.
 
-This preview adds immutable edited masks with AI-source provenance and restores
+This preview supports imported and edited masks with source provenance and restores
 verified accepted studies when you return to matching photos, masks and inputs.
 Full scientific diagnostics are retained.
 A full-year update still takes longer than a month; Stop cancels acceptance of

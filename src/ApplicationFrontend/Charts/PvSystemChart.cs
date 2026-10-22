@@ -63,7 +63,7 @@ public sealed class PvSystemChart : FrameworkElement
         double span = Math.Clamp(b - a, Math.Min(3600, last - first), last - first);
         from = Math.Clamp(a, first, last - span); to = from + span; InvalidateVisual();
     }
-    public static string Describe(BatteryHour h) => $"{h.Start:yyyy-MM-dd HH:mm zzz} → {h.End:HH:mm zzz} · {(h.End - h.Start).TotalMinutes:0.##} min{(h.IsPartialHour ? " (partial hour)" : "")}\nLoad {h.LoadWh:0.##} Wh · PV available {h.PvWh:0.##} Wh · end SoC {h.EndSocPercent:0.##}% · unmet {h.UnmetLoadWh:0.##} Wh";
+    public static string Describe(BatteryHour h) => $"{h.Start:yyyy-MM-dd HH:mm zzz} → {h.End:HH:mm zzz} · {(h.End - h.Start).TotalMinutes:0.##} min{(h.IsPartialHour ? " (partial hour)" : "")}\nConsumption {h.LoadWh:0.##} Wh · PV available {h.PvWh:0.##} Wh · end battery charge {h.EndSocPercent:0.##}% · unmet {h.UnmetLoadWh:0.##} Wh";
     private void Report(Point point)
     {
         if (result == null || !Plot.Contains(point)) return;
@@ -98,7 +98,7 @@ public sealed class PvSystemChart : FrameworkElement
         double X(double time) => plot.Left + (time - from) / (to - from) * plot.Width;
         double Energy(double value) => plot.Bottom - value / energyMax * plot.Height;
         double Soc(double value) => plot.Bottom - value / 100 * plot.Height;
-        Text(dc, "Energy · Wh", 5, 3); Text(dc, "SoC · %", ActualWidth - 58, 3);
+        Text(dc, "Energy · Wh", 5, 3); Text(dc, "Charge · %", ActualWidth - 67, 3);
         for (int i = 0; i <= 4; i++)
         {
             double y = plot.Bottom - i / 4d * plot.Height;

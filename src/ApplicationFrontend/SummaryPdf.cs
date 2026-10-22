@@ -13,6 +13,7 @@ internal static class SummaryPdf
         using var results = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "06-shading/panel-results.json")));
         using var profile = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "01-calibration/camera-profile.json")));
         using var mask = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "02-sky-mask/mask-details.json")));
+        using var maskSource = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "02-sky-mask/mask-provenance.json")));
         var r = results.RootElement; var c = profile.RootElement.GetProperty("Calibration"); var m = mask.RootElement.GetProperty("Mask");
         var s = snapshot.Settings;
         static string N(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
@@ -89,7 +90,9 @@ internal static class SummaryPdf
         Row("Active profile", Path.GetFileName(s.ProfilePath), 2);
         Row("Effective coverage", Value(c, "MaximumIncidentAngleDegrees") + "° maximum incident angle | " + (s.CoverageAngle > 0 ? "user override" : "saved profile"));
         Row("Camera pose", $"Bottom bearing {N(s.BottomAzimuth)}° | tilt {N(s.CameraTilt)}° | roll {N(s.CameraRoll)}°");
-        Row("Mask", $"{s.Model}, {Value(m, "InputSize")} px | {Value(m, "Width")} x {Value(m, "Height")} image | disk: {Value(m, "DiskMethod")}");
+        bool imported = maskSource.RootElement.TryGetProperty("ImportedAncestorSha256", out var importedAncestor) && importedAncestor.ValueKind == JsonValueKind.String;
+        string maskMethod = imported ? "Imported mask, no AI" : $"{s.Model}, {Value(m, "InputSize")} px";
+        Row("Mask", $"{maskMethod} | {Value(m, "Width")} x {Value(m, "Height")} image | disk: {Value(m, "DiskMethod")}");
         var disk = m.GetProperty("Disk");
         Row("Effective disk", $"Center ({N(disk.GetProperty("CenterX").GetDouble())}, {N(disk.GetProperty("CenterY").GetDouble())}) px | radius {N(disk.GetProperty("Radius").GetDouble())} px");
         Row("Panel / model", $"Tilt {N(s.PanelTilt)}° | azimuth {N(s.PanelAzimuth)}° | {Value(r, "Model")} | {s.Substeps} integration samples");
