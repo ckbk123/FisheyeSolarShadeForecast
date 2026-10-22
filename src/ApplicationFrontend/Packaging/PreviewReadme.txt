@@ -16,7 +16,12 @@ longer while Windows extracts the bundled runtime and model.
 3. Once a complete shaded irradiance result is ready, open PV Autonomy.
 4. Enter 24 hourly load values in Wh, panel area and efficiencies, battery
    capacity in Wh and initial charge. Click Evaluate system.
-5. Export results from the workspace you are evaluating.
+5. In Solar Irradiance, click Export data, keep Irradiance (.xlsx) checked,
+   choose a destination folder and click Export. The workbook includes all
+   intervals, direct/diffuse panel irradiance, both shading factors and final
+   shaded total. The diffuse header names Isotropic or Hay-Davies. Irradiance
+   uses W/m2; factors are shaded/unshaded, blank when the baseline is zero.
+   PV Autonomy has its own Export PV results action.
 
 The 24 load values repeat by local hour throughout the entire study. The battery
 is not reset at midnight. No unmet load in historical data does not guarantee
