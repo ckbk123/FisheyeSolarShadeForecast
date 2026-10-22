@@ -255,7 +255,7 @@ public sealed class SkyPhotoMasker : IDisposable
         catch { mask.Dispose(); throw; }
     }
 
-    private static void ValidateDisk(LensDisk disk, int width, int height)
+    internal static void ValidateDisk(LensDisk disk, int width, int height)
     {
         if (disk.ImageWidth != width || disk.ImageHeight != height)
             throw new InvalidDataException("Camera disk dimensions do not match the EXIF-oriented image.");
