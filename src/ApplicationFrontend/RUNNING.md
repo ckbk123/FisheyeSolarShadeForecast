@@ -25,6 +25,8 @@ Both curves show irradiance received by the selected panel before/after obstruct
 
 On small displays, workspace scrollbars keep graphs, photo previews and controls reachable. The input list and daily consumption list also have their own scrollbars. Moving keyboard focus to an input brings it into view.
 
+Help opens a separate reference window, so you can keep reading while editing the study or switching workspaces. Clicking Help again brings back the existing guide. Close it with its title-bar button or Escape.
+
 The application has two independent tabs: **Solar Irradiance** and **PV Autonomy**. Complete an explicit irradiance update first. The PV tab unlocks only for a current, complete shaded dataset covering the selected study dates. If source inputs or files change, PV evaluation/export is blocked until the source is updated. A previously accepted PV result can return when the exact irradiance source and PV settings match; other combinations require **Evaluate system**.
 
 In PV Autonomy, enter the 24 hourly consumption values on the left in **Wh per nominal hour**. The profile repeats by study-local hour; DST days can contain 23 or 25 actual hours. Paste exactly 24 tab/newline-separated values or fill every slot with a constant. Blank/invalid inputs remain visible and block calculation. **Example system** deliberately loads illustrative values; it does not calculate.

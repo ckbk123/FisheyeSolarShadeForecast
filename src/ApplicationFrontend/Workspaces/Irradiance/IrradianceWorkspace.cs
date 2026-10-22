@@ -20,6 +20,7 @@ namespace SolarShade.Desktop;
 public sealed class IrradianceWorkspace : UserControl, IDisposable
 {
     private readonly Window owner;
+    private HelpWindow? helpWindow, noticesWindow;
     private readonly IrradianceWorkspaceController controller;
     public IrradianceWorkspaceController Controller => controller;
     public FrameworkElement Actions { get; private set; } = null!;
@@ -958,8 +959,13 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         text += "\n\nCoordinates and orientation: Enter decimal degrees, for example latitude 43.56, longitude 1.48. South and west coordinates are negative. True north is geographic north; magnetic-compass correction is not automatic. Bearings increase clockwise: N 0°, E 90°, S 180°, W 270°. Bottom bearing sets the image direction before additional roll. With roll 0 degrees, it is the direction at the image bottom. With an upward camera, bottom south and roll 0°, east appears left and west right because you are looking up. Camera roll is rotation around the lens axis, separate from tilt; leave it at 0° if the bottom bearing already describes the image. With bottom south and tilt 0°, +90° roll moves east from the left to the bottom. The usable incident angle is a half-angle from the lens axis, not the full FOV; 0 uses the profile limit.";
         text += "\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.";
         text += "\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Original masks stay available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. Exports include mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Keep Data/Masks and Data/AcceptedResults when moving the application.";
-        var dialog = new Window { Owner = owner, Title = "Using SolarShade · preview 0.2.0", Width = 740, Height = 700, WindowStartupLocation = WindowStartupLocation.CenterOwner };
-        var panel = new StackPanel { Margin = new(22) }; panel.Children.Add(Label(text, 14)); panel.Children.Add(Button("Third-party notices", () => { using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Notices")!; using var reader = new StreamReader(stream); var notice = new Window { Owner = dialog, Title = "Third-party notices", Width = 720, Height = 540, Content = new TextBox { Text = reader.ReadToEnd(), IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } }; notice.ShowDialog(); })); dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; dialog.ShowDialog();
+        HelpWindow.Open(ref helpWindow, owner, "Using SolarShade · preview 0.2.0", text, panel =>
+            panel.Children.Add(Button("Third-party notices", () =>
+            {
+                using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Notices")!;
+                using var reader = new StreamReader(stream);
+                HelpWindow.Open(ref noticesWindow, helpWindow!, "Third-party notices", reader.ReadToEnd());
+            })));
     }
     private void ShowSavedStudies()
     {
