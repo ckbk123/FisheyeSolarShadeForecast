@@ -17,10 +17,22 @@ public static class WindowWorkArea
 
     public static void FitOnStartup(Window window)
     {
+        bool secondaryValidation = Environment.GetEnvironmentVariable("SOLARSHADE_VALIDATION_MONITOR") == "secondary";
+        if (secondaryValidation) window.ShowActivated = false;
         window.SourceInitialized += (_, _) =>
         {
             var handle = new WindowInteropHelper(window).Handle;
             var monitor = MonitorFromWindow(handle, 2 /* nearest */);
+            if (secondaryValidation)
+            {
+                EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr candidate, IntPtr dc, ref NativeRect rectangle, IntPtr data) =>
+                {
+                    var candidateInfo = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+                    if (GetMonitorInfo(candidate, ref candidateInfo) && (candidateInfo.Flags & 1) == 0)
+                    { monitor = candidate; return false; }
+                    return true;
+                }, IntPtr.Zero);
+            }
             var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
             if (!GetMonitorInfo(monitor, ref info)) return;
             double scale = GetDpiForWindow(handle) / 96d;
@@ -41,6 +53,9 @@ public static class WindowWorkArea
     private struct NativeRect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)]
     private struct MonitorInfo { public int Size; public NativeRect Monitor, Work; public uint Flags; }
+    private delegate bool MonitorCallback(IntPtr monitor, IntPtr dc, ref NativeRect rectangle, IntPtr data);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumDisplayMonitors(IntPtr dc, IntPtr clip, MonitorCallback callback, IntPtr data);
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Auto)] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
