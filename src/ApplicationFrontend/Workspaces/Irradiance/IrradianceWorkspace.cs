@@ -76,7 +76,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private readonly Button savedStudies = new() { Content = "Saved studies" };
     private readonly Button choosePhoto = new() { Content = "Choose sky photo…", Margin = new(0, 4, 6, 4), Padding = new(10, 6, 10, 6) };
     private readonly Button importMask = new() { Content = "Import existing mask…", Margin = new(0, 4, 6, 4), Padding = new(10, 6, 10, 6) };
-    private readonly ComboBox maskChoice = new() { MinWidth = 220 };
+    private readonly ComboBox maskChoice = new() { MinWidth = 120, HorizontalAlignment = HorizontalAlignment.Stretch };
     private sealed record MaskChoice(string? Id, string Title, bool Imported = false) { public override string ToString() => Title; }
     private readonly IrradianceChart chart = new();
     private readonly Button export = new() { Content = "Export irradiance", IsEnabled = false };
@@ -98,7 +98,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         TimeZoneSelection.ApplySystemZone(settings, systemZone());
         AddStyles();
         var root = new DockPanel(); Content = root;
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var actions = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
         Actions = actions; actions.Resources = Resources;
         actions.Children.Add(Button("Load example", async () => await LoadExample()));
         actions.Children.Add(Button("Help", ShowHelp));
@@ -122,8 +122,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         actions.Children.Add(export);
         var footer = new StackPanel { Margin = new(22, 8, 22, 10) }; footer.Children.Add(status); footer.Children.Add(detail); detail.TextWrapping = TextWrapping.Wrap;
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
-        var body = new Grid { Margin = new(16, 12, 16, 0), MinWidth = 950, MinHeight = 640 }; body.ColumnDefinitions.Add(new() { Width = new GridLength(348) }); body.ColumnDefinitions.Add(new() { Width = new GridLength(14) }); body.ColumnDefinitions.Add(new());
-        root.Children.Add(new WorkspaceViewport(body));
+        var body = new Grid { Margin = new(16, 12, 16, 0) };
         var inputs = new StackPanel { Margin = new(14) };
         var inputHost = new DockPanel { Background = Brushes.White }; body.Children.Add(inputHost);
         var tuning = new StackPanel { Margin = new(14, 0, 14, 8) }; DockPanel.SetDock(tuning, Dock.Bottom); inputHost.Children.Add(tuning);
@@ -165,8 +164,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         {
             if (zone.Template.FindName("PART_Popup", zone) is System.Windows.Controls.Primitives.Popup { Child: FrameworkElement list })
             {
-                list.MinWidth = Math.Min(600, SystemParameters.WorkArea.Width - 48);
-                list.MaxWidth = Math.Min(760, SystemParameters.WorkArea.Width - 48);
+                double available = Math.Max(160, owner.ActualWidth - 48);
+                list.MinWidth = Math.Min(600, available);
+                list.MaxWidth = Math.Min(760, available);
             }
         };
         zone.SelectionChanged += (_, _) => { if (!loading && !settings.UseSystemTimeZone && zone.SelectedValue is string z) { settings.Zone = z; zone.ToolTip = (zone.SelectedItem as TimeZoneInfo)?.DisplayName; Changed(); } };
@@ -201,29 +201,30 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         tuning.Children.Add(refreshData);
         tuning.Children.Add(Label("Update results reuses matching weather data. Download weather again bypasses the weather cache; camera calibration and masks are reused when unchanged.", 11));
 
-        var right = new Grid(); Grid.SetColumn(right, 2); body.Children.Add(right);
-        right.RowDefinitions.Add(new() { Height = new GridLength(2, GridUnitType.Star), MinHeight = 240, MaxHeight = 350 }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new() { Height = new GridLength(3, GridUnitType.Star), MinHeight = 390 });
-        var preview = new Grid { Background = Brushes.White }; right.Children.Add(preview); preview.RowDefinitions.Add(new() { Height = new GridLength(42) }); preview.RowDefinitions.Add(new()); preview.RowDefinitions.Add(new() { Height = new GridLength(92) });
-        var previewHeader = new DockPanel(); preview.Children.Add(previewHeader);
-        DockPanel.SetDock(showCardinals, Dock.Right); previewHeader.Children.Add(showCardinals);
+        var right = new Grid(); body.Children.Add(right);
+        root.Children.Add(new WorkspaceViewport(body, inputHost, right));
+        right.RowDefinitions.Add(new() { Height = GridLength.Auto }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var preview = new Grid { Background = Brushes.White }; right.Children.Add(preview); preview.RowDefinitions.Add(new() { Height = GridLength.Auto }); preview.RowDefinitions.Add(new() { Height = new GridLength(220) }); preview.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var previewHeader = new WrapPanel { Margin = new(12, 8, 12, 6) }; preview.Children.Add(previewHeader);
+        var previewTitle = Label("SKY PHOTO  /  MASK", 14); previewTitle.Margin = new(4, 4, 12, 4); previewHeader.Children.Add(previewTitle);
+        previewHeader.Children.Add(showCardinals);
         showCardinals.Checked += (_, _) => SetCardinalVisibility(); showCardinals.Unchecked += (_, _) => SetCardinalVisibility();
         showCardinals.ToolTip = "Show compass bearings at the calibrated image boundary. Uses the same heading, tilt and roll as sun paths and shading. Visibility does not recalculate.";
-        DockPanel.SetDock(showSunPath, Dock.Right); previewHeader.Children.Add(showSunPath);
+        previewHeader.Children.Add(showSunPath);
         showSunPath.Checked += (_, _) => SetSunPathVisibility(); showSunPath.Unchecked += (_, _) => SetSunPathVisibility();
         showSunPath.ToolTip = "Display the sun path for the selected period on the calibrated mask. This changes only the preview.";
-        var previewTitle = Label("SKY PHOTO  /  MASK", 14); previewTitle.Margin = new(16, 12, 0, 0); previewHeader.Children.Add(previewTitle);
         var pair = new Grid { Margin = new(12, 0, 12, 0) }; pair.ColumnDefinitions.Add(new()); pair.ColumnDefinitions.Add(new() { Width = new GridLength(12) }); pair.ColumnDefinitions.Add(new()); Grid.SetRow(pair, 1); preview.Children.Add(pair);
         pair.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = photo });
         var maskPane = new Grid(); maskPane.Children.Add(maskPreview); maskPane.Children.Add(editMask);
         var maskBorder = new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = maskPane }; Grid.SetColumn(maskBorder, 2); pair.Children.Add(maskBorder);
         editMask.Click += (_, _) => OpenMaskEditor();
-        var previewInfo = new Grid { Margin = new(16, 3, 8, 0) }; previewInfo.ColumnDefinitions.Add(new()); previewInfo.ColumnDefinitions.Add(new());
+        var previewInfo = new StackPanel { Margin = new(16, 6, 16, 10) };
         var previewLabels = new StackPanel(); previewLabels.Children.Add(maskInfo); previewLabels.Children.Add(sunPathInfo); previewLabels.Children.Add(cardinalInfo); previewInfo.Children.Add(previewLabels);
         var maskPicker = new StackPanel(); maskPicker.Children.Add(Label("Mask for calculation", 11)); maskPicker.Children.Add(maskChoice);
-        maskChoice.SelectionChanged += (_, _) => SelectMaskChoice(); Grid.SetColumn(maskPicker, 1); previewInfo.Children.Add(maskPicker);
+        maskChoice.SelectionChanged += (_, _) => SelectMaskChoice(); previewInfo.Children.Add(maskPicker);
         Grid.SetRow(previewInfo, 2); preview.Children.Add(previewInfo);
         var graph = new Grid { Background = Brushes.White, Margin = new(0, 0, 0, 0) }; Grid.SetRow(graph, 2); right.Children.Add(graph);
-        graph.RowDefinitions.Add(new() { Height = new GridLength(83) }); graph.RowDefinitions.Add(new() { Height = new GridLength(50) }); graph.RowDefinitions.Add(new()); graph.RowDefinitions.Add(new() { Height = new GridLength(31) }); graph.RowDefinitions.Add(new() { Height = new GridLength(45) });
+        graph.RowDefinitions.Add(new() { Height = GridLength.Auto }); graph.RowDefinitions.Add(new() { Height = GridLength.Auto }); graph.RowDefinitions.Add(new() { Height = new GridLength(260) }); graph.RowDefinitions.Add(new() { Height = GridLength.Auto }); graph.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var cards = new UniformGridCompat(3) { Margin = new(18, 10, 18, 0) }; graph.Children.Add(cards);
         cards.Children.Add(Metric("BEFORE SHADING · kWh/m²", beforeEnergy, new SolidColorBrush(Color.FromRgb(185, 121, 26)))); cards.Children.Add(Metric("AFTER SHADING · kWh/m²", afterEnergy, accent)); cards.Children.Add(Metric("ESTIMATED LOSS", reduction, ink));
         var toolbar = new WrapPanel { Margin = new(14, 4, 10, 0), VerticalAlignment = VerticalAlignment.Center }; Grid.SetRow(toolbar, 1); graph.Children.Add(toolbar);
@@ -488,7 +489,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                     Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
                     return true;
                 })) { Owner = owner };
-            editor.ShowDialog();
+            WindowWorkArea.FitToOwner(editor, owner); editor.ShowDialog();
         }
         catch (Exception ex) { ShowError(ex); }
     }
@@ -808,9 +809,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     {
         var pick = new OpenFileDialog { Title = "Import an existing mask without AI", Filter = "Black-and-white PNG|*.png" };
         if (pick.ShowDialog(owner) != true) return;
-        var dialog = new Window { Owner = owner, Title = "Import existing mask · no AI", Width = 510, SizeToContent = SizeToContent.Height,
-            ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
-        var panel = new StackPanel { Margin = new(20) }; dialog.Content = panel;
+        var dialog = new Window { Title = "Import existing mask · no AI", Width = 510, Height = 600,
+            ResizeMode = ResizeMode.CanResize, MinWidth = 280, MinHeight = 240 };
+        WindowWorkArea.FitToOwner(dialog, owner);
+        var panel = new StackPanel { Margin = new(20) }; dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         panel.Children.Add(Label("Photo: " + Path.GetFileName(settings.SkyImage), 13));
         panel.Children.Add(Label("Mask: " + Path.GetFileName(pick.FileName), 13));
         panel.Children.Add(Label("Use the same pixel dimensions as the oriented photo. Gray, colored and transparent pixels are rejected. Pixels outside the photo's lens disk become black.", 12));
