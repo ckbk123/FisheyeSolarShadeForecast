@@ -61,6 +61,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private readonly ImageOverlayPreview photo = new();
     private readonly CheckBox showCardinals = new() { Content = "Show cardinal directions", VerticalAlignment = VerticalAlignment.Center, Margin = new(8, 0, 8, 0) };
     private readonly TextBlock cardinalInfo = Label("Cardinal directions unavailable · add a calibrated sky photo", 11);
+    private readonly TextBlock fieldOfViewInfo = Label("FOV unavailable", 11);
+    private int orientedPhotoWidth, orientedPhotoHeight;
     private long orientationRevision;
     private byte[]? displayedPhoto, displayedCardinals;
     private CardinalDirectionOverlayResult? currentCardinals;
@@ -126,9 +128,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         DockPanel.SetDock(footerViewport, Dock.Bottom); root.Children.Add(footerViewport);
         var body = new Grid { Margin = new(16, 12, 16, 0) };
         var inputs = new StackPanel { Margin = new(14) };
-        var inputHost = new DockPanel { Background = Brushes.White }; body.Children.Add(inputHost);
-        var tuning = new StackPanel { Margin = new(14, 0, 14, 8) }; DockPanel.SetDock(tuning, Dock.Bottom); inputHost.Children.Add(tuning);
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs, Background = Brushes.White }; inputHost.Children.Add(scroll);
+        var inputHost = new Border { Background = Brushes.White }; body.Children.Add(inputHost);
+        var tuning = new StackPanel { Margin = new(0, 0, 0, 8) };
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs, Background = Brushes.White }; inputHost.Child = scroll;
         Section(inputs, "01  IMAGES & CALIBRATION");
         PathField(inputs, "Calibration folder", "CalibrationFolder", () => PickCalibrationFolder());
         var board = new Grid(); for (int i = 0; i < 3; i++) board.ColumnDefinitions.Add(new());
@@ -191,6 +193,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         Field(inputs, "Import interval, minutes (without metadata)", "ImportIntervalMinutes");
         isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; inputs.Children.Add(isotropic);
         inputs.Children.Add(Label("Neither diffuse model is always the lower estimate. The result depends on weather, panel direction and the mask.", 11));
+        inputs.Children.Add(tuning);
         Section(tuning, "05  PANEL INSTALLATION");
         PanelSlider(tuning, "Tilt from horizontal, °", "PanelTilt", 90); PanelSlider(tuning, "Front azimuth, ° true north", "PanelAzimuth", 360);
         tuning.Children.Add(Label("N 0° · E 90° · S 180° · W 270°", 11));
@@ -203,6 +206,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         tuning.Children.Add(refreshData);
         tuning.Children.Add(Label("Update results reuses matching weather data. Download weather again bypasses the weather cache; camera calibration and masks are reused when unchanged.", 11));
 
+<<<<<<< HEAD
         var right = new Grid(); body.Children.Add(right);
         root.Children.Add(new WorkspaceViewport(body, inputHost, right));
         right.RowDefinitions.Add(new() { Height = GridLength.Auto }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new() { Height = GridLength.Auto });
@@ -210,6 +214,13 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         var previewHeader = new WrapPanel { Margin = new(12, 8, 12, 6) }; preview.Children.Add(previewHeader);
         var previewTitle = Label("SKY PHOTO  /  MASK", 14); previewTitle.Margin = new(4, 4, 12, 4); previewHeader.Children.Add(previewTitle);
         previewHeader.Children.Add(showCardinals);
+=======
+        var right = new Grid(); Grid.SetColumn(right, 2); body.Children.Add(right);
+        right.RowDefinitions.Add(new() { Height = new GridLength(2, GridUnitType.Star), MinHeight = 240, MaxHeight = 350 }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new() { Height = new GridLength(3, GridUnitType.Star), MinHeight = 390 });
+        var preview = new Grid { Background = Brushes.White }; right.Children.Add(preview); preview.RowDefinitions.Add(new() { Height = new GridLength(42) }); preview.RowDefinitions.Add(new()); preview.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var previewHeader = new DockPanel(); preview.Children.Add(previewHeader);
+        DockPanel.SetDock(showCardinals, Dock.Right); previewHeader.Children.Add(showCardinals);
+>>>>>>> origin/main
         showCardinals.Checked += (_, _) => SetCardinalVisibility(); showCardinals.Unchecked += (_, _) => SetCardinalVisibility();
         showCardinals.ToolTip = "Show compass bearings at the calibrated image boundary. Uses the same heading, tilt and roll as sun paths and shading. Visibility does not recalculate.";
         previewHeader.Children.Add(showSunPath);
@@ -220,8 +231,14 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         var maskPane = new Grid(); maskPane.Children.Add(maskPreview); maskPane.Children.Add(editMask);
         var maskBorder = new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = maskPane }; Grid.SetColumn(maskBorder, 2); pair.Children.Add(maskBorder);
         editMask.Click += (_, _) => OpenMaskEditor();
+<<<<<<< HEAD
         var previewInfo = new StackPanel { Margin = new(16, 6, 16, 10) };
         var previewLabels = new StackPanel(); previewLabels.Children.Add(maskInfo); previewLabels.Children.Add(sunPathInfo); previewLabels.Children.Add(cardinalInfo); previewInfo.Children.Add(previewLabels);
+=======
+        var previewInfo = new Grid { Margin = new(16, 3, 8, 0) }; previewInfo.ColumnDefinitions.Add(new()); previewInfo.ColumnDefinitions.Add(new());
+        var previewLabels = new StackPanel(); previewLabels.Children.Add(fieldOfViewInfo); previewLabels.Children.Add(maskInfo); previewLabels.Children.Add(sunPathInfo); previewLabels.Children.Add(cardinalInfo); previewInfo.Children.Add(previewLabels);
+        System.Windows.Automation.AutomationProperties.SetAutomationId(fieldOfViewInfo, "SkyPhotoFieldOfView");
+>>>>>>> origin/main
         var maskPicker = new StackPanel(); maskPicker.Children.Add(Label("Mask for calculation", 11)); maskPicker.Children.Add(maskChoice);
         maskChoice.SelectionChanged += (_, _) => SelectMaskChoice(); previewInfo.Children.Add(maskPicker);
         Grid.SetRow(previewInfo, 2); preview.Children.Add(previewInfo);
@@ -444,8 +461,11 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                     if (unmaskedPhoto.Empty()) throw new InvalidDataException("The selected photograph could not be decoded.");
                     displayedPhoto = AppServices.Preview(unmaskedPhoto);
                     photo.SetImage(Bitmap(displayedPhoto), unmaskedPhoto.Width, unmaskedPhoto.Height);
+                    orientedPhotoWidth = unmaskedPhoto.Width; orientedPhotoHeight = unmaskedPhoto.Height;
+                    RefreshFieldOfView();
                     maskInfo.Text = "Photo selected · Update results for AI, or import an existing mask";
                 }
+                else { orientedPhotoWidth = orientedPhotoHeight = 0; RefreshFieldOfView(); }
                 return;
             }
             var (variant, png) = ManualMaskStore.Load(settings.SkyImage, settings.SelectedMaskId);
@@ -458,7 +478,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             ShowMask(new MaskAsset(AppServices.Preview(original), AppServices.Preview(binary), variant.BaseMask with { Png = png },
                 variant.Description, variant));
         }
-        catch (Exception ex) { ShowError(ex); }
+        catch (Exception ex) { orientedPhotoWidth = orientedPhotoHeight = 0; RefreshFieldOfView(); ShowError(ex); }
     }
     private void OpenMaskEditor()
     {
@@ -585,11 +605,12 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         if ((groups & ArtifactGroup.Mask) != 0)
         {
             bool geometryChanged = (groups & (ArtifactGroup.Profile | ArtifactGroup.Orientation)) != 0;
-            if (geometryChanged) { photo.ClearImage(); displayedPhoto = null; }
+            if (geometryChanged) { photo.ClearImage(); displayedPhoto = null; orientedPhotoWidth = orientedPhotoHeight = 0; }
             maskPreview.ClearImage(); displayedMaskPng = null;
             displayedAsset = null; editMask.IsEnabled = false;
             maskInfo.Text = "Sky inputs changed · click Update results";
         }
+        if ((groups & (ArtifactGroup.Profile | ArtifactGroup.Mask)) != 0) RefreshFieldOfView();
         if ((groups & ArtifactGroup.Orientation) != 0) InvalidateOrientation("Cardinal directions waiting for Update results");
         if ((groups & ArtifactGroup.SunPath) != 0) ClearSunPath("Sun path waiting for Update results");
         MarkPreviousResults();
@@ -745,7 +766,15 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             if (sunPathIsCurrent && completed?.SunPath != null) ShowSunPath(completed.SunPath);
         }
         maskInfo.Text = asset.Description;
-        displayedAsset = asset; RefreshButtons();
+        displayedAsset = asset; orientedPhotoWidth = asset.Result.Width; orientedPhotoHeight = asset.Result.Height;
+        RefreshFieldOfView(); RefreshButtons();
+    }
+    private void RefreshFieldOfView()
+    {
+        var disk = displayedAsset?.Disk;
+        var view = SkyPhotoFieldOfView.Load(settings, orientedPhotoWidth, orientedPhotoHeight,
+            disk == null ? null : new ImageDisk(disk.CenterX, disk.CenterY, disk.Radius));
+        fieldOfViewInfo.Text = view.Text; fieldOfViewInfo.ToolTip = view.Explanation;
     }
     public static string OrientationInputKey(UserSettings s) => AppData.Key(new
     { s.SkyImage, s.ProfilePath, s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle, s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
@@ -993,6 +1022,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         catch (Exception ex) { MessageBox.Show(owner, ex.Message, "Saved studies could not be cleared", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
     public Evaluation? Completed => completed;
+    public string FieldOfViewTextForTest => fieldOfViewInfo.Text;
     public CalibrationReview? CalibrationReviewForTest => calibrationReview;
     public Task<(CalibrationProfile Profile, string Path, string Details)> CalibrateForTest(UserSettings inputs) => services.Calibrate(inputs);
     public void SetProfileForTest(string path) { settings.ProfilePath = PortablePaths.Store(path); settings.CoverageAngle = 0; LoadFields(); Changed(); }

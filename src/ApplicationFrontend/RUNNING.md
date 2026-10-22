@@ -21,7 +21,7 @@ Debug Data holds one current set. Explicit exports are separate snapshots that l
 
 Both curves show irradiance received by the selected panel before/after obstruction shading, in W/m². Summary cards integrate the actual represented durations in kWh/m². Electrical PV power, ground reflection and rear-side irradiance are outside this calculation.
 
-The input workflow is grouped under **01 Images & Calibration**, **02 Camera Pose**, **03 Site Location**, **04 Historical Data**, and **05 Panel Installation**. Site Location contains the coordinates, elevation and time zone. Historical Data contains the study dates, weather source/import controls, and **Use isotropic diffuse instead of Hay–Davies**. The other Advanced settings controls are no longer shown; existing saved calculation settings are retained. Panel Installation keeps its tilt, azimuth and update controls visible below the input list.
+The input workflow is grouped under **01 Images & Calibration**, **02 Camera Pose**, **03 Site Location**, **04 Historical Data**, and **05 Panel Installation**. Site Location contains the coordinates, elevation and time zone. Historical Data contains the study dates, weather source/import controls, and **Use isotropic diffuse instead of Hay–Davies**. The other Advanced settings controls are no longer shown; existing saved calculation settings are retained. All five sections, including the panel tilt, azimuth and update controls, belong to one scrolling input list.
 
 ## PV Autonomy
 
