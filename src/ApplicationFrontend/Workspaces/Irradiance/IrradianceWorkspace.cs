@@ -121,7 +121,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         };
         actions.Children.Add(export);
         var footer = new StackPanel { Margin = new(22, 8, 22, 10) }; footer.Children.Add(status); footer.Children.Add(detail); detail.TextWrapping = TextWrapping.Wrap;
-        DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
+        var footerViewport = new ScrollViewer { Content = footer, MaxHeight = 80,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        DockPanel.SetDock(footerViewport, Dock.Bottom); root.Children.Add(footerViewport);
         var body = new Grid { Margin = new(16, 12, 16, 0) };
         var inputs = new StackPanel { Margin = new(14) };
         var inputHost = new DockPanel { Background = Brushes.White }; body.Children.Add(inputHost);
