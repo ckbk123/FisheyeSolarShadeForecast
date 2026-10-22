@@ -764,7 +764,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             if (manifest?.Stages.TryGetValue("03-irradiance", out var stage) == true) origin = stage.Origin;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { }
-        lastWeatherResult.Text = $"Last result: {origin}. Source: {result.Raw.Source}. Dataset timestamp: {result.Raw.FetchedUtc:yyyy-MM-dd HH:mm} UTC.";
+        lastWeatherResult.Text = $"Last result: {origin}. Source: {result.Raw.Source}. Dataset timestamp: {result.Raw.FetchedUtc.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
     }
     private async Task Calibrate()
     {

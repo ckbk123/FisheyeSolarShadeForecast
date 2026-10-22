@@ -3,12 +3,33 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using SolarShade.Desktop;
+using SolarShade.Irradiance;
 using Xunit;
 using static ManualUpdateTests;
 
 [Collection("Manual update UI")]
 public sealed class WeatherControlsTests
 {
+    [Fact]
+    public void NativeDatasetTimestampIsConvertedBeforeLabellingItUtc() => Sta(async () =>
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var data = IrradianceDatasetFiles.Import(fixture.Settings.ImportPath, TimeZoneInfo.Utc,
+            TimeSpan.FromHours(1), TimestampLabel.Start) with
+        { FetchedUtc = new DateTimeOffset(2025, 5, 15, 12, 0, 0, TimeSpan.FromHours(7)) };
+        string workbook = Path.Combine(fixture.Root, "offset-timestamp.xlsx");
+        IrradianceDatasetFiles.Export(data, workbook);
+        var owner = new MainWindow(loadExampleOnFirstRun: false, applicationServices: service);
+        try
+        {
+            owner.Irradiance.SelectWeatherFile(workbook); owner.Calculate(); await Until(() => !owner.UpdatingForTest);
+            Assert.NotNull(owner.Completed);
+            Assert.Contains(Descendants(owner.Irradiance).OfType<TextBlock>(),
+                text => text.Text.Contains("Dataset timestamp: 2025-05-15 05:00 UTC."));
+        }
+        finally { owner.Close(); }
+    });
+
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
         yield return root;
