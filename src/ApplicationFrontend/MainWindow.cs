@@ -22,6 +22,7 @@ public sealed class MainWindow : Window
     {
         Title = "SolarShade · Solar Forecast Estimator · Preview 0.2.0"; Width = 1440; Height = 960; MinWidth = 1080; MinHeight = 720;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        WindowWorkArea.FitOnStartup(this);
         Background = new SolidColorBrush(Color.FromRgb(242, 246, 246));
         FontFamily = new("Segoe UI"); FontSize = 13; Foreground = new SolidColorBrush(Color.FromRgb(25, 48, 58));
         UseLayoutRounding = true;
