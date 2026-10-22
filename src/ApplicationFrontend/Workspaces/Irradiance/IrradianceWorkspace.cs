@@ -113,7 +113,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         actions.Children.Add(export);
         var footer = new StackPanel { Margin = new(22, 8, 22, 10) }; footer.Children.Add(status); footer.Children.Add(detail); detail.TextWrapping = TextWrapping.Wrap;
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
-        var body = new Grid { Margin = new(16, 12, 16, 0) }; body.ColumnDefinitions.Add(new() { Width = new GridLength(348) }); body.ColumnDefinitions.Add(new() { Width = new GridLength(14) }); body.ColumnDefinitions.Add(new()); root.Children.Add(body);
+        var body = new Grid { Margin = new(16, 12, 16, 0), MinWidth = 950, MinHeight = 640 }; body.ColumnDefinitions.Add(new() { Width = new GridLength(348) }); body.ColumnDefinitions.Add(new() { Width = new GridLength(14) }); body.ColumnDefinitions.Add(new());
+        root.Children.Add(new WorkspaceViewport(body));
         var inputs = new StackPanel { Margin = new(14) };
         var inputHost = new DockPanel { Background = Brushes.White }; body.Children.Add(inputHost);
         var tuning = new StackPanel { Margin = new(14, 0, 14, 8) }; DockPanel.SetDock(tuning, Dock.Bottom); inputHost.Children.Add(tuning);
@@ -186,6 +187,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         advanced.Children.Add(Label("Neither diffuse model is always the lower estimate. The result depends on weather, panel direction and the mask.", 11));
         inputs.Children.Add(new Expander { Header = "Advanced settings", Content = advanced, Margin = new(0, 12, 0, 12) });
         update.Background = accent; update.Foreground = Brushes.White;
+        System.Windows.Automation.AutomationProperties.SetAutomationId(update, "UpdateResults");
+        System.Windows.Automation.AutomationProperties.SetAutomationId(refreshData, "RefreshData");
         update.Click += (_, _) => Calculate(); refreshData.Click += (_, _) => Begin(true); stop.Click += (_, _) => StopUpdate();
         tuning.Children.Add(updateIndicator);
         var runButtons = new WrapPanel(); runButtons.Children.Add(update); runButtons.Children.Add(stop); tuning.Children.Add(runButtons);
@@ -193,7 +196,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         tuning.Children.Add(Label("Update results reuses matching weather data. Download weather again bypasses the weather cache; camera calibration and masks are reused when unchanged.", 11));
 
         var right = new Grid(); Grid.SetColumn(right, 2); body.Children.Add(right);
-        right.RowDefinitions.Add(new() { Height = new GridLength(350) }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new());
+        right.RowDefinitions.Add(new() { Height = new GridLength(2, GridUnitType.Star), MinHeight = 240, MaxHeight = 350 }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new() { Height = new GridLength(3, GridUnitType.Star), MinHeight = 390 });
         var preview = new Grid { Background = Brushes.White }; right.Children.Add(preview); preview.RowDefinitions.Add(new() { Height = new GridLength(42) }); preview.RowDefinitions.Add(new()); preview.RowDefinitions.Add(new() { Height = new GridLength(92) });
         var previewHeader = new DockPanel(); preview.Children.Add(previewHeader);
         DockPanel.SetDock(showCardinals, Dock.Right); previewHeader.Children.Add(showCardinals);

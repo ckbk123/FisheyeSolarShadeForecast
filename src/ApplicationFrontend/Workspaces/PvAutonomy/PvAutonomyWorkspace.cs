@@ -36,7 +36,8 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         var sourceBar = new DockPanel { Margin = new(0, 0, 0, 8) }; DockPanel.SetDock(sourceBar, Dock.Top); root.Children.Add(sourceBar);
         sourceBar.Children.Add(sourceText);
         status.Margin = new(0, 7, 0, 0); DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
-        var columns = new Grid(); columns.ColumnDefinitions.Add(new() { Width = new(280) }); columns.ColumnDefinitions.Add(new() { Width = new(14) }); columns.ColumnDefinitions.Add(new()); root.Children.Add(columns);
+        var columns = new Grid { MinWidth = 950, MinHeight = 600 }; columns.ColumnDefinitions.Add(new() { Width = new(280) }); columns.ColumnDefinitions.Add(new() { Width = new(14) }); columns.ColumnDefinitions.Add(new());
+        root.Children.Add(new WorkspaceViewport(columns));
         var left = new Border { Background = Brushes.White, Child = load }; columns.Children.Add(left);
         var right = new DockPanel { Background = Brushes.White, Margin = new(0), LastChildFill = true }; Grid.SetColumn(right, 2); columns.Children.Add(right);
         var top = new StackPanel { Margin = new(12, 8, 12, 0) }; DockPanel.SetDock(top, Dock.Top); right.Children.Add(top);
