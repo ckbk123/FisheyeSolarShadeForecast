@@ -18,6 +18,9 @@ public sealed record UserSettings
     public string SkyImage { get; set; } = "";
     public string ProfilePath { get; set; } = "";
     public string ImportPath { get; set; } = "";
+    // Null keeps legacy settings: an import path selects imports; otherwise use services.
+    public bool? UseDataServices { get; set; }
+    public string RememberedImportPath { get; set; } = "";
     public int Columns { get; set; } = 6;
     public int Rows { get; set; } = 9;
     public double SquareMm { get; set; } = 22;

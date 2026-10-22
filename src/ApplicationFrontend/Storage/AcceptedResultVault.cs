@@ -22,6 +22,7 @@ internal static class AcceptedResultVault
         return AppData.Key(new
         {
             Software = AppServices.SoftwareFingerprint,
+            UseDataServices = WeatherSourceSelection.UsesServices(s),
             Photo = sources.Image.Content, Profile = sources.Profile.Content, Weather = sources.Weather.Content,
             Mask = sources.EditedMask.Content, MaskMetadata = sources.EditedMetadata.Content, s.SelectedMaskId,
             MaskAncestor = sources.MaskAncestor.Content,
@@ -98,6 +99,7 @@ internal static class AcceptedResultVault
     internal static bool Exists(UserSettings settings) => Directory.Exists(Folder(Key(settings)));
     internal static (DebugDataRun Run, Evaluation Evaluation)? Restore(DebugDataStore store, UserSettings settings)
     {
+        if (WeatherSourceSelection.Problem(settings) != null) return null;
         string key = Key(settings), folder = Folder(key);
         if (!Directory.Exists(folder)) return null;
         var (vault, saved) = Verify(folder, key);

@@ -46,7 +46,7 @@ public sealed class AppServices : IIrradianceService
     private TrackedRun? activeRun;
     private DebugDataStore? storage;
     private DebugDataStore Storage => storage ??= new(debugRoot ?? DebugDataRun.DefaultRoot);
-    public UserSettings PrepareInputs(UserSettings settings) { lock (inputGate) { ObjectDisposedException.ThrowIf(disposeRequested, this); return Storage.PrepareInputs(settings); } }
+    public UserSettings PrepareInputs(UserSettings settings) { lock (inputGate) { ObjectDisposedException.ThrowIf(disposeRequested, this); return Storage.PrepareInputs(WeatherSourceSelection.Normalize(settings)); } }
     private CurrentValueCache Values => new(debugRoot ?? DebugDataRun.DefaultRoot);
     private sealed class TrackedRun(DebugDataRun debug, InputDependencies inputs, CancellationTokenSource cancellation)
     {
@@ -120,7 +120,7 @@ public sealed class AppServices : IIrradianceService
     {
         lock (inputGate)
         {
-            if (activeRun != null || evaluationGate.CurrentCount == 0) return null;
+            if (activeRun != null || evaluationGate.CurrentCount == 0 || WeatherSourceSelection.Problem(settings) != null) return null;
             var restored = AcceptedResultVault.Restore(Storage, settings);
             if (restored == null) return null;
             var result = restored.Value.Evaluation;
@@ -205,6 +205,7 @@ public sealed class AppServices : IIrradianceService
         try
         {
             ct.ThrowIfCancellationRequested();
+            WeatherSourceSelection.RequireValid(s);
             s = PrepareInputs(s);
             var persisted = PortablePaths.Map(s, path => PortablePaths.Store(path));
             s = PortablePaths.Map(s, path => PortablePaths.Resolve(path));
@@ -223,7 +224,7 @@ public sealed class AppServices : IIrradianceService
             string nextRaw = dependencies.Keys[ArtifactGroup.Irradiance];
             debug.RecordInput("irradiance-request", new { Fingerprint = nextRaw });
             bool reuseRaw = raw != null && rawKey == nextRaw && !refresh;
-            string rawDirectory = debug.BeginStage("03-irradiance", reuseRaw ? "Reused in-memory dataset" : string.IsNullOrEmpty(s.ImportPath) ? "Provider or validated disk cache" : "Imported", typeof(IrradianceClient));
+            string rawDirectory = debug.BeginStage("03-irradiance", reuseRaw ? "Reused in-memory dataset" : WeatherSourceSelection.UsesServices(s) ? "Provider or validated disk cache" : "Imported", typeof(IrradianceClient));
             if (!reuseRaw)
             {
                 IrradianceDataset next;
@@ -233,7 +234,7 @@ public sealed class AppServices : IIrradianceService
                         TimeZoneInfo.Utc, TimeSpan.Zero, TimestampLabel.Explicit, ct), ct);
                     debug.Origin("03-irradiance", "Reused published source dataset");
                 }
-                else if (string.IsNullOrEmpty(s.ImportPath))
+                else if (WeatherSourceSelection.UsesServices(s))
                 {
                     progress("Retrieving irradiance and its source intervals");
                     var fetched = await FetchWithOrigin(s, refresh, ct);
@@ -560,6 +561,8 @@ public sealed class AppServices : IIrradianceService
 
     private static async Task<(IrradianceDataset Dataset, string Origin)> FetchWithOrigin(UserSettings s, bool refresh, CancellationToken ct)
     {
+        if (!WeatherSourceSelection.UsesServices(s)) throw new InvalidOperationException("Data services are disabled in Import Own Excel mode.");
+        WeatherSourceSelection.RequireValid(s);
         string key = AppData.Key(new { s.Start, s.End, s.Longitude, s.Latitude, s.Provider, s.Zone, Library = AppData.LibraryVersion(typeof(IrradianceClient)) });
         string path = AppData.PathFor(Path.Combine("weather-stages", key + ".xlsx"));
         if (!refresh && File.Exists(path)) return (IrradianceDatasetFiles.Import(path, TimeZoneInfo.Utc, TimeSpan.Zero, TimestampLabel.Explicit, ct), "Reused validated disk weather cache");

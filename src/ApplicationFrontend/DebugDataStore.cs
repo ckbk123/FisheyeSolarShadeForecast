@@ -59,7 +59,10 @@ public sealed class DebugDataStore : IDisposable
                 if (!File.Exists(full) && !Directory.Exists(full)) throw new IOException("A selected input in old debug data is missing: " + full);
                 return PortablePaths.Store(Preserve(full, "Inputs"));
             }
-            var saved = PortablePaths.Map(settings, Protect);
+            // An inactive remembered import must not block service mode when its file is gone.
+            var saved = PortablePaths.Map(settings, Protect, includeRemembered: false);
+            if (!WeatherSourceSelection.UsesServices(saved) && !string.IsNullOrWhiteSpace(saved.ImportPath))
+                saved.RememberedImportPath = saved.ImportPath;
             // Save references first, so interruption cannot strand selected inputs.
             if (saved != settings) AppData.SaveSettings(saved);
             if (!recovered) { Current?.Recover(InputDependencies.Capture(saved).SourcePaths); recovered = true; }

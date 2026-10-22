@@ -7,6 +7,7 @@ public static class UpdateInputs
 {
     public static string? Problem(UserSettings s)
     {
+        if (WeatherSourceSelection.Problem(s) is { } sourceProblem) return sourceProblem;
         if (!double.IsFinite(s.Latitude) || Math.Abs(s.Latitude) > 90) return "Latitude must be between -90 and 90 degrees.";
         if (!double.IsFinite(s.Longitude) || Math.Abs(s.Longitude) > 180) return "Longitude must be between -180 and 180 degrees.";
         if (!double.IsFinite(s.Elevation)) return "Enter a finite elevation.";
@@ -17,14 +18,14 @@ public static class UpdateInputs
         if (!double.IsFinite(s.CoverageAngle) || s.CoverageAngle < 0 || s.CoverageAngle > 180) return "Coverage must be 0 (use profile) or at most 180 degrees.";
         if (s.Start > s.End) return "Start date must not be after end date.";
         if (s.Start.Year < 1900 || s.End.Year > 2100) return "Choose dates in the supported 1900–2100 range.";
-        if (s.ImportPath.Length > 0 && (!double.IsFinite(s.ImportIntervalMinutes) || s.ImportIntervalMinutes <= 0)) return "Import interval must be greater than zero.";
+        if (!WeatherSourceSelection.UsesServices(s) && (!double.IsFinite(s.ImportIntervalMinutes) || s.ImportIntervalMinutes <= 0)) return "Import interval must be greater than zero.";
         if (s.Substeps <= 0) return "Choose a positive number of integration samples.";
         try
         {
             _ = TimeZoneSelection.Resolve(s.Zone);
             if (string.IsNullOrWhiteSpace(s.SkyImage) || !File.Exists(PortablePaths.Resolve(s.SkyImage))) return "Choose an existing sky photograph.";
             if (string.IsNullOrWhiteSpace(s.ProfilePath) || !File.Exists(PortablePaths.Resolve(s.ProfilePath))) return "Load a camera profile or calibrate the camera.";
-            if (!string.IsNullOrEmpty(s.ImportPath) && !File.Exists(PortablePaths.Resolve(s.ImportPath))) return "The selected irradiance file is missing.";
+            if (!WeatherSourceSelection.UsesServices(s) && !File.Exists(PortablePaths.Resolve(s.ImportPath))) return "The selected irradiance file is missing.";
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or TimeZoneNotFoundException or InvalidTimeZoneException)
         { return ex.Message; }
