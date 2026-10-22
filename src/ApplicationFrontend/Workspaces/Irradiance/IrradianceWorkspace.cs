@@ -128,7 +128,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         SmallField(board, 0, "Inner columns", "Columns"); SmallField(board, 1, "Inner rows", "Rows"); SmallField(board, 2, "Square, mm", "SquareMm");
         inputs.Children.Add(Label("Count inner corners, not squares: 7 × 10 squares → 6 × 9 corners.", 11));
         var calButtons = new WrapPanel(); calButtons.Children.Add(Button("Calibrate", async () => await Calibrate())); calButtons.Children.Add(Button("Load camera profile…", PickProfile));
-        reviewCalibration.Click += (_, _) => ShowCalibrationReview(); calButtons.Children.Add(reviewCalibration);
+        reviewCalibration.Click += (_, _) => { RefreshCalibrationReview(); ShowCalibrationReview(); }; calButtons.Children.Add(reviewCalibration);
         inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
         inputs.Children.Add(Label("Load camera parameters: camera-profile.json includes coverage. Native calibration.yml/.yaml also needs a validated maximum incident angle in Advanced options. Calibrate saves reusable files under Data/Profiles and diagnostics under Debug Data/01-calibration.", 11));
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
@@ -494,6 +494,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                     WatchSources(); SaveInputs();
                 }
                 if (observedRevision != revision) return;
+                if (refreshSources || reviewedProfile != settings.ProfilePath) RefreshCalibrationReview();
                 uiInputs = InputDependencies.Capture(settings, uiInputs, false);
                 if (refreshSources && result.changed != ArtifactGroup.None)
                 {
@@ -739,20 +740,24 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private void PickProfile() { var p = CameraProfilePicker(); if (p.ShowDialog(owner) == true) { settings.ProfilePath = PortablePaths.Store(p.FileName); settings.CoverageAngle = 0; LoadFields(); Changed(); } }
     private void RefreshCalibrationReview()
     {
-        if (reviewedProfile != settings.ProfilePath)
+        string? fingerprint = ProfileFingerprint();
+        CalibrationReview? savedReview = null;
+        if (calibrationReview?.Report.Failure != null && reviewedProfile == settings.ProfilePath && fingerprint == reviewedProfileFingerprint)
         {
-            string? fingerprint = null;
-            if (!string.IsNullOrWhiteSpace(settings.ProfilePath))
-                try { fingerprint = AppData.FileKey(PortablePaths.Resolve(settings.ProfilePath)); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-            var savedReview = string.IsNullOrWhiteSpace(settings.ProfilePath) ? null :
-                CalibrationReview.TryLoad(Path.GetDirectoryName(PortablePaths.Resolve(settings.ProfilePath))!);
-            // Managed storage may relocate the identical selected profile without its sibling diagnostics.
-            if (savedReview != null || fingerprint == null || fingerprint != reviewedProfileFingerprint)
-                calibrationReview = savedReview;
-            reviewedProfile = settings.ProfilePath;
-            reviewedProfileFingerprint = fingerprint;
+            var failed = CalibrationReview.TryLoad(calibrationReview.Directory);
+            if (failed?.EvidenceFingerprint == calibrationReview.EvidenceFingerprint) savedReview = failed;
         }
+        savedReview ??= string.IsNullOrWhiteSpace(settings.ProfilePath) ? null : CalibrationReview.ForProfile(settings.ProfilePath);
+        if (savedReview == null && calibrationReview != null && fingerprint == reviewedProfileFingerprint)
+        {
+            var previous = CalibrationReview.TryLoad(calibrationReview.Directory);
+            // Identical relocated profiles may retain their original, still verified sibling evidence.
+            if (fingerprint != null && previous?.EvidenceFingerprint == calibrationReview.EvidenceFingerprint &&
+                previous.MatchesProfile(settings.ProfilePath)) savedReview = previous;
+        }
+        calibrationReview = savedReview;
+        reviewedProfile = settings.ProfilePath;
+        reviewedProfileFingerprint = fingerprint;
         reviewCalibration.IsEnabled = calibrationReview != null;
         calibrationInfo.Text = string.IsNullOrWhiteSpace(settings.ProfilePath) ? "No camera profile selected" :
             "Camera profile: " + settings.ProfilePath;
@@ -761,11 +766,17 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         if (calibrationReview?.Report.Failure != null) calibrationInfo.Text += "\nLast calibration failed; open the review for details.";
         calibrationInfo.ToolTip = string.IsNullOrWhiteSpace(settings.ProfilePath) ? null : PortablePaths.Resolve(settings.ProfilePath);
     }
+    private string? ProfileFingerprint()
+    {
+        if (string.IsNullOrWhiteSpace(settings.ProfilePath)) return null;
+        try { return AppData.FileKey(PortablePaths.Resolve(settings.ProfilePath)); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
     private void ShowCalibrationReview()
     {
         if (calibrationReview == null) return;
         calibrationReviewWindow?.Close();
-        var dialog = new CalibrationReviewWindow(calibrationReview) { Owner = owner };
+        var dialog = new CalibrationReviewWindow(calibrationReview, owner);
         calibrationReviewWindow = dialog;
         dialog.Closed += (_, _) => { if (calibrationReviewWindow == dialog) calibrationReviewWindow = null; };
         dialog.Show();
@@ -795,6 +806,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             if (closing) return;
             calibrationReview = CalibrationReview.TryLoad(ex.DiagnosticsDirectory); reviewCalibration.IsEnabled = calibrationReview != null;
             reviewedProfile = settings.ProfilePath;
+            reviewedProfileFingerprint = ProfileFingerprint();
             RefreshCalibrationReview();
             ShowError(ex); ShowCalibrationReview();
         }

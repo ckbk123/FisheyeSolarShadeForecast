@@ -22,13 +22,21 @@ public sealed class CalibrationReviewWindow : Window
         public override string ToString() => (Image.Detected ? "Detected · " : "Failed · ") + Image.Name;
     }
 
-    public CalibrationReviewWindow(CalibrationReview review)
+    public CalibrationReviewWindow(CalibrationReview review, Window? owner = null)
     {
         this.review = review;
         Title = "Checkerboard calibration review";
         if (string.Equals(Environment.GetEnvironmentVariable("SOLARSHADE_VALIDATION_MONITOR"), "secondary", StringComparison.OrdinalIgnoreCase))
             ShowActivated = false;
         Width = Math.Min(900, SystemParameters.WorkArea.Width); Height = Math.Min(760, SystemParameters.WorkArea.Height);
+        if (owner != null)
+        {
+            Owner = owner;
+            double OwnerExtent(double actual, double requested, double fallback) => double.IsFinite(actual) && actual > 0 ? actual
+                : double.IsFinite(requested) && requested > 0 ? requested : fallback;
+            Width = Math.Min(Width, OwnerExtent(owner.ActualWidth, owner.Width, Width));
+            Height = Math.Min(Height, OwnerExtent(owner.ActualHeight, owner.Height, Height));
+        }
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var root = new DockPanel { Margin = new(16) }; Content = root;
         var header = new StackPanel(); DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);

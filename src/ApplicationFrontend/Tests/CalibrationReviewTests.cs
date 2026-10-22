@@ -4,6 +4,9 @@ using OpenCvSharp;
 using SolarShade.Calibration.Solver;
 using SolarShade.Calibration.Validation;
 using SolarShade.Core.Models;
+using SolarShade.Camera;
+using Window = System.Windows.Window;
+using WindowStartupLocation = System.Windows.WindowStartupLocation;
 using SolarShade.Desktop;
 using Xunit;
 using static ManualUpdateTests;
@@ -11,6 +14,115 @@ using static ManualUpdateTests;
 [Collection("Manual update UI")]
 public sealed class CalibrationReviewTests
 {
+    private static string BoundReview(Fixture fixture)
+    {
+        string directory = Path.Combine(fixture.Root, "bound-review"); Directory.CreateDirectory(directory);
+        CameraProfileFiles.Export(CameraProfileFiles.Load(fixture.Settings.ProfilePath), directory);
+        using (var preview = new Mat(50, 50, MatType.CV_8UC1, Scalar.White))
+            Cv2.ImWrite(Path.Combine(directory, "preview.png"), preview);
+        var detections = new CalibrationDetectionReport(1, 6, 9,
+            [new("board.png", "board.png", true, 54, "Detected 54 inner corners.", "preview.png")]);
+        AppData.Write(Path.Combine(directory, "checkerboard-detections.json"), detections);
+        CalibrationEvidenceFiles.Write(directory);
+        return Path.Combine(directory, "camera-profile.json");
+    }
+
+    [Fact]
+    public void ReviewWindowFitsItsOwnerBeforeEitherWindowIsShown() => Sta(() =>
+    {
+        using var fixture = new Fixture();
+        string profile = BoundReview(fixture);
+        var review = CalibrationReview.ForProfile(profile)!;
+        var owner = new Window { Width = 760, Height = 540 };
+        // WPF requires an owner HWND, but creating the handle does not show or activate the window.
+        _ = new System.Windows.Interop.WindowInteropHelper(owner).EnsureHandle();
+        var window = new CalibrationReviewWindow(review, owner);
+        try
+        {
+            Assert.Same(owner, window.Owner); Assert.Equal(WindowStartupLocation.CenterOwner, window.WindowStartupLocation);
+            Assert.True(window.Width <= owner.Width); Assert.True(window.Height <= owner.Height);
+            Assert.False(window.IsVisible); Assert.False(owner.IsVisible);
+        }
+        finally { window.Close(); owner.Close(); }
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public void SamePathProfileReplacementClearsItsPreviousReviewIncludingAfterSourceRecheck() => Sta(async () =>
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        string profilePath = BoundReview(fixture); byte[] original = File.ReadAllBytes(profilePath);
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try
+        {
+            window.SetProfileForTest(profilePath); await window.InputsSettled;
+            Assert.NotNull(window.Irradiance.CalibrationReviewForTest);
+            var profile = CameraProfileFiles.Load(profilePath);
+            AppData.Write(profilePath, profile with { Calibration = profile.Calibration with { PrincipalPoint = [105, 151] } });
+            await window.RecheckSourcesAsync();
+            Assert.Null(window.Irradiance.CalibrationReviewForTest);
+            Assert.Null(CalibrationReview.ForProfile(profilePath)); // A fresh reader cannot attach the old evidence either.
+            File.WriteAllBytes(profilePath, original); await window.RecheckSourcesAsync();
+            Assert.NotNull(window.Irradiance.CalibrationReviewForTest);
+            AppData.Write(profilePath, profile with { Calibration = profile.Calibration with { PrincipalPoint = [110, 151] } });
+            window.SetProfileForTest(profilePath); await window.InputsSettled;
+            Assert.Null(window.Irradiance.CalibrationReviewForTest); // Reloading the unchanged filename must verify content.
+        }
+        finally { await window.InputsSettled; window.Close(); }
+    });
+
+    [Fact]
+    public void AnotherProfileInTheSameDirectoryCannotInheritItsSiblingReview() => Sta(async () =>
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        string original = BoundReview(fixture), other = Path.Combine(Path.GetDirectoryName(original)!, "another-camera.json");
+        var profile = CameraProfileFiles.Load(original);
+        AppData.Write(other, profile with { Calibration = profile.Calibration with { PrincipalPoint = [110, 151] } });
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try
+        {
+            window.SetProfileForTest(original); await window.InputsSettled;
+            Assert.NotNull(window.Irradiance.CalibrationReviewForTest);
+            window.SetProfileForTest(other); await window.InputsSettled;
+            Assert.Null(window.Irradiance.CalibrationReviewForTest);
+            Assert.NotNull(CalibrationReview.ForProfile(Path.Combine(Path.GetDirectoryName(original)!, "calibration.yml")));
+        }
+        finally { await window.InputsSettled; window.Close(); }
+    });
+
+    [Fact]
+    public void HistoricalEvidenceIsAssociatedOnlyWithItsSavedFittedProjection()
+    {
+        using var fixture = new Fixture(); string profilePath = BoundReview(fixture);
+        string directory = Path.GetDirectoryName(profilePath)!;
+        File.Delete(Path.Combine(directory, CalibrationEvidenceFiles.FileName));
+        var profile = CameraProfileFiles.Load(profilePath); var c = profile.Calibration;
+        var reference = new CalibrationReferenceSolution(1, "Historical fixture", [c.ImageWidth, c.ImageHeight], 22,
+            [6, 9], c.PrincipalPoint, c.IncidentAngleToRadiusPolynomial, [0, 1], []);
+        AppData.Write(Path.Combine(directory, "result.json"), reference);
+        Assert.NotNull(CalibrationReview.ForProfile(profilePath));
+        AppData.Write(profilePath, profile with { Calibration = c with { PrincipalPoint = [110, 151] } });
+        Assert.Null(CalibrationReview.ForProfile(profilePath));
+    }
+
+    [Fact]
+    public void ModifiedEvidenceClearsTheReviewEvenWhenTheProfileDidNotChange() => Sta(async () =>
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        string profile = BoundReview(fixture);
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try
+        {
+            window.SetProfileForTest(profile); await window.InputsSettled;
+            Assert.NotNull(window.Irradiance.CalibrationReviewForTest);
+            using (var changed = new Mat(50, 50, MatType.CV_8UC1, Scalar.Black))
+                Cv2.ImWrite(Path.Combine(Path.GetDirectoryName(profile)!, "preview.png"), changed);
+            await window.RecheckSourcesAsync();
+            Assert.Null(window.Irradiance.CalibrationReviewForTest);
+        }
+        finally { await window.InputsSettled; window.Close(); }
+    });
+
     private static string Photos(Fixture fixture, bool board = false)
     {
         string directory = Path.Combine(fixture.Root, "checkerboards"); Directory.CreateDirectory(directory);

@@ -32,6 +32,7 @@ public static class CalibrationWorkflow
             CameraProfileFiles.Export(profile, staging, cancellationToken);
             CameraProfileFiles.WriteAtomic(Path.Combine(staging, "validation.json"), JsonSerializer.Serialize(report,
                 new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
+            CalibrationEvidenceFiles.Write(staging, cancellationToken);
             var artifacts = new List<string>();
             foreach (string source in Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories))
             {
@@ -47,6 +48,12 @@ public static class CalibrationWorkflow
         {
             // Test existence in the catch body: the solver's finally writes this report during unwinding.
             if (!File.Exists(Path.Combine(staging, "checkerboard-detections.json"))) throw;
+            // Validation/publication can fail after the solver succeeds. Retain that failure context
+            // with the detection evidence so it cannot be mistaken for the active successful fit.
+            string feedback = Path.Combine(staging, "checkerboard-detections.json");
+            var detectionReport = JsonSerializer.Deserialize<CalibrationDetectionReport>(File.ReadAllText(feedback));
+            if (detectionReport != null && detectionReport.Failure == null)
+                CameraProfileFiles.WriteAtomic(feedback, JsonSerializer.Serialize(detectionReport with { Failure = ex.GetBaseException().Message }));
             // Failed fits still have useful detector feedback. Retain it without publishing a camera profile.
             foreach (string source in Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories)
                 .Where(path => Path.GetFileName(path) == "checkerboard-detections.json" ||
