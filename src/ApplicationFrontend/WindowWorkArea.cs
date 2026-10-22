@@ -28,6 +28,20 @@ public static class WindowWorkArea
 
     public static void FitOnStartup(Window window) => _ = new Placement(window);
 
+    /// <summary>Keep application dialogs on the owner's monitor and within its usable size.</summary>
+    public static void FitToOwner(Window dialog, Window owner)
+    {
+        static double Extent(double actual, double requested, double fallback) => double.IsFinite(actual) && actual > 0 ? actual
+            : double.IsFinite(requested) && requested > 0 ? requested : fallback;
+        dialog.Owner = owner; dialog.ShowActivated = owner.ShowActivated;
+        dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        double width = Extent(owner.ActualWidth, owner.Width, 740), height = Extent(owner.ActualHeight, owner.Height, 700);
+        dialog.MinWidth = Math.Min(dialog.MinWidth, width); dialog.MinHeight = Math.Min(dialog.MinHeight, height);
+        dialog.Width = Math.Min(Extent(dialog.ActualWidth, dialog.Width, width), width);
+        dialog.Height = Math.Min(Extent(dialog.ActualHeight, dialog.Height, height), height);
+        dialog.MaxHeight = height;
+    }
+
     private sealed class Placement
     {
         private readonly Window window;

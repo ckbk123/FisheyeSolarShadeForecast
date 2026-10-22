@@ -20,34 +20,49 @@ public sealed class MainWindow : Window
 
     public MainWindow(Func<TimeZoneInfo>? systemZoneProvider = null, bool loadExampleOnFirstRun = true, AppServices? applicationServices = null)
     {
-        Title = "SolarShade · Solar Forecast Estimator · Preview 0.2.0"; Width = 1440; Height = 960; MinWidth = 760; MinHeight = 540;
+        Title = "SolarShade · Solar Forecast Estimator · Preview 0.2.0"; Width = 1440; Height = 960; MinWidth = 480; MinHeight = 320;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         WindowWorkArea.FitOnStartup(this);
         Background = new SolidColorBrush(Color.FromRgb(242, 246, 246));
         FontFamily = new("Segoe UI"); FontSize = 13; Foreground = new SolidColorBrush(Color.FromRgb(25, 48, 58));
         UseLayoutRounding = true;
         var root = new DockPanel(); Content = root;
-        var header = new Grid { Height = 72, Background = Foreground };
+        var header = new Grid { MinHeight = 72, Background = Foreground };
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
         header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        var title = new StackPanel { Margin = new(24, 10, 0, 0) };
+        header.RowDefinitions.Add(new() { Height = GridLength.Auto }); header.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var title = new StackPanel { Margin = new(18, 8, 12, 8) };
         title.Children.Add(Label("SOLARSHADE", 24, Brushes.White));
         title.Children.Add(Label("Solar energy studies", 12, Brushes.LightGray)); header.Children.Add(title);
-        actions.Margin = new(8, 0, 20, 0); actions.VerticalAlignment = VerticalAlignment.Center;
+        actions.Margin = new(8, 4, 14, 4); actions.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(actions, 1); header.Children.Add(actions);
+        bool? stackedHeader = null;
+        header.SizeChanged += (_, _) =>
+        {
+            bool narrow = header.ActualWidth < 850;
+            // The native title bar still identifies the app; reserve short, narrow windows for actions.
+            title.Visibility = header.ActualWidth < 600 ? Visibility.Collapsed : Visibility.Visible;
+            if (narrow == stackedHeader) return;
+            stackedHeader = narrow;
+            Grid.SetColumn(actions, narrow ? 0 : 1); Grid.SetRow(actions, narrow ? 1 : 0);
+            Grid.SetColumnSpan(actions, narrow ? 2 : 1);
+            header.ColumnDefinitions[1].Width = narrow ? new(0) : GridLength.Auto;
+        };
         root.Children.Add(host);
         Irradiance = new(this, new(applicationServices ?? new()), systemZoneProvider, loadExampleOnFirstRun);
         host.Register(new("irradiance", "Solar Irradiance", Irradiance, Irradiance.Actions));
         var pvService = new PvEvaluationService(IrradianceController);
         PvAutonomy = new(this, IrradianceController, new(IrradianceController, pvService), Irradiance.RecheckSourcesAsync, () => host.Select("irradiance"));
         host.Register(new("pv", "PV Autonomy", PvAutonomy, PvAutonomy.Actions));
-        var availability = Label("", 11); availability.Margin = new(20, 3, 0, 3); DockPanel.SetDock(availability, Dock.Top);
-        root.Children.Insert(1, availability);
+        var availability = Label("", 11); availability.Margin = new(20, 3, 20, 3);
+        var availabilityViewport = new ScrollViewer { Content = availability, MaxHeight = 42,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        DockPanel.SetDock(availabilityViewport, Dock.Top); root.Children.Insert(1, availabilityViewport);
         void RefreshAvailability()
         {
             var state = IrradianceController.Source; host.SetAvailability("pv", state.IsReady, state.Reason);
             availability.Text = state.IsReady ? "" : "PV Autonomy · " + state.Reason;
-            availability.Visibility = state.IsReady ? Visibility.Collapsed : Visibility.Visible;
+            availabilityViewport.Visibility = state.IsReady ? Visibility.Collapsed : Visibility.Visible;
         }
         IrradianceController.SourceChanged += (_, _) => RefreshAvailability(); RefreshAvailability();
         host.ActiveChanged += (_, _) => actions.Content = host.Active?.Actions;

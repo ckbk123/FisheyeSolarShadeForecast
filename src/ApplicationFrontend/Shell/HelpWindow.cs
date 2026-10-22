@@ -9,17 +9,15 @@ public sealed class HelpWindow : Window
 {
     private HelpWindow(Window owner, string title, string text, Action<StackPanel>? addControls)
     {
-        Owner = owner; Title = title;
-        ShowActivated = owner.ShowActivated;
-        Width = Math.Min(740, owner.ActualWidth > 0 ? owner.ActualWidth : owner.Width);
-        Height = Math.Min(700, owner.ActualHeight > 0 ? owner.ActualHeight : owner.Height);
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = title; Width = 740; Height = 700;
+        WindowWorkArea.FitToOwner(this, owner);
         var panel = new StackPanel { Margin = new(22) };
         panel.Children.Add(MainWindow.Label("Keep this guide open while using the application.", 12));
         panel.Children.Add(new Separator { Margin = new(0, 10, 0, 10) });
         panel.Children.Add(MainWindow.Label(text, 14));
         addControls?.Invoke(panel);
-        Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { Close(); e.Handled = true; } };
     }
 
