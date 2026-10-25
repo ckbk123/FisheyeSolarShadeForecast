@@ -47,7 +47,7 @@ public sealed class WeatherControlsTests
         {
             var controls = Descendants(owner.Irradiance).ToArray();
             var source = Assert.Single(controls.OfType<ComboBox>(), c => AutomationProperties.GetName(c) == "Weather data source");
-            var refresh = Assert.Single(controls.OfType<Button>(), b => Equals(b.Content, "Download weather again & update"));
+            var refresh = Assert.Single(controls.OfType<Button>(), b => AutomationProperties.GetAutomationId(b) == "RefreshData");
             var mode = Assert.Single(controls.OfType<ToggleButton>(), c => AutomationProperties.GetAutomationId(c) == "WeatherSourceMode");
             Assert.False(mode.IsChecked); Assert.Equal("Import Own Excel", mode.Content); Assert.False(refresh.IsEnabled);
             owner.Calculate(); await Until(() => !owner.UpdatingForTest);
