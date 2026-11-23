@@ -16,6 +16,7 @@ internal static class SummaryPdf
         using var maskSource = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "02-sky-mask/mask-provenance.json")));
         var r = results.RootElement; var c = profile.RootElement.GetProperty("Calibration"); var m = mask.RootElement.GetProperty("Mask");
         var s = snapshot.Settings;
+        var angles = snapshot.EquipmentAngles ?? throw new InvalidDataException("Saved equipment angles are invalid.");
         static string N(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
         static string Value(JsonElement e, string key) => e.TryGetProperty(key, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : "Not recorded";
         static string Total(JsonElement e, string key) => e.GetProperty(key).ValueKind == JsonValueKind.Null ? "N/A" : e.GetProperty(key).GetDouble().ToString("0.000", CultureInfo.InvariantCulture);
@@ -89,18 +90,19 @@ internal static class SummaryPdf
         Row("Sky image", Path.GetFileName(s.SkyImage), 2);
         Row("Active profile", Path.GetFileName(s.ProfilePath), 2);
         Row("Effective coverage", Value(c, "MaximumIncidentAngleDegrees") + "° maximum incident angle | " + (s.CoverageAngle > 0 ? "user override" : "saved profile"));
-        Row("Camera pose", $"Bottom bearing {N(s.BottomAzimuth)}° | tilt {N(s.CameraTilt)}° | roll {N(s.CameraRoll)}°");
+        Row("Phone pose", angles.DescribePhone());
+        Row("Photo orientation", angles.DescribeImage(), 2);
         bool imported = maskSource.RootElement.TryGetProperty("ImportedAncestorSha256", out var importedAncestor) && importedAncestor.ValueKind == JsonValueKind.String;
         string maskMethod = imported ? "Imported mask, no AI" : $"{s.Model}, {Value(m, "InputSize")} px";
         Row("Mask", $"{maskMethod} | {Value(m, "Width")} x {Value(m, "Height")} image | disk: {Value(m, "DiskMethod")}");
         var disk = m.GetProperty("Disk");
         Row("Effective disk", $"Center ({N(disk.GetProperty("CenterX").GetDouble())}, {N(disk.GetProperty("CenterY").GetDouble())}) px | radius {N(disk.GetProperty("Radius").GetDouble())} px");
-        Row("Panel / model", $"Tilt {N(s.PanelTilt)}° | azimuth {N(s.PanelAzimuth)}° | {Value(r, "Model")} | {s.Substeps} integration samples");
+        Row("Panel / model", $"{angles.DescribePanel()} | {Value(r, "Model")} | {s.Substeps} samples", 2);
 
         Section("03 / Reading this export");
         Wrapped("01 calibration; 02 mask and orientation; 03 horizontal irradiance; 04 solar positions and sun paths; 05 unshaded panel; 06 shading factors and panel results. Workbooks and images are exact copies of the completed debug data.", left, width, 3, small, muted);
         y += 4;
-        Wrapped("Totals are panel irradiation, not electrical generation. Bearings use true north. White mask = sky; unobserved sky is blocked; no ground reflection. Source interval metadata takes priority over import fallback settings. Checkerboard setup applies only to a future calibration, not the active profile.", left, width, 3, small, muted);
+        Wrapped("Equipment azimuth is clockwise from geographic south (west +90°, east -90°). Solar azimuth and photo bearings are clockwise from true north. Totals are panel irradiation. White mask = sky. Unobserved sky is blocked. Ground reflection is excluded. Source interval metadata takes priority over import fallback settings. Checkerboard setup applies to future calibrations.", left, width, 4, small, muted);
         y += 4;
         Wrapped("Full saved interface settings, filenames, library versions and fingerprints: run.json. Detailed assumptions and effective calibration: stage JSON files. Export time and integrity hashes: export.json. Long fields in this recap may be shortened.", left, width, 3, small, muted);
         if (y > 794) throw new InvalidDataException("The summary exceeds its single-page layout.");

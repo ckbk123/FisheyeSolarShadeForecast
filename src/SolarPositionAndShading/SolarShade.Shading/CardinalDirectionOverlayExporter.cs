@@ -18,12 +18,13 @@ public static class CardinalDirectionOverlayExporter
         var rows = result.Markers.Select(m => new object?[] {m.Name, m.AzimuthDegrees, m.Visible, m.BoundaryZenithDegrees,
             m.BoundaryX, m.BoundaryY, m.LabelX, m.LabelY, m.Status});
         string description = $"{result.GeometryConvention} Native image {result.Width}x{result.Height}; " +
-            $"image-top heading {result.Pose.ImageTopAzimuthDegrees} degrees, tilt {result.Pose.TiltDegrees} degrees, roll {result.Pose.RollDegrees} degrees. " +
+            $"projection image-top reference {result.Pose.ImageTopAzimuthDegrees} degrees clockwise from true north before roll, signed tilt {result.Pose.TiltDegrees} degrees from up toward that reference, image roll {result.Pose.RollDegrees} degrees around the lens. " +
             "Transparent magenta display annotations; no solar or irradiance calculation.";
         ScientificWorkbook.Write(workbook, [new("Cardinal directions", headers, rows)], description, ct);
         AtomicWrite(details, JsonSerializer.SerializeToUtf8Bytes(new
         {
             result.Width, result.Height, result.Pose, result.Projection, result.Markers, result.Options, result.Timings, result.GeometryConvention,
+            PoseConvention = "Projection inputs: ImageTopAzimuthDegrees is the pre-roll image-top bearing clockwise from true north, TiltDegrees is the signed optical-axis rotation from up toward that bearing, and RollDegrees rotates the image around the lens.",
             Color = "Magenta (#FF00B4), straight-alpha PNG", AnnotationOnly = true,
             Artifacts = new[] {Path.GetFileName(image), Path.GetFileName(workbook)}
         }, new JsonSerializerOptions {WriteIndented = true}), ct);

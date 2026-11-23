@@ -1,6 +1,6 @@
 # Running SolarShade
 
-Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.2.0 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
+Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.3.0 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
 
 ## Workflow
 
@@ -40,6 +40,22 @@ Enter panel area (m²), panel efficiency (%), conversion efficiency (%), battery
 Click **Evaluate system**. The shared chart shows load demand and available PV energy on the same Wh axis, with end-of-hour battery charge on the fixed 0–100% axis. Available PV is after panel/conversion efficiencies and before curtailment. Red marks identify intervals containing unmet load, even when their end charge recovered. Hover or open **Hourly values** for explicit interval bounds, offsets, partial-hour flags and values. **Model & totals** shows full energy totals, assumptions and the first shortfall interval. “No unmet load during this study” does not guarantee supply in unseen weather.
 
 **Export PV results** copies verified CSV, JSON and XLSX files plus a scoped manifest to a new scenario folder. JSON includes the full irradiance input, system settings and substeps. Irradiance and PV exports remain independent. PV settings persist in `Data/pv-settings.json`; a matching accepted PV result can also be restored from `Data/AcceptedResults`. Optional managed outputs occupy `Debug Data/07-battery` under the same storage lease as irradiance; altering them blocks PV export without damaging the irradiance study.
+
+## Phone and panel angles
+
+Use geographic directions. Panel azimuth follows the outward normal of its front face. Phone azimuth follows the optical axis coming out of the fisheye lens. In both cases S = 0°, W = +90°, N = ±180°, and E = −90° or 270°. Tilt is the angle of the device plane above horizontal, from 0° to 90°. For an uphill phone capture the top of the oriented photo corresponds to the raised lens end. With the phone lens-outward on the panel, enter the same tilt and azimuth for both.
+
+| Physical setup | Phone entry | Panel entry |
+| --- | --- | --- |
+| Both face south at 28°, lens end uphill | 28° tilt, 0° azimuth | 28° tilt, 0° azimuth |
+| Both face east at 28°, lens end uphill | 28° tilt, −90° azimuth | 28° tilt, −90° azimuth |
+| LAAS Site 2 historical run | 0° tilt, image top 0° true (assumed north) | 6.8° tilt, −26° azimuth |
+
+When a device is flat, its upward normal has no compass direction. For a flat phone, enter the **image-top bearing clockwise from true north** to register the photograph against the sun path. Changing this heading rotates the overlay while the lens still points straight up. For an upward-looking image with north at the top, east appears on the left. Solar azimuth in the ephemeris and the cardinal overlay remain geographic bearings clockwise from north.
+
+Saved settings retain their original physical fields for older readers. In the stored geometry the 28° south-facing phone uses image bottom 180°, signed camera tilt −28°, and roll 0°. The corresponding stored panel uses tilt 28° and front bearing 180°. Opening and updating an older study preserves its pose. The UI identifies older phone placements outside the uphill convention, including an optical axis pointing below the horizon. Changing one of those placements is an explicit action.
+
+**Copy panel pose to phone** applies the panel angles once. The two inputs can then be edited independently. At zero tilt the copy keeps the photo heading. After upgrading, use **Update results** to generate outputs with the new build. An older north-zero panel entry of 0° still models north and appears as 180° here. If field notes establish that the operator meant south, set the front azimuth to 0° in the new interface and update that study.
 
 ## Cardinal-direction preview
 

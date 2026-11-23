@@ -110,7 +110,14 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         var draft = Controller.Draft;
         if (fields.Any(f => f.Text != ((Func<PvSettingsDraft, string>)f.Tag)(draft)) || !load.Values.SequenceEqual(draft.Load)) LoadFields();
         var snapshot = source.Source.Snapshot;
-        sourceText.Text = snapshot == null ? source.Source.Reason : $"Shaded irradiance ready · {snapshot.Settings.Start:yyyy-MM-dd} – {snapshot.Settings.End:yyyy-MM-dd} · {snapshot.TimeZoneId} · tilt {snapshot.Settings.PanelTilt:0.#}° · azimuth {snapshot.Settings.PanelAzimuth:0.#}°";
+        if (snapshot == null)
+            sourceText.Text = source.Source.Reason;
+        else
+        {
+            var angles = EquipmentOrientation.Describe(snapshot.Settings);
+            string facing = angles.PanelAzimuth is double azimuth ? $"{azimuth:0.##}° from south" : "undefined (flat)";
+            sourceText.Text = $"Shaded irradiance ready · {snapshot.Settings.Start:yyyy-MM-dd} – {snapshot.Settings.End:yyyy-MM-dd} · {snapshot.TimeZoneId} · panel tilt {angles.PanelTilt:0.##}° · front azimuth {facing}";
+        }
         evaluate.IsEnabled = Controller.CanEvaluate; stop.IsEnabled = Controller.IsBusy; export.IsEnabled = Controller.CanExport;
         status.Text = snapshot == null ? source.Source.Reason : Controller.Problem ?? Controller.Status;
         chart.SetResult(Controller.Result); chart.Stale = !Controller.IsCurrent; chart.Opacity = Controller.IsCurrent ? 1 : .55; chart.InvalidateVisual();

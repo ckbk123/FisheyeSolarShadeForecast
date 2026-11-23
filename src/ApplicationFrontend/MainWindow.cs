@@ -20,7 +20,7 @@ public sealed class MainWindow : Window
 
     public MainWindow(Func<TimeZoneInfo>? systemZoneProvider = null, bool loadExampleOnFirstRun = true, AppServices? applicationServices = null)
     {
-        Title = "SolarShade · Solar Forecast Estimator · Preview 0.2.0"; Width = 1440; Height = 960; MinWidth = 480; MinHeight = 320;
+        Title = $"SolarShade · Solar Forecast Estimator · Preview {Program.PreviewVersion}"; Width = 1440; Height = 960; MinWidth = 480; MinHeight = 320;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         WindowWorkArea.FitOnStartup(this);
         Background = new SolidColorBrush(Color.FromRgb(242, 246, 246));

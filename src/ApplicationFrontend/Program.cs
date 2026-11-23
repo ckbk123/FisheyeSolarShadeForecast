@@ -8,6 +8,7 @@ namespace SolarShade.Desktop;
 
 public static class Program
 {
+    public static string PreviewVersion => typeof(Program).Assembly.GetName().Version!.ToString(3);
     public static readonly Stopwatch Startup = Stopwatch.StartNew();
     [STAThread]
     public static int Main(string[] args)

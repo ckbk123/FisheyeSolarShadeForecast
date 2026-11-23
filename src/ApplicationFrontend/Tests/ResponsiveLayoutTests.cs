@@ -42,7 +42,7 @@ public sealed class ResponsiveLayoutTests
                 button.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
                 AssertVisibleInsideWorkspace(button, window.Irradiance);
             }
-            foreach (string property in new[] { "Latitude", "Start", "PanelTilt", "PanelAzimuth" })
+            foreach (string property in new[] { "Latitude", "Start", "PanelTilt", "PanelFacingAzimuth" })
             {
                 var field = Descendants<TextBox>(window.Irradiance).Single(b => Equals(b.Tag, property));
                 field.BringIntoView(); await Task.Delay(30); window.UpdateLayout();

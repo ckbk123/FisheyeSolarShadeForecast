@@ -33,6 +33,8 @@ public sealed class DebugDataRun : IDisposable
         public DateTimeOffset UpdatedUtc { get; set; }
         public DateTimeOffset? LastSuccessfulUpdateUtc { get; set; }
         public UserSettings Settings { get; set; } = new();
+        public string StoredEquipmentConvention => "Settings.PanelAzimuth and Settings.BottomAzimuth are solver inputs clockwise from true north. BottomAzimuth references image bottom before roll. CameraTilt is signed from up toward image top before roll. CameraRoll rotates the image around the lens. EquipmentAngles gives the displayed orientations.";
+        public EquipmentAngleReport? EquipmentAngles => EquipmentAngleReport.From(Settings);
         public Dictionary<string, JsonElement> Inputs { get; set; } = new();
         public Dictionary<string, StageRecord> Stages { get; set; } = new();
         public Dictionary<string, ArtifactGroup> PendingGroups { get; set; } = new();

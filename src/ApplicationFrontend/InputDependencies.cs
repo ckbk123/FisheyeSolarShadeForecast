@@ -89,8 +89,9 @@ public sealed class InputDependencies
         "CenteredDisk" => ArtifactGroup.Mask | PoseChain,
         "SelectedMaskId" => ArtifactGroup.Mask | ArtifactGroup.Shading,
         "ProfilePath" or "CoverageAngle" => ArtifactGroup.Profile | PoseChain,
-        "BottomAzimuth" or "CameraTilt" or "CameraRoll" => PoseChain,
-        "PanelTilt" or "PanelAzimuth" or "Isotropic" => PanelChain,
+        "BottomAzimuth" or "CameraTilt" or "CameraRoll" or nameof(UserSettings.PhoneInclination)
+            or nameof(UserSettings.PhoneFacingAzimuth) or nameof(UserSettings.FlatImageTopBearing) => PoseChain,
+        "PanelTilt" or "PanelAzimuth" or nameof(UserSettings.PanelFacingAzimuth) or "Isotropic" => PanelChain,
         "Latitude" or "Longitude" or "Start" or "End" => !WeatherSourceSelection.UsesServices(settings) ? GeometryChain : WeatherChain,
         "Elevation" or "Substeps" => GeometryChain,
         "Zone" or "ImportPath" or "UseDataServices" => WeatherChain,

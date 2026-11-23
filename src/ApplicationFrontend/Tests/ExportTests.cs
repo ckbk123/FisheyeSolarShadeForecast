@@ -69,10 +69,13 @@ public sealed class ExportTests
         Assert.Equal(File.ReadAllBytes(Path.Combine(fixture.Debug, "run.json")), File.ReadAllBytes(Path.Combine(exported, "run.json")));
         using var pdf = PdfReader.Open(Path.Combine(exported, "Summary.pdf"), PdfDocumentOpenMode.Import);
         Assert.Single(pdf.Pages); Assert.Contains(state.Id, pdf.Info.Subject);
+        using var sunPathPdf = PdfReader.Open(Path.Combine(exported, "SunPathReport.pdf"), PdfDocumentOpenMode.Import);
+        Assert.Single(sunPathPdf.Pages); Assert.Contains(state.Id, sunPathPdf.Info.Subject);
         using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(exported, "export.json")));
         Assert.Equal(AppData.FileKey(Path.Combine(exported, "Summary.pdf")), receipt.RootElement.GetProperty("SummarySha256").GetString());
+        Assert.Equal(AppData.FileKey(Path.Combine(exported, "SunPathReport.pdf")), receipt.RootElement.GetProperty("SunPathReportSha256").GetString());
         Assert.Equal("Complete", receipt.RootElement.GetProperty("Status").GetString());
-        Assert.Equal(state.ArtifactHashes.Count + 3, Directory.GetFiles(exported, "*", SearchOption.AllDirectories).Length);
+        Assert.Equal(state.ArtifactHashes.Count + 4, Directory.GetFiles(exported, "*", SearchOption.AllDirectories).Length);
     }
     [Theory]
     [InlineData("01-calibration/camera-profile.json")]

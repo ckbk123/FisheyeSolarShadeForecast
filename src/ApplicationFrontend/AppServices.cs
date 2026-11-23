@@ -287,7 +287,7 @@ public sealed class AppServices : IIrradianceService
                     progress("Drawing sun paths on the calibrated image");
                     var next = await Task.Run(() => SunPathOverlayGenerator.Generate(geometry!,
                         new CalibratedSkyProjection(activeProfile.Calibration,
-                            CameraPose.FromImageBottom(s.BottomAzimuth, s.CameraTilt, s.CameraRoll),
+                            EquipmentOrientation.ToCameraPose(s),
                             new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius)), zone, ct: ct), ct);
                     ct.ThrowIfCancellationRequested(); sunPath = next; sunPathKey = nextSunPath; SunPathGenerationCount++;
                     await Task.Run(() => Values.Write("sun-path", nextSunPath, next), ct);
@@ -312,7 +312,7 @@ public sealed class AppServices : IIrradianceService
                 {
                     progress("Preparing panel visibility");
                     var next = await Task.Run(() => new PanelSkyScene(SkyShadingModule.DecodeMask(activeMask.Png), activeProfile.Calibration,
-                        CameraPose.FromImageBottom(s.BottomAzimuth, s.CameraTilt, s.CameraRoll),
+                        EquipmentOrientation.ToCameraPose(s),
                         new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius)), ct);
                     ct.ThrowIfCancellationRequested(); scene = next; sceneKey = nextScene;
                 }
@@ -540,7 +540,7 @@ public sealed class AppServices : IIrradianceService
                     progress("Drawing cardinal directions on the sky photograph");
                     var next = await Task.Run(() => CardinalDirectionOverlayGenerator.Generate(
                         new CalibratedSkyProjection(activeProfile.Calibration,
-                            CameraPose.FromImageBottom(s.BottomAzimuth, s.CameraTilt, s.CameraRoll),
+                            EquipmentOrientation.ToCameraPose(s),
                             new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius)), ct: ct), ct);
                     ct.ThrowIfCancellationRequested(); cardinals = next; cardinalKey = nextCardinal; CardinalGenerationCount++;
                     await Task.Run(() => Values.Write("cardinals", nextCardinal, next), ct);

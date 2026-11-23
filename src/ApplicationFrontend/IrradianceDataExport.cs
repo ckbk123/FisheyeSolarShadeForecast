@@ -49,7 +49,7 @@ internal static class IrradianceDataExport
                     Products = new[] { "Irradiance" }, Workbook = "irradiance.xlsx", WorkbookSha256 = AppData.FileKey(workbook),
                     SourceArtifactSha256 = snapshot.ArtifactHashes[PanelResults],
                     Model = root.GetProperty("Model").GetString(), TimeZoneId = root.GetProperty("TimeZoneId").GetString(),
-                    TimestampConvention = root.GetProperty("TimestampConvention").GetString(), FactorSemantics,
+                    TimestampConvention = root.GetProperty("TimestampConvention").GetString(), FactorSemantics, snapshot.EquipmentAngles,
                     RowCount = root.GetProperty("Rows").GetArrayLength()
                 });
                 DebugDataStore.SafePath(destination);
@@ -92,6 +92,8 @@ internal static class IrradianceDataExport
                 StudyEndDateInclusive = DateOnly.FromDateTime(snapshot.Settings.End),
                 EffectiveStart = Instant(rows[0], "Start"), EffectiveEnd = Instant(rows[rows.GetArrayLength() - 1], "End"),
                 Panel = root.TryGetProperty("Panel", out var panel) && panel.ValueKind == JsonValueKind.Object ? panel : (JsonElement?)null,
+                PanelStorageConvention = SolarShade.Irradiance.Transposition.PanelOrientation.SolverConvention,
+                snapshot.EquipmentAngles,
                 DatasetFingerprint = root.TryGetProperty("DatasetFingerprint", out var fingerprint) && fingerprint.ValueKind == JsonValueKind.String ? fingerprint.GetString() : null,
                 SourceArtifactSha256 = snapshot.ArtifactHashes.GetValueOrDefault(PanelResults),
                 NativeCadence = root.TryGetProperty("NativeCadence", out var cadence) && cadence.ValueKind == JsonValueKind.String ? cadence.GetString() : null,

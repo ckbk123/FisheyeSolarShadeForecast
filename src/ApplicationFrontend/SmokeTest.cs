@@ -154,14 +154,14 @@ public static class SmokeTest
                     throw new InvalidOperationException("Camera pose did not refresh cardinal directions exactly once.");
                 Capture(window, Path.Combine(output, "sun-path-camera-edited.png"));
                 long validCameraRevision = window.RevisionForTest;
-                window.CommitFieldForTest("CameraTilt", "not-a-number");
+                window.CommitFieldForTest("PhoneInclination", "not-a-number");
                 if (window.RevisionForTest <= validCameraRevision || window.SunPathVisibleForTest || window.CardinalsVisibleForTest)
                     throw new InvalidOperationException("An invalid camera commit did not reject stale callbacks and hide the sun path.");
                 await Task.Delay(450);
                 if (window.Completed != reprojected || window.SunPathVisibleForTest || window.CardinalsVisibleForTest)
                     throw new InvalidOperationException("Invalid camera input allowed an old result or overlay to publish.");
                 Capture(window, Path.Combine(output, "sun-path-invalid-camera.png"));
-                window.CommitFieldForTest("CameraTilt", reprojected.Settings.CameraTilt.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                window.CommitFieldForTest("PhoneInclination", reprojected.Settings.PhoneInclination.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 window.Calculate();
                 await Until(() => window.Completed != reprojected, 30);
                 var correctedCamera = window.Completed!;

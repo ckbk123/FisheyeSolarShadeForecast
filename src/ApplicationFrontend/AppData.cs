@@ -10,7 +10,7 @@ using SolarShade.SkyPhotoMasking;
 
 namespace SolarShade.Desktop;
 
-public sealed record UserSettings
+public sealed partial record UserSettings
 {
     public bool FirstRun { get; set; }
     public string CalibrationFolder { get; set; } = "";

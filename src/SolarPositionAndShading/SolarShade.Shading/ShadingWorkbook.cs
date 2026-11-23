@@ -168,7 +168,7 @@ public static class ShadingWorkbook
                 Sheet("xl/worksheets/sheet1.xml",Data(),positions==null?[37,23,23,25,23,23,23,34]:[37,28,28]);
                 if(positions!=null)Sheet("xl/worksheets/sheet2.xml",[
                     ["Parameter","Value"],["Latitude (degrees)",site.LatitudeDegrees],["Longitude (degrees)",site.LongitudeDegrees],["Elevation (metres)",site.ElevationMetres],
-                    ["Azimuth convention","Clockwise from true north: N=0, E=90, S=180, W=270."],
+                    ["Azimuth convention","Solar azimuth and projection input bearings are clockwise from true north: N=0, E=90, S=180, W=270."],
                     ["Zenith convention","0 = vertical sky; 90 = geometric horizon; greater than 90 = below horizon."],
                     ["Timestamp convention","Exact input instant and UTC offset, including night rows; no phase shift."],
                     ["Algorithm","NOAA/Meeus solar equations; WGS84 observer parallax; UTC approximates UT1; refraction disabled."],
@@ -185,7 +185,7 @@ public static class ShadingWorkbook
                     ["Diffuse loss upper bound",result.Diffuse.ShadingUpperBound],["Diffuse coverage",result.Diffuse.Coverage],
                     ["Diffuse model","Constant isotropic sky; horizontal plane; cosine-weighted solid angle."],
                     ["Latitude (degrees)",site.LatitudeDegrees],["Longitude (degrees)",site.LongitudeDegrees],["Elevation (metres)",site.ElevationMetres],
-                    ["Image top azimuth (degrees)",pose.ImageTopAzimuthDegrees],["Camera tilt (degrees)",pose.TiltDegrees],["Camera roll (degrees)",pose.RollDegrees],
+                    ["Projection image-top bearing before roll (degrees clockwise from true north)",pose.ImageTopAzimuthDegrees],["Signed optical-axis tilt from up toward pre-roll image top (degrees)",pose.TiltDegrees],["Image roll around the optical axis (degrees)",pose.RollDegrees],
                     ["Solar angular radius (degrees)",result.SolarAngularRadiusDegrees],["Disk samples",(double)result.DiskSamples],
                     ["Window start relative to label (min)",result.Sampling.StartOffsetMinutes],["Window duration (min)",result.Sampling.DurationMinutes],["Time samples",(double)result.Sampling.Samples],
                     ["Temporal model","Constant DNI within each interval; horizontal cosine-weighted averaging. No measured sub-hour irradiance available."],

@@ -42,9 +42,13 @@ internal static class SnapshotExport
             }
             ValidateResults(staging);
             (writePdf ?? SummaryPdf.Write)(staging, snapshot, exported);
+            SunPathReportPdf.Write(staging, snapshot);
             string pdf = Path.Combine(staging, "Summary.pdf");
             using (var document = PdfSharp.Pdf.IO.PdfReader.Open(pdf, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import))
                 if (document.PageCount != 1) throw new InvalidDataException("The summary must contain exactly one page.");
+            string sunPathPdf = Path.Combine(staging, "SunPathReport.pdf");
+            using (var document = PdfSharp.Pdf.IO.PdfReader.Open(sunPathPdf, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import))
+                if (document.PageCount != 1) throw new InvalidDataException("The sun-path report must contain exactly one page.");
             lock (run.SyncRoot)
             {
                 using var inputs = LockInputs(snapshot.Settings);
@@ -52,8 +56,9 @@ internal static class SnapshotExport
                 if (current.Id != snapshot.Id) throw new InvalidOperationException("Results changed during export. Export the new completed update.");
                 AppData.Write(Path.Combine(staging, "export.json"), new {
                     Status = "Complete", ResultId = snapshot.Id, ExportedUtc = exported,
-                    SummarySha256 = AppData.FileKey(pdf), RunManifestSha256 = AppData.FileKey(Path.Combine(staging, "run.json")),
-                    snapshot.ArtifactHashes
+                    SummarySha256 = AppData.FileKey(pdf), SunPathReportSha256 = AppData.FileKey(sunPathPdf),
+                    RunManifestSha256 = AppData.FileKey(Path.Combine(staging, "run.json")),
+                    snapshot.EquipmentAngles, snapshot.ArtifactHashes
                 });
                 DebugDataStore.SafePath(destination);
                 Directory.Move(staging, destination); // Same-volume rename exposes only the complete package.

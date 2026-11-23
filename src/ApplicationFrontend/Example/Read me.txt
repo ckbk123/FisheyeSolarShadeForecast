@@ -4,6 +4,10 @@ Extract the complete package and open APPLICATION.exe. First launch loads
 this example. Click Update results to calculate; no weather download is required.
 Load example restores its input settings and preserves your time-zone preference.
 
+The example panel faces north at 30 degrees from horizontal. Its equipment
+azimuth is 180 degrees on the south-zero convention. The camera looks straight
+up, so its optical azimuth is undefined. The image top points true north.
+
 Calib Images
   Twelve checkerboard photographs (1.jpg through 12.jpg) and saved calibration.yml.
   Inner corners: 6 columns x 9 rows. One square: 22 mm. The example uses fitted
@@ -22,7 +26,7 @@ Irradiance
   horizontal DHI in W/m2. Surrounding intervals support date/time-zone boundaries.
 
 Debug Data/reference-run
-  A fixed successful run generated through the current library pipeline.
+  A fixed successful run generated with the historic north-zero engine inputs.
   run.json records its exact settings, source identifiers, library versions,
   stage origins and artifact paths. Numbered folders contain native calibration
   YAML, binary sky-mask PNG, horizontal irradiance, solar geometry, unshaded
