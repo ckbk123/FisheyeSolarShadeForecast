@@ -32,6 +32,8 @@ public sealed class IrradianceChart : FrameworkElement
     public IrradianceChart()
     {
         MinHeight = 180; ClipToBounds = true; Cursor = Cursors.Cross;
+        // All plot segments are horizontal or vertical. Native aliased strokes keep the grid crisp at chart scale.
+        RenderOptions.SetEdgeMode(this, EdgeMode.Aliased);
         MouseWheel += (_, e) =>
         {
             if (rows.Length < 3) return;

@@ -165,9 +165,13 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
             Content = table, Width = 1000, Height = 550, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         WindowWorkArea.FitToOwner(dialog, owner); dialog.ShowDialog();
     }
-    private void ShowHelp() => HelpWindow.Open(ref helpWindow, owner, "PV Autonomy · Help",
-        "1. Complete and update Solar Irradiance.\n2. Enter 24 hourly consumption values in Wh. They repeat by study-local hour (DST days can have 23 or 25 hours).\n3. Enter panel area, efficiencies, battery capacity in Wh and charge at the study start. Click Evaluate system.\n\nThe graph overlays load demand and PV energy available on the Wh axis, with battery charge on the fixed 0–100% axis. Red marks mean unmet load, even if charge recovered before the hour ended. Hover for actual interval bounds and duration. Zooming never resets the battery.\n\nConversion losses apply to PV only. Battery charge/discharge is ideal, all capacity is accessible, and power limits, ageing and temperature effects are omitted. Results describe the supplied study period only.\n\nExport PV results saves CSV, JSON and XLSX, including inputs, assumptions and the full irradiance source in JSON. Settings are restored on restart; results require an explicit evaluation."
-        );
+    private void ShowHelp() => HelpWindow.OpenGuide(ref helpWindow, owner, "PV Autonomy · Help",
+        [
+            ("Set up a study", "1. Complete and update Solar Irradiance.\n2. Enter 24 hourly consumption values in Wh. They repeat by study-local hour (DST days can have 23 or 25 hours).\n3. Enter panel area, efficiencies, battery capacity in Wh and charge at the study start. Click Evaluate system."),
+            ("Read the energy chart", "The graph overlays load demand and PV energy available on the Wh axis, with battery charge on the fixed 0–100% axis. Red marks mean unmet load, even if charge recovered before the hour ended. Hover for actual interval bounds and duration. Zooming never resets the battery."),
+            ("Battery assumptions", "Conversion losses apply to PV only. Battery charge/discharge is ideal, all capacity is accessible, and power limits, ageing and temperature effects are omitted. Results describe the supplied study period only."),
+            ("Export and restore", "Export PV results saves CSV, JSON and XLSX, including inputs, assumptions and the full irradiance source in JSON. Settings are restored on restart; results require an explicit evaluation."),
+        ]);
     private static Border Card(UIElement child) => new() { Child = child, Background = StudioTheme.Surface, BorderBrush = StudioTheme.Line, BorderThickness = new(1), CornerRadius = new(8) };
     internal static TextBlock Text(string value, double size = 12) => new() { Text = value, FontSize = size, TextWrapping = TextWrapping.Wrap, Margin = new(0, 2, 0, 2), Foreground = StudioTheme.Muted };
     internal static TextBlock Heading(string value, double size) => new() { Text = value, FontSize = size, FontWeight = FontWeights.SemiBold, Foreground = StudioTheme.Ink, TextWrapping = TextWrapping.Wrap };
