@@ -12,8 +12,11 @@ public sealed class HelpWindow : Window
         Title = title; Width = 740; Height = 700;
         WindowWorkArea.FitToOwner(this, owner);
         var panel = new StackPanel { Margin = new(22) };
-        panel.Children.Add(MainWindow.Label("Keep this guide open while using the application.", 12));
-        panel.Children.Add(new Separator { Margin = new(0, 10, 0, 10) });
+        if (addControls != null || owner is MainWindow)
+        {
+            panel.Children.Add(MainWindow.Label("Hover over a control or focus it and press F1 for its explanation. Press Esc to dismiss.", 13));
+            panel.Children.Add(new Separator { Margin = new(0, 10, 0, 10) });
+        }
         panel.Children.Add(MainWindow.Label(text, 14));
         addControls?.Invoke(panel);
         Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,

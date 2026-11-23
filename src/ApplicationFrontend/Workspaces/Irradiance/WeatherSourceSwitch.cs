@@ -17,7 +17,7 @@ internal sealed class WeatherSourceSwitch : ToggleButton
         var row = new FrameworkElementFactory(typeof(DockPanel)); outline.AppendChild(row);
         var track = new FrameworkElementFactory(typeof(Border)); track.Name = "Track";
         track.SetValue(DockPanel.DockProperty, Dock.Left); track.SetValue(WidthProperty, 48d); track.SetValue(HeightProperty, 26d);
-        track.SetValue(Border.CornerRadiusProperty, new CornerRadius(13)); track.SetValue(Border.BackgroundProperty, Brushes.SlateGray);
+        track.SetValue(Border.CornerRadiusProperty, new CornerRadius(13)); track.SetValue(Border.BackgroundProperty, StudioTheme.Muted);
         var thumb = new FrameworkElementFactory(typeof(Ellipse)); thumb.Name = "Thumb";
         thumb.SetValue(WidthProperty, 18d); thumb.SetValue(HeightProperty, 18d); thumb.SetValue(MarginProperty, new Thickness(4));
         thumb.SetValue(Shape.FillProperty, Brushes.White); thumb.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Left);
@@ -28,10 +28,10 @@ internal sealed class WeatherSourceSwitch : ToggleButton
         var template = new ControlTemplate(typeof(ToggleButton)) { VisualTree = outline };
         var on = new Trigger { Property = IsCheckedProperty, Value = true };
         on.Setters.Add(new Setter(HorizontalAlignmentProperty, HorizontalAlignment.Right, "Thumb"));
-        on.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(15, 125, 111)), "Track"));
+        on.Setters.Add(new Setter(Border.BackgroundProperty, StudioTheme.Teal, "Track"));
         template.Triggers.Add(on);
         var focused = new Trigger { Property = IsKeyboardFocusedProperty, Value = true };
-        focused.Setters.Add(new Setter(Border.BorderBrushProperty, Brushes.DarkSlateGray, "FocusOutline")); template.Triggers.Add(focused);
+        focused.Setters.Add(new Setter(Border.BorderBrushProperty, StudioTheme.Blue, "FocusOutline")); template.Triggers.Add(focused);
         Template = template;
         System.Windows.Automation.AutomationProperties.SetAutomationId(this, "WeatherSourceMode");
     }

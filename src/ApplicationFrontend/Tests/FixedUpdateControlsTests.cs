@@ -37,7 +37,7 @@ public sealed class FixedUpdateControlsTests
             Assert.Contains(viewport, Ancestors<WorkspaceViewport>(inputs));
             Assert.Equal(348, block.MaxWidth);
             Assert.Equal(FontWeights.Bold, indicator.FontWeight);
-            Assert.Contains(Descendants<TextBlock>(block), text => text.Text == "UPDATE RESULTS" && text.FontWeight == FontWeights.Bold);
+            Assert.Contains(Descendants<TextBlock>(block), text => text.Text == "Calculation" && text.FontWeight == FontWeights.SemiBold);
             Assert.All(buttons, button => Assert.Equal(FontWeights.Bold, button.FontWeight));
             var footer = Assert.Single(Descendants<ScrollViewer>(Assert.IsType<Grid>(VisualTreeHelper.GetParent(block))));
             Assert.Equal(80, footer.MaxHeight); Assert.DoesNotContain(footer, Ancestors<ScrollViewer>(block));
@@ -49,7 +49,9 @@ public sealed class FixedUpdateControlsTests
                 var field = Assert.Single(Descendants<TextBox>(inputs), box => Equals(box.Tag, property));
                 Assert.Contains(inputs, Ancestors<ScrollViewer>(field));
             }
-            Assert.Contains(Descendants<TextBlock>(inputs), text => text.Text.StartsWith("Update results reuses matching weather data.", StringComparison.Ordinal));
+            Assert.Contains("reuses matching weather data", AutomationProperties.GetHelpText(buttons[0]));
+            Assert.NotNull(buttons[0].ToolTip);
+            Assert.DoesNotContain(Descendants<TextBlock>(inputs), text => text.Text.Contains("reuses matching weather data"));
 
             FrameworkElement[] fixedElements = [block, indicator, .. buttons];
             var originalBounds = fixedElements.ToDictionary(element => element, element => Bounds(element, surface));

@@ -20,14 +20,18 @@ public sealed class ExportDataWindowTests
         var dialog = new ExportDataWindow(isotropic);
         try
         {
-            Assert.True(Find<CheckBox>(dialog, "ExportIrradiance").IsChecked);
+            var irradiance = Find<CheckBox>(dialog, "ExportIrradiance");
+            Assert.True(irradiance.IsChecked);
             Assert.False(Find<Button>(dialog, "ConfirmExportData").IsEnabled);
-            var description = Assert.Single(Descendants(dialog).OfType<TextBlock>(), t => t.Text.Contains("6 columns"));
-            Assert.Contains($"diffuse ({model})", description.Text);
-            Assert.Contains("Timeseries, direct", description.Text);
-            Assert.Contains("shading factor direct, shading factor diffuse, and final total irradiance", description.Text);
-            Assert.Contains(Descendants(dialog).OfType<TextBlock>(), t => t.Text.Contains("W/m²") && t.Text.Contains("0 to 1"));
-            Assert.Contains(Descendants(dialog).OfType<TextBlock>(), t => t.Text.Contains("zero") && t.Text.Contains("blank"));
+            Assert.Contains(Descendants(dialog).OfType<TextBlock>(), t => t.Text.Contains(model));
+            var description = AutomationProperties.GetHelpText(irradiance);
+            Assert.Equal(description, irradiance.ToolTip);
+            Assert.Contains("6 columns", description);
+            Assert.Contains($"diffuse ({model})", description);
+            Assert.Contains("Timeseries, direct", description);
+            Assert.Contains("shading factor direct, shading factor diffuse, and final total irradiance", description);
+            Assert.Contains("W/m²", description); Assert.Contains("0 to 1", description);
+            Assert.Contains("zero", description); Assert.Contains("blank", description);
             Assert.Null(dialog.SelectedOptions); Assert.Null(dialog.DestinationDirectory);
         }
         finally { dialog.Close(); }

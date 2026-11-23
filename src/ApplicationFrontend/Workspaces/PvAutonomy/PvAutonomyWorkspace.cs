@@ -11,7 +11,8 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
     private HelpWindow? helpWindow;
     private readonly IrradianceWorkspaceController source;
     private readonly Func<Task> recheck;
-    private readonly TextBlock sourceText = Text(""), status = Text(""), summary = Text("", 15), details = Text("", 11), hover = Text("Scroll to zoom · drag to pan. Red marks identify intervals with unmet load.", 11);
+    private readonly TextBlock sourceText = Text(""), status = Text(""), summary = Text("", 15), hover = Text("");
+    private readonly TextBlock shortfallKey = Text("━  Unmet load");
     private readonly Button evaluate, stop, export;
     private readonly List<TextBox> fields = [];
     private readonly DailyLoadEditor load = new();
@@ -35,46 +36,51 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         }); actions.Children.Add(export); Actions = actions;
         var root = new DockPanel { Margin = new(16, 10, 16, 10) }; Content = root;
         var columns = new Grid();
-        var left = new Border { Background = Brushes.White, Child = load }; columns.Children.Add(left);
-        var right = new Grid { Background = Brushes.White }; columns.Children.Add(right);
+        var left = Card(load); columns.Children.Add(left);
+        var right = new Grid();
+        var results = Card(right); columns.Children.Add(results);
         right.RowDefinitions.Add(new() { Height = GridLength.Auto });
         right.RowDefinitions.Add(new() { MinHeight = 220 });
         right.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        root.Children.Add(new WorkspaceViewport(columns, left, right, sidebarWidth: 300, contentMinimumWidth: 500,
+        root.Children.Add(new WorkspaceViewport(columns, left, results, sidebarWidth: 300, contentMinimumWidth: 500,
             sidebarMinimumHeight: 600, contentMinimumHeight: 600));
-        var top = new StackPanel { Margin = new(12, 8, 12, 0) }; right.Children.Add(top);
-        sourceText.Margin = new(0, 0, 0, 8); top.Children.Add(sourceText);
-        top.Children.Add(Text("PV System Autonomy", 21));
-        top.Children.Add(Text("Check whether your panel and battery can supply the daily consumption during this study.", 11));
-        top.ToolTip = "Evaluate energy supply and battery charge over the study period.";
+        var top = new StackPanel { Margin = new(16, 12, 16, 0) }; right.Children.Add(top);
+        top.Children.Add(Heading("System settings", 19));
+        sourceText.Margin = new(0, 2, 0, 4); top.Children.Add(sourceText);
         var settings = new WrapPanel(); top.Children.Add(settings);
-        AddField(settings, "Panel area · m²", d => d.Area, (d, v) => d with { Area = v });
-        AddField(settings, "Panel efficiency · %", d => d.PanelEfficiency, (d, v) => d with { PanelEfficiency = v });
-        AddField(settings, "PV conversion efficiency · %", d => d.ConversionEfficiency, (d, v) => d with { ConversionEfficiency = v });
-        AddField(settings, "Battery capacity · Wh", d => d.Capacity, (d, v) => d with { Capacity = v });
-        AddField(settings, "Initial charge · %", d => d.InitialSoc, (d, v) => d with { InitialSoc = v });
-        fields[4].ToolTip = "Charge at the start of the entire study, not the displayed day.";
-        fields[2].ToolTip = "Total PV-side conversion efficiency. Battery charging/discharging is ideal in this model.";
+        AddField(settings, "Panel area · m²", "Active panel area receiving the study’s shaded irradiance.", d => d.Area, (d, v) => d with { Area = v });
+        AddField(settings, "Panel efficiency · %", "Percentage of incident solar energy converted to electricity by the panel.", d => d.PanelEfficiency, (d, v) => d with { PanelEfficiency = v });
+        AddField(settings, "PV conversion efficiency · %", "Percentage of the panel’s electrical output available to the load and battery. Battery charging and discharging are ideal in this model.", d => d.ConversionEfficiency, (d, v) => d with { ConversionEfficiency = v });
+        AddField(settings, "Battery capacity · Wh", "Usable energy the battery can store when fully charged.", d => d.Capacity, (d, v) => d with { Capacity = v });
+        AddField(settings, "Initial charge · %", "Battery charge at the start of the entire study period. Navigating the chart preserves the simulated charge.", d => d.InitialSoc, (d, v) => d with { InitialSoc = v });
         var commands = new WrapPanel(); top.Children.Add(commands);
-        evaluate = Button("Evaluate system", async () => { await recheck(); await Controller.EvaluateAsync(); }); evaluate.Background = Brushes.Teal; evaluate.Foreground = Brushes.White;
+        evaluate = Button("Evaluate system", async () => { await recheck(); await Controller.EvaluateAsync(); });
+        evaluate.Background = StudioTheme.Blue; evaluate.BorderBrush = StudioTheme.Blue; evaluate.Foreground = Brushes.White;
+        StudioTheme.Help(evaluate, "Calculate hourly PV supply, consumption and battery charge from the current shaded irradiance study.");
         stop = Button("Stop", Controller.Stop); commands.Children.Add(evaluate); commands.Children.Add(stop);
-        commands.Children.Add(Text("Initial charge applies at the study start.", 11));
-        commands.Children.Add(Button("Model & totals", () => MessageBox.Show(owner, Controller.Result == null ? "Evaluate the system to see totals. Battery charge/discharge is ideal; conversion efficiency applies to PV only." : details.Text,
-            Controller.IsCurrent ? "PV Autonomy · Model and totals" : "PV Autonomy · Previous totals (stale)", MessageBoxButton.OK, MessageBoxImage.Information)));
+        commands.Children.Add(Button("Model & totals", ShowModelTotals));
         summary.Margin = new(0, 5, 0, 2); top.Children.Add(summary);
-        top.Children.Add(Text("Hourly energy and battery charge", 15));
+        var chartHeading = Heading("Hourly energy and battery charge", 16);
+        chartHeading.Margin = new(0, 10, 0, 2); top.Children.Add(chartHeading);
         var legend = new WrapPanel(); top.Children.Add(legend);
         Legend(legend, "Load demand · Wh", PvSystemChart.LoadBrush, b => chart.ShowLoad = b);
         Legend(legend, "PV available · Wh", PvSystemChart.PvBrush, b => chart.ShowPv = b);
         Legend(legend, "Battery charge · %", PvSystemChart.SocBrush, b => chart.ShowSoc = b);
+        shortfallKey.Foreground = Brushes.Crimson; shortfallKey.VerticalAlignment = VerticalAlignment.Center;
+        legend.Children.Add(shortfallKey);
         var bottom = new StackPanel { Margin = new(12, 0, 12, 8) }; Grid.SetRow(bottom, 2); right.Children.Add(bottom);
         var navigation = new WrapPanel(); bottom.Children.Add(navigation);
-        navigation.Children.Add(Button("Full period", chart.Reset)); navigation.Children.Add(day);
-        navigation.Children.Add(Button("←", () => MoveDay(-1)));
-        navigation.Children.Add(Button("→", () => MoveDay(1)));
+        navigation.Children.Add(Button("Full period", chart.Reset, "Show the whole study. Scroll over the chart to zoom and drag to pan.")); navigation.Children.Add(day);
+        System.Windows.Automation.AutomationProperties.SetName(day, "Displayed study day");
+        var previousDay = Button("←", () => MoveDay(-1), "Show the previous day.");
+        var nextDay = Button("→", () => MoveDay(1), "Show the next day.");
+        System.Windows.Automation.AutomationProperties.SetName(previousDay, "Previous day");
+        System.Windows.Automation.AutomationProperties.SetName(nextDay, "Next day");
+        navigation.Children.Add(previousDay); navigation.Children.Add(nextDay);
         day.SelectedDateChanged += (_, _) => { if (day.SelectedDate is { } date) chart.Day(date); };
-        navigation.Children.Add(Button("First shortfall", () => { if (Controller.Result?.Summary.FirstShortfallIntervalStart is { } start) { day.SelectedDate = start.Date; chart.Day(start.Date); } }));
-        navigation.Children.Add(Button("Hourly values", ShowTable));
+        navigation.Children.Add(Button("First shortfall", () => { if (Controller.Result?.Summary.FirstShortfallIntervalStart is { } start) { day.SelectedDate = start.Date; chart.Day(start.Date); } },
+            "Show the first interval with unmet consumption. Red marks along the chart identify these intervals."));
+        navigation.Children.Add(Button("Hourly values", ShowTable, "Inspect the actual interval bounds, energy values, battery charge and unmet consumption."));
         hover.MinHeight = 34; bottom.Children.Add(hover); chart.Hover += value => hover.Text = value;
         status.Margin = new(0, 7, 0, 0); bottom.Children.Add(status);
         chart.Margin = new(10, 0, 10, 0); Grid.SetRow(chart, 1); right.Children.Add(chart);
@@ -82,10 +88,11 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         Controller.Changed += OnChanged; source.SourceChanged += OnSourceChanged; owner.Activated += OnActivated;
         LoadFields(); Refresh();
     }
-    private void AddField(Panel panel, string label, Func<PvSettingsDraft, string> get, Func<PvSettingsDraft, string, PvSettingsDraft> set)
+    private void AddField(Panel panel, string label, string help, Func<PvSettingsDraft, string> get, Func<PvSettingsDraft, string, PvSettingsDraft> set)
     {
-        var group = new StackPanel { Width = 132, Margin = new(0, 8, 6, 0) }; group.Children.Add(Text(label, 11));
+        var group = new StackPanel { Width = 150, VerticalAlignment = VerticalAlignment.Bottom, Margin = new(0, 8, 8, 0) }; group.Children.Add(Text(label));
         var box = new TextBox { Padding = new(6, 4, 6, 4), Margin = new(0, 3, 0, 4), Tag = get };
+        StudioTheme.Help(box, help);
         System.Windows.Automation.AutomationProperties.SetName(box, label); fields.Add(box); group.Children.Add(box); panel.Children.Add(group);
         box.TextChanged += (_, _) => { if (!loading) Controller.SetDraft(set(Controller.Draft, box.Text)); };
     }
@@ -110,25 +117,41 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         var draft = Controller.Draft;
         if (fields.Any(f => f.Text != ((Func<PvSettingsDraft, string>)f.Tag)(draft)) || !load.Values.SequenceEqual(draft.Load)) LoadFields();
         var snapshot = source.Source.Snapshot;
-        if (snapshot == null)
-            sourceText.Text = source.Source.Reason;
-        else
+        sourceText.Visibility = snapshot == null ? Visibility.Collapsed : Visibility.Visible;
+        if (snapshot != null)
         {
-            var angles = EquipmentOrientation.Describe(snapshot.Settings);
+            var study = snapshot.Settings;
+            var angles = EquipmentOrientation.Describe(study);
             string facing = angles.PanelAzimuth is double azimuth ? $"{azimuth:0.##}° from south" : "undefined (flat)";
-            sourceText.Text = $"Shaded irradiance ready · {snapshot.Settings.Start:yyyy-MM-dd} – {snapshot.Settings.End:yyyy-MM-dd} · {snapshot.TimeZoneId} · panel tilt {angles.PanelTilt:0.##}° · front azimuth {facing}";
+            sourceText.Text = $"{study.Start:yyyy-MM-dd} – {study.End:yyyy-MM-dd} · {snapshot.TimeZoneId} · panel tilt {angles.PanelTilt:0.##}° · front azimuth {facing}";
         }
         evaluate.IsEnabled = Controller.CanEvaluate; stop.IsEnabled = Controller.IsBusy; export.IsEnabled = Controller.CanExport;
         status.Text = snapshot == null ? source.Source.Reason : Controller.Problem ?? Controller.Status;
         chart.SetResult(Controller.Result); chart.Stale = !Controller.IsCurrent; chart.Opacity = Controller.IsCurrent ? 1 : .55; chart.InvalidateVisual();
+        summary.Visibility = Controller.Result == null ? Visibility.Collapsed : Visibility.Visible;
+        shortfallKey.Visibility = Controller.Result?.Summary.UnmetLoadWh > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (Controller.Result is { } result)
         {
             var s = result.Summary;
-            summary.Text = $"{(Controller.IsCurrent ? "" : "Previous · ")}Minimum battery charge {s.MinimumSocPercent:0.#}%    Final charge {result.Hours[^1].EndSocPercent:0.#}%    Unmet consumption {s.UnmetLoadWh:0.##} Wh";
-            details.Text = $"PV available {s.PvWh:0.##} Wh · Load demand {s.LoadWh:0.##} Wh · Served {s.ServedLoadWh:0.##} Wh · Curtailed {s.CurtailedWh:0.##} Wh\n{s.HoursContainingShortfall} intervals contain unmet load. First: {s.FirstShortfallIntervalStart?.ToString("yyyy-MM-dd HH:mm zzz") ?? "none"}.\nMinimum charge includes subhour steps and the initial charge. The first shortfall identifies an interval, not an exact outage instant.\n{result.Assumptions}\nConservative shading assumptions carry through from Solar Irradiance. No unmet load in this study does not guarantee supply in unseen weather.";
+            summary.Text = $"{(Controller.IsCurrent ? "" : "Previous · ")}Minimum charge {s.MinimumSocPercent:0.#}%    Final charge {result.Hours[^1].EndSocPercent:0.#}%    Unmet load {s.UnmetLoadWh:0.##} Wh";
             day.DisplayDateStart = result.Hours[0].Start.Date; day.DisplayDateEnd = result.Hours[^1].Start.Date;
         }
-        else summary.Text = "Minimum battery charge —    Final charge —    Unmet consumption —";
+    }
+    private void ShowModelTotals()
+    {
+        var result = Controller.Result;
+        string title = "PV Autonomy · Model and totals";
+        string message = "Evaluate the system to see totals. Conversion efficiency applies to PV generation. Battery charging and discharging are ideal in this model.";
+        if (result != null)
+        {
+            var s = result.Summary;
+            if (!Controller.IsCurrent) title = "PV Autonomy · Previous totals (stale)";
+            message = $"PV available {s.PvWh:0.##} Wh · Load demand {s.LoadWh:0.##} Wh · Served {s.ServedLoadWh:0.##} Wh · Curtailed {s.CurtailedWh:0.##} Wh\n" +
+                $"Intervals with unmet load: {s.HoursContainingShortfall}. First interval start: {s.FirstShortfallIntervalStart?.ToString("yyyy-MM-dd HH:mm zzz") ?? "none"}.\n" +
+                $"Minimum charge includes the initial charge and all subhour steps.\n{result.Assumptions}\n" +
+                "The calculation uses Solar Irradiance’s conservative shading assumptions. Its supply estimate applies to this study period.";
+        }
+        MessageBox.Show(owner, message, title, MessageBoxButton.OK, MessageBoxImage.Information);
     }
     private void ShowTable()
     {
@@ -145,10 +168,13 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
     private void ShowHelp() => HelpWindow.Open(ref helpWindow, owner, "PV Autonomy · Help",
         "1. Complete and update Solar Irradiance.\n2. Enter 24 hourly consumption values in Wh. They repeat by study-local hour (DST days can have 23 or 25 hours).\n3. Enter panel area, efficiencies, battery capacity in Wh and charge at the study start. Click Evaluate system.\n\nThe graph overlays load demand and PV energy available on the Wh axis, with battery charge on the fixed 0–100% axis. Red marks mean unmet load, even if charge recovered before the hour ended. Hover for actual interval bounds and duration. Zooming never resets the battery.\n\nConversion losses apply to PV only. Battery charge/discharge is ideal, all capacity is accessible, and power limits, ageing and temperature effects are omitted. Results describe the supplied study period only.\n\nExport PV results saves CSV, JSON and XLSX, including inputs, assumptions and the full irradiance source in JSON. Settings are restored on restart; results require an explicit evaluation."
         );
-    internal static TextBlock Text(string value, double size = 12) => new() { Text = value, FontSize = size, TextWrapping = TextWrapping.Wrap, Margin = new(0, 2, 0, 2), Foreground = Brushes.DarkSlateGray };
-    internal static Button Button(string label, Action action)
+    private static Border Card(UIElement child) => new() { Child = child, Background = StudioTheme.Surface, BorderBrush = StudioTheme.Line, BorderThickness = new(1), CornerRadius = new(8) };
+    internal static TextBlock Text(string value, double size = 12) => new() { Text = value, FontSize = size, TextWrapping = TextWrapping.Wrap, Margin = new(0, 2, 0, 2), Foreground = StudioTheme.Muted };
+    internal static TextBlock Heading(string value, double size) => new() { Text = value, FontSize = size, FontWeight = FontWeights.SemiBold, Foreground = StudioTheme.Ink, TextWrapping = TextWrapping.Wrap };
+    internal static Button Button(string label, Action action, string? help = null)
     {
-        var button = new Button { Content = label, Padding = new(10, 6, 10, 6), Margin = new(0, 3, 6, 3), Background = Brushes.White, Foreground = Brushes.DarkSlateGray, BorderBrush = Brushes.LightSteelBlue };
+        var button = new Button { Content = label, Padding = new(10, 6, 10, 6), Margin = new(0, 3, 6, 3) };
+        if (help != null) StudioTheme.Help(button, help);
         button.Click += (_, _) => action(); return button;
     }
     public void Dispose()

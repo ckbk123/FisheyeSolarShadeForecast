@@ -221,8 +221,11 @@ public sealed class ResponsiveLayoutTests
             Assert.Equal(UpdateState.Failed, window.UpdateStateForTest);
             var root = Assert.IsAssignableFrom<FrameworkElement>(window.Content);
             await LayoutHidden(root, 464, 280);
-            var availability = Descendants<TextBlock>(root).Single(t => t.Text.StartsWith("PV Autonomy · ", StringComparison.Ordinal));
-            availability.Text += "\n" + failure;
+            var pvTab = window.Workspaces.Items.OfType<TabItem>().Single(t => Equals(t.Header, "PV Autonomy"));
+            Assert.False(pvTab.IsEnabled);
+            Assert.True(ToolTipService.GetShowOnDisabled(pvTab));
+            Assert.False(string.IsNullOrWhiteSpace(pvTab.ToolTip as string));
+            pvTab.ToolTip = failure;
             await LayoutHidden(root, 464, 280);
             var viewport = Descendants<WorkspaceViewport>(window.Irradiance).Single();
             Assert.True(viewport.ActualHeight >= 32, $"Only {viewport.ActualHeight} pixels remain for study controls.");

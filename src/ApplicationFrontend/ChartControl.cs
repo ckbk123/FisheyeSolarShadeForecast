@@ -14,12 +14,17 @@ public sealed class IrradianceChart : FrameworkElement
     private Point? drag;
     public int Component { get; set; }
     public Action<string>? HoverText { get; set; }
-    private static readonly Pen Amber = Stroke(216, 146, 38, 1.5), Teal = Stroke(17, 137, 122, 1.5);
+    public static Brush BeforeBrush => StudioTheme.Amber;
+    public static Brush AfterBrush => StudioTheme.Teal;
+    private static readonly Typeface ChartFace = new(StudioTheme.Font, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+    private static readonly Pen BeforeLine = Stroke(StudioTheme.Amber, 1.5), AfterLine = Stroke(StudioTheme.Teal, 1.5);
     private static readonly Pen MajorGrid = Stroke(221, 229, 233), MinorGrid = Stroke(240, 243, 245);
     private static readonly Pen DayGrid = Stroke(171, 189, 198), HourGrid = Stroke(230, 237, 240);
     private static readonly Pen Axis = Stroke(128, 148, 158);
     private static Pen Stroke(byte r, byte g, byte b, double width = 1)
-    { var pen = new Pen(new SolidColorBrush(Color.FromRgb(r, g, b)), width); pen.Freeze(); return pen; }
+        => Stroke(new SolidColorBrush(Color.FromRgb(r, g, b)), width);
+    private static Pen Stroke(Brush brush, double width)
+    { var pen = new Pen(brush, width); pen.Freeze(); return pen; }
     private double PlotWidth => Math.Max(1, ActualWidth - Left - RightMargin);
     private double Fraction(double x) => Math.Clamp((x - Left) / PlotWidth, 0, 1);
     private DateTimeOffset TimeAt(double x) => rows[first].Start + (rows[last].End - rows[first].Start) * Fraction(x);
@@ -92,14 +97,18 @@ public sealed class IrradianceChart : FrameworkElement
     private void Draw(DrawingContext dc)
     {
         double w = ActualWidth, h = ActualHeight;
-        dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, Math.Max(0, w), Math.Max(0, h)));
+        dc.DrawRectangle(StudioTheme.Surface, null, new Rect(0, 0, Math.Max(0, w), Math.Max(0, h)));
         if (w < 100 || h < 100) return;
         double right = w - RightMargin, bottom = h - BottomMargin;
         FormattedText Label(string value, double size = 11, Brush? brush = null) => new(value, CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight, new Typeface("Segoe UI"), size, brush ?? Brushes.SlateGray, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            FlowDirection.LeftToRight, ChartFace, size, brush ?? StudioTheme.Muted, VisualTreeHelper.GetDpi(this).PixelsPerDip);
         void Text(string value, double x, double y, double size = 11) => dc.DrawText(Label(value, size), new(x, y));
         if (rows.Length == 0)
-        { Text("Your panel irradiance will appear here", Left + 30, h / 2 - 16, 18); Text("Choose your inputs, then select Update results.", Left + 30, h / 2 + 14); return; }
+        {
+            var prompt = Label("Update results to plot irradiance.", 15);
+            dc.DrawText(prompt, new(Math.Max(0, (w - prompt.Width) / 2), (h - prompt.Height) / 2));
+            return;
+        }
 
         var start = rows[first].Start; var end = rows[last].End;
         if (end <= start) return;
@@ -160,7 +169,7 @@ public sealed class IrradianceChart : FrameworkElement
                 }
             geometry.Freeze(); dc.DrawGeometry(null, pen, geometry);
         }
-        Draw(r => Before(r), Amber); Draw(After, Teal);
+        Draw(r => Before(r), BeforeLine); Draw(After, AfterLine);
         dc.Pop();
         dc.DrawLine(Axis, new(Left, Top), new(Left, bottom));
         dc.DrawLine(Axis, new(Left, bottom), new(right, bottom));
@@ -185,7 +194,7 @@ public sealed class IrradianceChart : FrameworkElement
             if (center - width / 2 < Left || center + width / 2 > right || center - width / 2 < previousRight + 8) continue;
             var label = Label(day.Date.ToString(b - a >= 82 ? "dd.MM.yyyy" : "dd.MM"), 11);
             // On long views a date spans several narrow day bands; keep separators out of its text.
-            dc.DrawRectangle(Brushes.White, null, new Rect(center - label.Width / 2 - 2, bottom + 29, label.Width + 4, label.Height + 3));
+            dc.DrawRectangle(StudioTheme.Surface, null, new Rect(center - label.Width / 2 - 2, bottom + 29, label.Width + 4, label.Height + 3));
             dc.DrawText(label, new(center - label.Width / 2, bottom + 31)); previousRight = center + label.Width / 2;
         }
     }

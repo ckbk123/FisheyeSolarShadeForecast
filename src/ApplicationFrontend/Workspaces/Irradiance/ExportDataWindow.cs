@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Win32;
 
@@ -22,38 +21,31 @@ public sealed class ExportDataWindow : Window
 
     public ExportDataWindow(bool isotropic, Window? owner = null, Func<Window, string?>? folderPicker = null)
     {
-        Title = "Export data"; Width = 620; Height = 620; MinWidth = 360; MinHeight = 300;
-        Background = Brushes.White;
+        Title = "Export data"; Width = 560; Height = 415; MinWidth = 360; MinHeight = 300;
+        Background = StudioTheme.Surface;
         if (owner != null) WindowWorkArea.FitToOwner(this, owner);
-        else WindowWorkArea.FitOnStartup(this);
+        else { StudioTheme.Apply(this); WindowWorkArea.FitOnStartup(this); }
         chooseFolder = folderPicker ?? PickFolder;
-
-        var buttonStyle = new Style(typeof(Button));
-        buttonStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 7, 12, 7)));
-        buttonStyle.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0, 4, 8, 4)));
-        buttonStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.White));
-        buttonStyle.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(191, 209, 214))));
-        buttonStyle.Setters.Add(new Setter(Control.CursorProperty, Cursors.Hand));
-        Resources.Add(typeof(Button), buttonStyle);
 
         var panel = new StackPanel { Margin = new(22) };
         Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-        panel.Children.Add(IrradianceWorkspace.Label("Choose data to export", 20));
-        panel.Children.Add(IrradianceWorkspace.Label("Export the current complete result for the full selected period.", 13));
+        var title = IrradianceWorkspace.Label("Export results", 21, StudioTheme.Ink);
+        title.FontWeight = FontWeights.SemiBold; panel.Children.Add(title);
         AutomationProperties.SetAutomationId(irradiance, "ExportIrradiance");
         panel.Children.Add(irradiance);
         string diffuseModel = isotropic ? "Isotropic" : "Hay–Davies";
-        panel.Children.Add(IrradianceWorkspace.Label(
-            $"irradiance.xlsx · 6 columns\nTimeseries, direct, diffuse ({diffuseModel}), shading factor direct, shading factor diffuse, and final total irradiance.", 13));
-        panel.Children.Add(IrradianceWorkspace.Label(
-            "Direct and diffuse: unshaded irradiance on the panel (W/m²). Factors: transmission from 0 to 1. Final total: shaded irradiance (W/m²). Timeseries includes UTC offsets.", 12));
-        panel.Children.Add(IrradianceWorkspace.Label("When an unshaded component is zero, its shading factor is blank.", 12));
+        panel.Children.Add(IrradianceWorkspace.Label($"Full study period · {diffuseModel} diffuse", 13));
+        StudioTheme.Help(irradiance,
+            $"The workbook has 6 columns. Timeseries, direct, diffuse ({diffuseModel}), shading factor direct, shading factor diffuse, and final total irradiance. " +
+            "Times include UTC offsets. Direct and diffuse are unshaded panel irradiance in W/m². Factors give transmission from 0 to 1. " +
+            "A factor is blank when its unshaded component is zero. The final total is shaded irradiance in W/m².");
         panel.Children.Add(new Separator { Margin = new(0, 16, 0, 12) });
 
         var folderLabel = new Label { Content = "Destination folder", Target = destination, Padding = new(0), FontSize = 13 };
         panel.Children.Add(folderLabel);
         AutomationProperties.SetName(destination, "Destination folder");
+        StudioTheme.Help(destination, "Choose an existing folder. SolarShade creates a uniquely named subfolder there for irradiance.xlsx.");
         AutomationProperties.SetAutomationId(destination, "ExportDestination");
         panel.Children.Add(destination);
         var browse = new Button { Content = "Browse…", HorizontalAlignment = HorizontalAlignment.Left };
@@ -64,7 +56,6 @@ public sealed class ExportDataWindow : Window
             if (selected != null) destination.Text = selected;
         };
         panel.Children.Add(browse);
-        panel.Children.Add(IrradianceWorkspace.Label("A new, uniquely named export subfolder will be created inside this folder.", 12));
         validation.Margin = new(0, 10, 0, 8);
         AutomationProperties.SetLiveSetting(validation, AutomationLiveSetting.Polite);
         AutomationProperties.SetAutomationId(validation, "ExportValidation");
@@ -75,7 +66,7 @@ public sealed class ExportDataWindow : Window
         cancel.Click += (_, _) => Close();
         commands.Children.Add(cancel);
         AutomationProperties.SetAutomationId(export, "ConfirmExportData");
-        export.Background = new SolidColorBrush(Color.FromRgb(15, 125, 111)); export.Foreground = Brushes.White;
+        export.Background = StudioTheme.Blue; export.Foreground = Brushes.White;
         export.Click += (_, _) =>
         {
             Validate();

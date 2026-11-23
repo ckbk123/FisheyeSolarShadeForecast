@@ -1,0 +1,159 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+                    xmlns:ui="clr-namespace:SolarShade.Desktop">
+    <Style TargetType="Button">
+        <Setter Property="Background" Value="White"/>
+        <Setter Property="Foreground" Value="{x:Static ui:StudioTheme.Ink}"/>
+        <Setter Property="BorderBrush" Value="#BFCDD8"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="10,5"/>
+        <Setter Property="Margin" Value="0,3,5,3"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Body" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter RecognizesAccessKey="True" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Body" Property="BorderBrush" Value="#7195B7"/></Trigger>
+                        <Trigger Property="IsPressed" Value="True"><Setter TargetName="Body" Property="Opacity" Value="0.82"/></Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Body" Property="BorderBrush" Value="#3071AC"/></Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Body" Property="Opacity" Value="0.53"/></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="HeaderButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Background" Value="#203448"/>
+        <Setter Property="Foreground" Value="#F2F6FA"/>
+        <Setter Property="BorderBrush" Value="#566B7D"/>
+        <Setter Property="Margin" Value="0,3,6,3"/>
+        <Setter Property="Padding" Value="12,6"/>
+    </Style>
+
+    <Style TargetType="TextBox">
+        <Setter Property="Background" Value="White"/>
+        <Setter Property="Foreground" Value="{x:Static ui:StudioTheme.Ink}"/>
+        <Setter Property="BorderBrush" Value="{x:Static ui:StudioTheme.Line}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="7,4"/>
+        <Setter Property="Margin" Value="0,3,6,6"/>
+        <Setter Property="SelectionBrush" Value="#A4C9E8"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                        <ScrollViewer x:Name="PART_ContentHost" Focusable="False" Margin="0"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Frame" Property="Opacity" Value="0.60"/></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter Property="BorderBrush" Value="{x:Static ui:StudioTheme.Blue}"/></Trigger>
+        </Style.Triggers>
+    </Style>
+    <Style TargetType="ComboBox">
+        <Setter Property="Padding" Value="7,4"/>
+        <Setter Property="Margin" Value="0,3,6,6"/>
+        <Setter Property="BorderBrush" Value="{x:Static ui:StudioTheme.Line}"/>
+        <Setter Property="Foreground" Value="{x:Static ui:StudioTheme.Ink}"/>
+        <Setter Property="Background" Value="White"/>
+        <Style.Triggers>
+            <Trigger Property="IsEditable" Value="False">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ComboBox">
+                            <Grid>
+                                <ToggleButton x:Name="Toggle" Focusable="False" ClickMode="Press" Background="{TemplateBinding Background}"
+                                              BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                                              IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                                                <Path Data="M0,0 L4,4 8,0" Stroke="#506477" StrokeThickness="1.4"
+                                                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,9,0"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                                <Border Padding="{TemplateBinding Padding}" Margin="1,1,24,1" IsHitTestVisible="False">
+                                    <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                      ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}" VerticalAlignment="Center"/>
+                                </Border>
+                                <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
+                                       AllowsTransparency="True" Focusable="False">
+                                    <Border Background="White" BorderBrush="{x:Static ui:StudioTheme.Line}" BorderThickness="1" Padding="2"
+                                            MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                            MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                        <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto"><ItemsPresenter/></ScrollViewer>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Toggle" Property="BorderBrush" Value="#7195B7"/></Trigger>
+                                <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Toggle" Property="BorderBrush" Value="{x:Static ui:StudioTheme.Blue}"/></Trigger>
+                                <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.60"/></Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+    <Style TargetType="TabItem">
+        <Setter Property="Padding" Value="16,7"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="Tab" Padding="{TemplateBinding Padding}" Background="Transparent" BorderBrush="Transparent" BorderThickness="0,0,0,2">
+                        <ContentPresenter x:Name="TabTitle" ContentSource="Header" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                          TextElement.FontWeight="SemiBold" TextElement.Foreground="{x:Static ui:StudioTheme.Muted}" RecognizesAccessKey="True"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Tab" Property="Background" Value="#E6EDF3"/></Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="TabTitle" Property="TextElement.Foreground" Value="{x:Static ui:StudioTheme.Blue}"/>
+                            <Setter TargetName="Tab" Property="BorderBrush" Value="{x:Static ui:StudioTheme.Blue}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Tab" Property="Background" Value="#DEE9F3"/></Trigger>
+                        <Trigger Property="IsEnabled" Value="False"><Setter TargetName="TabTitle" Property="TextElement.Foreground" Value="#667787"/></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style TargetType="ToolTip">
+        <Setter Property="MaxWidth" Value="370"/>
+        <Setter Property="Padding" Value="11,8"/>
+        <Setter Property="FontFamily" Value="{x:Static ui:StudioTheme.Font}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="{x:Static ui:StudioTheme.Navy}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Background="{TemplateBinding Background}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter>
+                            <ContentPresenter.Resources>
+                                <DataTemplate DataType="{x:Type sys:String}"><TextBlock Text="{Binding}" TextWrapping="Wrap"/></DataTemplate>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>

@@ -7,7 +7,7 @@ namespace SolarShade.Desktop;
 
 public sealed partial class IrradianceWorkspace
 {
-    private const string EquipmentCompass = "Outward-facing azimuth, clockwise from geographic south. S 0° · W +90° · N ±180° · E −90° (or 270°).";
+    private const string EquipmentCompass = "S 0°  ·  W +90°  ·  N ±180°  ·  E −90°";
     private readonly Dictionary<string, Slider> angleSliders = new();
     private readonly StackPanel flatHeadingInputs = new();
     private readonly TextBlock phonePoseInfo = Label("", 12);
@@ -18,11 +18,14 @@ public sealed partial class IrradianceWorkspace
 
     private void AddPhoneControls(Panel parent)
     {
-        Section(parent, "02  CAMERA POSE");
+        Section(parent, "Camera pose");
         parent.Children.Add(Label(EquipmentCompass, 11));
-        AddAngleField(parent, "Phone tilt from horizontal, °", nameof(UserSettings.PhoneInclination));
-        AddAngleField(parent, "Lens azimuth, ° from south", nameof(UserSettings.PhoneFacingAzimuth));
-        AddAngleField(flatHeadingInputs, "Image-top bearing, ° clockwise from true north", nameof(UserSettings.FlatImageTopBearing));
+        AddAngleField(parent, "Phone tilt from horizontal, °", nameof(UserSettings.PhoneInclination),
+            "Raise the lens end uphill. At 0° the phone is flat with the lens pointing up. At 90° the lens points toward the horizon.");
+        AddAngleField(parent, "Lens azimuth, ° clockwise from south", nameof(UserSettings.PhoneFacingAzimuth),
+            "Use the horizontal direction of the outward lens axis. Measure clockwise from geographic south. East can be entered as −90° or 270°.");
+        AddAngleField(flatHeadingInputs, "Image-top bearing, ° clockwise from true north", nameof(UserSettings.FlatImageTopBearing),
+            "With a flat phone, this bearing orients the photograph and its sun path. When the image top points north, east appears on the left.");
         parent.Children.Add(flatHeadingInputs);
         parent.Children.Add(phonePoseInfo);
         useUphillPlacement = Button("Use lens-end-uphill placement", () =>
@@ -36,28 +39,32 @@ public sealed partial class IrradianceWorkspace
             EquipmentOrientation.PlacePhoneOnPanel(settings);
             ApplyPhonePlacement();
         });
-        placePhoneOnPanel.ToolTip = "Copy the panel’s current tilt and front direction once. The lens faces outward and the lens end goes uphill. With a flat panel the photograph keeps its heading.";
+        StudioTheme.Help(placePhoneOnPanel, "Copy the panel’s current tilt and front direction once. The lens faces outward and the lens end goes uphill. With a flat panel the photograph keeps its heading.");
         parent.Children.Add(placePhoneOnPanel);
     }
 
     private void AddPanelControls(Panel parent)
     {
-        Section(parent, "05  PANEL INSTALLATION");
+        Section(parent, "Panel installation");
         parent.Children.Add(Label(EquipmentCompass, 11));
-        AddAngleField(parent, "Panel tilt from horizontal, °", nameof(UserSettings.PanelTilt), 0, 90);
-        AddAngleField(parent, "Panel front azimuth, ° from south", nameof(UserSettings.PanelFacingAzimuth), -180, 180);
+        AddAngleField(parent, "Panel tilt from horizontal, °", nameof(UserSettings.PanelTilt),
+            "Measure the angle between the panel surface and horizontal. Enter 0° for a flat panel or 90° for a vertical panel.", 0, 90);
+        AddAngleField(parent, "Panel front azimuth, ° clockwise from south", nameof(UserSettings.PanelFacingAzimuth),
+            "Use the horizontal direction of the outward normal on the solar-cell face. A 28° south-facing panel has tilt 28° and front azimuth 0°. East can be entered as −90° or 270°.", -180, 180);
         parent.Children.Add(panelPoseInfo);
     }
 
-    private void AddAngleField(Panel parent, string label, string property, double? minimum = null, double? maximum = null)
+    private void AddAngleField(Panel parent, string label, string property, string help, double? minimum = null, double? maximum = null)
     {
         var row = new DockPanel();
         var number = MakeField(property);
         number.Width = 80;
         AutomationProperties.SetName(number, label);
+        StudioTheme.Help(number, help);
         DockPanel.SetDock(number, Dock.Right);
         row.Children.Add(number);
         var caption = Label(label, 12);
+        StudioTheme.Help(caption, help);
         caption.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(caption);
         parent.Children.Add(row);
@@ -67,6 +74,7 @@ public sealed partial class IrradianceWorkspace
             Margin = new(0, 0, 8, 7), Tag = property
         };
         AutomationProperties.SetName(slider, label);
+        StudioTheme.Help(slider, help);
         angleSliders.Add(property, slider);
         slider.ValueChanged += (_, _) =>
         {
@@ -117,18 +125,17 @@ public sealed partial class IrradianceWorkspace
                     ? $"Lens zenith {pose.PhoneTilt:G}° from vertical up. Use lens-end-uphill placement to bring the lens to 90° at the horizon."
                     : "Use lens-end-uphill placement to set the image top uphill.";
                 if (pose.PhoneTilt == 180)
-                    reset += $" At nadir the facing azimuth is undefined; the new horizon pose will face {EquipmentOrientation.FromNorth(settings.BottomAzimuth):0.##}° from south.";
+                    reset += $" At nadir the facing azimuth is undefined. The new horizon pose will face {EquipmentOrientation.FromNorth(settings.BottomAzimuth):0.##}° from south.";
                 phonePoseInfo.Text = $"Saved pose · {pose.PhonePlacement}. Its original orientation is in use. {reset}";
             }
             else if (flat)
-                phonePoseInfo.Text = "Flat phone · lens points straight up. Lens azimuth is undefined. Image top orients the photograph and its sun path. With image top north, east appears on the left.";
+                phonePoseInfo.Text = "Flat phone · lens azimuth is undefined.";
             else
-                phonePoseInfo.Text = "Lens azimuth follows the outward optical axis. Raise the lens end of the phone. Use geographic directions from a true-north compass."
-                    + (settings.CameraRoll != 0 && pose.ImageTopBearing is { } top
-                        ? $" Saved image-top bearing {top:0.##}° clockwise from true north." : "");
-            panelPoseInfo.Text = pose.PanelTilt == 0
-                ? "Flat panel · the front normal points straight up. Front azimuth is undefined."
-                : "Front azimuth follows the face of the solar cells. A 28° south-facing panel has tilt 28° and azimuth 0°.";
+                phonePoseInfo.Text = settings.CameraRoll != 0 && pose.ImageTopBearing is { } top
+                    ? $"Image top {top:0.##}° clockwise from true north · saved roll {settings.CameraRoll:0.##}°"
+                    : "Lens end uphill";
+            panelPoseInfo.Text = "Flat panel · front azimuth is undefined.";
+            panelPoseInfo.Visibility = pose.PanelTilt == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         finally { loading = wasLoading; }
 

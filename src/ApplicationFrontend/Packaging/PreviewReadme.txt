@@ -1,9 +1,12 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.0
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.1
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
 No separate .NET installation is required. The first launch/model use can take
 longer while Windows extracts the bundled runtime and model.
+
+Hover over a study control for guidance, or focus it and press F1. Escape closes
+keyboard help. Open Help for the full guide while working on your study.
 
 1. Open Solar Irradiance. Load the example or select your study inputs.
    Both the phone and panel use tilt from horizontal and clockwise azimuth
@@ -24,7 +27,7 @@ longer while Windows extracts the bundled runtime and model.
 4. Enter 24 hourly load values in Wh, panel area and efficiencies, battery
    capacity in Wh and initial charge. Click Evaluate system.
 5. In Solar Irradiance, click Export data, keep Irradiance (.xlsx) checked,
-   choose a destination folder and click Export. The workbook includes all
+   choose a destination folder and confirm with Export data. The workbook includes all
    intervals, direct/diffuse panel irradiance, both shading factors and final
    shaded total. The diffuse header names Isotropic or Hay-Davies. Irradiance
    uses W/m2; factors are shaded/unshaded, blank when the baseline is zero.

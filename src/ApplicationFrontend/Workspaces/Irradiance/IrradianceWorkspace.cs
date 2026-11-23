@@ -3,6 +3,7 @@ using System.Globalization;
 using SolarShade.Camera;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -52,24 +53,25 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private Evaluation? completed { get => controller.Completed; set => controller.Completed = value; }
     private readonly Dictionary<string, TextBox> fields = new();
     private readonly HashSet<string> invalidFields = new();
-    private readonly TextBlock status = Label("Ready when you are", 13), detail = Label("Start with your data, or load the included example.", 12), maskInfo = Label("Choose a sky photo to begin", 12), calibrationInfo = Label("No camera profile selected", 11);
+    private readonly TextBlock status = Label("", 13), detail = Label("", 12), maskInfo = Label("Choose a sky photo", 12), calibrationInfo = Label("No camera profile selected", 12);
     private readonly Button reviewCalibration = new() { Content = "Review checkerboard photos", IsEnabled = false };
+    private readonly Button loadProfile = new() { Content = "Load camera profile…" };
     private CalibrationReview? calibrationReview;
     private CalibrationReviewWindow? calibrationReviewWindow;
     private string? reviewedProfile;
     private string? reviewedProfileFingerprint;
-    private readonly TextBlock beforeEnergy = Label("—", 26), afterEnergy = Label("—", 26), reduction = Label("—", 26), hover = Label("Scroll to zoom · drag to pan · click Full period to reset", 11);
-    private readonly TextBlock provenance = Label("Horizontal data is retained; both graph curves refer to the panel.", 11);
+    private readonly TextBlock beforeEnergy = Label("—", 27), afterEnergy = Label("—", 27), reduction = Label("—", 27), hover = Label("", 12);
+    private readonly TextBlock provenance = Label("", 12);
     private readonly ImageOverlayPreview photo = new();
     private readonly CheckBox showCardinals = new() { Content = "Show cardinal directions", VerticalAlignment = VerticalAlignment.Center, Margin = new(8, 0, 8, 0) };
-    private readonly TextBlock cardinalInfo = Label("Cardinal directions unavailable · add a calibrated sky photo", 11);
+    private readonly TextBlock cardinalInfo = Label("", 12);
     private readonly TextBlock fieldOfViewInfo = Label("FOV unavailable", 11);
     private int orientedPhotoWidth, orientedPhotoHeight;
     private long orientationRevision;
     private byte[]? displayedPhoto, displayedCardinals;
     private CardinalDirectionOverlayResult? currentCardinals;
     private readonly MaskOverlayPreview maskPreview = new();
-    private readonly TextBlock sunPathInfo = Label("Sun path unavailable · add a calibrated sky photo", 11);
+    private readonly TextBlock sunPathInfo = Label("", 12);
     private readonly CheckBox showSunPath = new() { Content = "Show sun path", VerticalAlignment = VerticalAlignment.Center, Margin = new(12, 0, 16, 0) };
     private bool sunPathPublishedEarly;
     private bool sunPathIsCurrent;
@@ -87,7 +89,6 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private ComboBox provider = null!, model = null!, resolution = null!, images = null!, zone = null!, window = null!;
     private CheckBox isotropic = null!, useSystemZone = null!;
     private DatePicker graphDay = null!;
-    private readonly Brush ink = new SolidColorBrush(Color.FromRgb(25, 48, 58)), accent = new SolidColorBrush(Color.FromRgb(15, 125, 111));
     public IrradianceWorkspace(Window owner, IrradianceWorkspaceController controller, Func<TimeZoneInfo>? systemZoneProvider = null, bool loadExampleOnFirstRun = true)
     {
         this.owner = owner; this.controller = controller;
@@ -100,10 +101,9 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         systemZone = systemZoneProvider ?? TimeZoneSelection.CurrentSystemZone;
         settings = WeatherSourceSelection.Normalize(AppData.ReadSettings() ?? PortablePaths.Example());
         TimeZoneSelection.ApplySystemZone(settings, systemZone());
-        AddStyles();
         var root = new DockPanel(); Content = root;
         var actions = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
-        Actions = actions; actions.Resources = Resources;
+        Actions = actions;
         actions.Children.Add(Button("Load example", async () => await LoadExample()));
         actions.Children.Add(Button("Help", ShowHelp));
         savedStudies.Click += (_, _) => ShowSavedStudies(); actions.Children.Add(savedStudies);
@@ -131,11 +131,10 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         fixedFooter.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         fixedFooter.ColumnDefinitions.Add(new());
         var updateControls = new StackPanel();
-        var updateBlock = new Border { Child = updateControls, MaxWidth = 348, Padding = new(10, 5, 10, 3),
-            Background = new SolidColorBrush(Color.FromRgb(231, 243, 240)),
-            BorderBrush = accent, BorderThickness = new(4, 0, 0, 0) };
+        var updateBlock = new Border { Child = updateControls, MaxWidth = 348, Padding = new(12, 6, 10, 4),
+            Background = StudioTheme.Surface, BorderBrush = StudioTheme.Line, BorderThickness = new(1), CornerRadius = new(6) };
         System.Windows.Automation.AutomationProperties.SetAutomationId(updateBlock, "IrradianceUpdateControls");
-        var updateHeading = Label("UPDATE RESULTS", 13, ink); updateHeading.FontWeight = FontWeights.Bold;
+        var updateHeading = Label("Calculation", 13, StudioTheme.Ink); updateHeading.FontWeight = FontWeights.SemiBold;
         var updateHeader = new WrapPanel(); updateHeader.Children.Add(updateHeading);
         updateIndicator.FontWeight = FontWeights.Bold; updateIndicator.Margin = new(10, 0, 0, 0);
         System.Windows.Automation.AutomationProperties.SetAutomationId(updateIndicator, "IrradianceUpdateState");
@@ -144,36 +143,44 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         DockPanel.SetDock(fixedFooter, Dock.Bottom); root.Children.Add(fixedFooter);
         var body = new Grid { Margin = new(16, 12, 16, 0) };
         var inputs = new StackPanel { Margin = new(14) };
-        var inputHost = new Border { Background = Brushes.White }; body.Children.Add(inputHost);
+        var inputHost = Card(); inputHost.VerticalAlignment = VerticalAlignment.Top; body.Children.Add(inputHost);
         var tuning = new StackPanel { Margin = new(0, 0, 0, 8) };
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs, Background = Brushes.White }; inputHost.Child = scroll;
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs }; inputHost.Child = scroll;
         System.Windows.Automation.AutomationProperties.SetAutomationId(scroll, "IrradianceInputs");
-        Section(inputs, "01  IMAGES & CALIBRATION");
+        Section(inputs, "Images & calibration");
         PathField(inputs, "Calibration folder", "CalibrationFolder", () => PickCalibrationFolder());
         var board = new Grid(); for (int i = 0; i < 3; i++) board.ColumnDefinitions.Add(new());
         inputs.Children.Add(board);
         SmallField(board, 0, "Inner columns", "Columns"); SmallField(board, 1, "Inner rows", "Rows"); SmallField(board, 2, "Square, mm", "SquareMm");
-        inputs.Children.Add(Label("Count inner corners, not squares: 7 × 10 squares → 6 × 9 corners.", 11));
-        var calButtons = new WrapPanel(); calButtons.Children.Add(Button("Calibrate", async () => await Calibrate())); calButtons.Children.Add(Button("Load camera profile…", PickProfile));
+        const string boardHelp = "Count the checkerboard’s inner corners. A board with 7 × 10 squares has 6 × 9 inner corners.";
+        StudioTheme.Help(fields["Columns"], boardHelp);
+        StudioTheme.Help(fields["Rows"], boardHelp);
+        StudioTheme.Help(fields["SquareMm"], "Measure the side of one checkerboard square in millimetres.");
+        var calButtons = new WrapPanel();
+        var calibrate = Button("Calibrate", async () => await Calibrate());
+        loadProfile.Click += (_, _) => PickProfile();
+        StudioTheme.Help(calibrate, "Fit the checkerboard photos and save the reusable camera profile under Data/Profiles. Diagnostic files are saved under Debug Data/01-calibration.");
+        calButtons.Children.Add(calibrate); calButtons.Children.Add(loadProfile);
         reviewCalibration.Click += (_, _) => { RefreshCalibrationReview(); ShowCalibrationReview(); }; calButtons.Children.Add(reviewCalibration);
         inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
-        inputs.Children.Add(Label("Load camera-profile.json for camera parameters and validated coverage. Calibrate saves this reusable profile under Data/Profiles and diagnostics under Debug Data/01-calibration.", 11));
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
         var imageButtons = new WrapPanel(); imageButtons.Children.Add(choosePhoto); imageButtons.Children.Add(importMask); inputs.Children.Add(imageButtons);
         choosePhoto.Click += (_, _) => PickSkyPhoto(); importMask.Click += (_, _) => PickMask();
-        importMask.ToolTip = "Use an existing black-and-white PNG without AI segmentation. White is open sky and black is obstruction; inversion is an explicit import option.";
-        inputs.Children.Add(Label("Choose the photograph first. Import a ready-made black-and-white mask to skip AI segmentation.", 11));
+        StudioTheme.Help(choosePhoto, "Choose the original sky photograph taken with the calibrated lens.");
+        StudioTheme.Help(importMask, "Select a sky photograph first. Import an opaque black-and-white PNG at the same oriented dimensions. White means open sky by default. You can invert the mask during import.");
         images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) { settings.SkyImage = Path.Combine(settings.SkyFolder, name); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } };
         model = Combo(inputs, "Sky segmentation", Enum.GetNames<SkyModel>()); model.SelectionChanged += (_, _) => { if (!loading && model.SelectedIndex >= 0) { settings.Model = (SkyModel)model.SelectedIndex; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
         resolution = Combo(inputs, "Mask resolution", ["1024 · original quality", "512 · faster"]); resolution.SelectionChanged += (_, _) => { if (!loading) { settings.Resolution = resolution.SelectedIndex == 1 ? 512 : 1024; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
         AddPhoneControls(inputs);
-        Section(inputs, "03  SITE LOCATION");
+        Section(inputs, "Site location");
         Field(inputs, "Latitude, ° N (+) / S (−)", "Latitude"); Field(inputs, "Longitude, ° E (+) / W (−)", "Longitude"); Field(inputs, "Elevation above sea level, m", "Elevation");
-        inputs.Children.Add(Label("Use decimal degrees, for example latitude 43.56 and longitude 1.48. Southern latitudes and western longitudes are negative.", 11));
+        StudioTheme.Help(fields["Latitude"], "Enter geographic latitude in decimal degrees. North is positive, south is negative.");
+        StudioTheme.Help(fields["Longitude"], "Enter geographic longitude in decimal degrees. East is positive, west is negative.");
         useSystemZone = new() { Content = "Use Windows time zone (automatic)", Margin = new(0, 8, 0, 4) };
         useSystemZone.Checked += (_, _) => ChangeTimeZoneMode(true);
         useSystemZone.Unchecked += (_, _) => ChangeTimeZoneMode(false);
         inputs.Children.Add(useSystemZone);
+        StudioTheme.Help(useSystemZone, "Use the Windows time zone for study dates and the graph. Clear this option to choose a different region or a fixed UTC offset.");
         zone = Combo(inputs, "Time zone for dates and graph", []);
         zone.DisplayMemberPath = nameof(TimeZoneInfo.DisplayName); zone.SelectedValuePath = nameof(TimeZoneInfo.Id);
         zone.ItemsSource = TimeZoneSelection.Choices();
@@ -186,11 +193,12 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 list.MaxWidth = Math.Min(760, available);
             }
         };
-        zone.SelectionChanged += (_, _) => { if (!loading && !settings.UseSystemTimeZone && zone.SelectedValue is string z) { settings.Zone = z; zone.ToolTip = (zone.SelectedItem as TimeZoneInfo)?.DisplayName; Changed(); } };
-        inputs.Children.Add(Label("Turn off automatic to choose. Named regions follow daylight saving; fixed UTC offsets never change. Coordinates select the weather location.", 11));
-        Section(inputs, "04  HISTORICAL DATA");
+        zone.SelectionChanged += (_, _) => { if (!loading && !settings.UseSystemTimeZone && zone.SelectedValue is string z) { settings.Zone = z; Changed(); } };
+        StudioTheme.Help(zone, "Regional time zones follow daylight saving time. A fixed UTC offset applies year-round. Site coordinates set the weather location.");
+        Section(inputs, "Historical data");
         Field(inputs, "Start date · DD.MM.YYYY", "Start"); Field(inputs, "End date · inclusive · DD.MM.YYYY", "End");
         inputs.Children.Add(weatherMode);
+        StudioTheme.Help(weatherMode, "Choose a weather service or import a local file containing direct horizontal and diffuse horizontal irradiance.");
         weatherMode.Checked += (_, _) => SelectWeatherMode(true);
         weatherMode.Unchecked += (_, _) => SelectWeatherMode(false);
         inputs.Children.Add(serviceWeatherControls); inputs.Children.Add(importWeatherControls);
@@ -201,16 +209,17 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             if (!loading && provider.SelectedIndex >= 0) { settings.Provider = provider.SelectedIndex; Changed(); }
         };
         chooseWeatherFile.Click += (_, _) => PickImport(); importWeatherControls.Children.Add(chooseWeatherFile);
-        importWeatherControls.Children.Add(Label("Import: timestamp, direct horizontal (BHI), diffuse horizontal (DHI), in W/m². Native metadata sets the intervals; otherwise choose their duration and label below.", 11));
-        importWeatherControls.Children.Add(Label("Example CSV header: Timestamp,BHI,DHI\n2025-05-15T12:00:00+07:00,500,100\nA total-only (GHI) measurement cannot supply both components. Example/Irradiance includes a workbook.", 11));
+        StudioTheme.Help(chooseWeatherFile, "Include Timestamp, BHI (direct horizontal) and DHI (diffuse horizontal), in W/m². A sample CSV row is 2025-05-15T12:00:00+07:00,500,100. Example/Irradiance contains a sample workbook.");
         window = Combo(importWeatherControls, "Imported rows represent", ["Preceding interval · end labels", "Following interval · start labels", "Centered interval"]); window.SelectionChanged += (_, _) => { if (!loading) { settings.ImportWindow = window.SelectedIndex; Changed(); } };
         Field(importWeatherControls, "Import interval, minutes (without metadata)", "ImportIntervalMinutes");
+        StudioTheme.Help(window, "Use the source file’s timestamp convention. Native workbook metadata takes precedence over these interval settings.");
+        StudioTheme.Help(fields["ImportIntervalMinutes"], "For a file without interval metadata, enter the duration represented by one source row in minutes.");
         inputs.Children.Add(weatherSource); inputs.Children.Add(lastWeatherResult);
         isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; inputs.Children.Add(isotropic);
-        inputs.Children.Add(Label("Neither diffuse model is always the lower estimate. The result depends on weather, panel direction and the mask.", 11));
+        StudioTheme.Help(isotropic, "Hay–Davies includes a circumsolar component. An isotropic sky distributes diffuse light uniformly. Their estimates depend on the weather, panel direction and mask.");
         inputs.Children.Add(tuning);
         AddPanelControls(tuning);
-        update.Background = accent; update.Foreground = Brushes.White;
+        update.Background = StudioTheme.Blue; update.Foreground = Brushes.White;
         System.Windows.Automation.AutomationProperties.SetAutomationId(update, "UpdateResults");
         System.Windows.Automation.AutomationProperties.SetAutomationId(refreshData, "RefreshData");
         System.Windows.Automation.AutomationProperties.SetAutomationId(stop, "StopUpdate");
@@ -226,39 +235,48 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         update.Click += (_, _) => Calculate(); refreshData.Click += (_, _) => Begin(true); stop.Click += (_, _) => StopUpdate();
         var runButtons = new WrapPanel(); runButtons.Children.Add(update); runButtons.Children.Add(stop); updateControls.Children.Add(runButtons);
         updateControls.Children.Add(refreshData);
-        tuning.Children.Add(Label("Update results reuses matching weather data. Download weather again bypasses the weather cache; camera calibration and masks are reused when unchanged.", 11));
 
         var right = new Grid(); body.Children.Add(right);
         root.Children.Add(new WorkspaceViewport(body, inputHost, right));
         right.RowDefinitions.Add(new() { Height = GridLength.Auto }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var preview = new Grid { Background = Brushes.White }; right.Children.Add(preview); preview.RowDefinitions.Add(new() { Height = GridLength.Auto }); preview.RowDefinitions.Add(new() { Height = new GridLength(220) }); preview.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var preview = new Grid(); right.Children.Add(Card(preview)); preview.RowDefinitions.Add(new() { Height = GridLength.Auto }); preview.RowDefinitions.Add(new() { Height = new GridLength(220) }); preview.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var previewHeader = new WrapPanel { Margin = new(12, 8, 12, 6) }; preview.Children.Add(previewHeader);
-        var previewTitle = Label("SKY PHOTO  /  MASK", 14); previewTitle.Margin = new(4, 4, 12, 4); previewHeader.Children.Add(previewTitle);
+        var previewTitle = Label("Sky photo & mask", 16, StudioTheme.Ink); previewTitle.FontWeight = FontWeights.SemiBold; previewTitle.Margin = new(4, 3, 12, 4); previewHeader.Children.Add(previewTitle);
         previewHeader.Children.Add(showCardinals);
         showCardinals.Checked += (_, _) => SetCardinalVisibility(); showCardinals.Unchecked += (_, _) => SetCardinalVisibility();
-        showCardinals.ToolTip = "Show compass bearings at the calibrated image boundary. Uses the same heading, tilt and roll as sun paths and shading. Visibility does not recalculate.";
+        StudioTheme.Help(showCardinals, "Update the study to project the compass at the edge of the calibrated view. The bearings use the same camera pose as shading.");
         previewHeader.Children.Add(showSunPath);
         showSunPath.Checked += (_, _) => SetSunPathVisibility(); showSunPath.Unchecked += (_, _) => SetSunPathVisibility();
-        showSunPath.ToolTip = "Display the sun path for the selected period on the calibrated mask. This changes only the preview.";
+        StudioTheme.Help(showSunPath, "Update the study to project the sun path for the selected dates onto the mask. This switch controls its visibility.");
         var pair = new Grid { Margin = new(12, 0, 12, 0) }; pair.ColumnDefinitions.Add(new()); pair.ColumnDefinitions.Add(new() { Width = new GridLength(12) }); pair.ColumnDefinitions.Add(new()); Grid.SetRow(pair, 1); preview.Children.Add(pair);
-        pair.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = photo });
+        pair.Children.Add(new Border { Background = StudioTheme.Canvas, Child = photo });
         var maskPane = new Grid(); maskPane.Children.Add(maskPreview); maskPane.Children.Add(editMask);
-        var maskBorder = new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = maskPane }; Grid.SetColumn(maskBorder, 2); pair.Children.Add(maskBorder);
+        var maskBorder = new Border { Background = StudioTheme.Canvas, Child = maskPane }; Grid.SetColumn(maskBorder, 2); pair.Children.Add(maskBorder);
         editMask.Click += (_, _) => OpenMaskEditor();
         var previewInfo = new StackPanel { Margin = new(16, 6, 16, 10) };
-        var previewLabels = new StackPanel(); previewLabels.Children.Add(fieldOfViewInfo); previewLabels.Children.Add(maskInfo); previewLabels.Children.Add(sunPathInfo); previewLabels.Children.Add(cardinalInfo); previewInfo.Children.Add(previewLabels);
+        previewInfo.Children.Add(fieldOfViewInfo); previewInfo.Children.Add(maskInfo);
+        sunPathInfo.Visibility = cardinalInfo.Visibility = Visibility.Collapsed;
+        previewInfo.Children.Add(sunPathInfo); previewInfo.Children.Add(cardinalInfo);
         System.Windows.Automation.AutomationProperties.SetAutomationId(fieldOfViewInfo, "SkyPhotoFieldOfView");
         var maskPicker = new StackPanel(); maskPicker.Children.Add(Label("Mask for calculation", 11)); maskPicker.Children.Add(maskChoice);
+        AutomationProperties.SetName(maskChoice, "Mask for calculation");
         maskChoice.SelectionChanged += (_, _) => SelectMaskChoice(); previewInfo.Children.Add(maskPicker);
         Grid.SetRow(previewInfo, 2); preview.Children.Add(previewInfo);
-        var graph = new Grid { Background = Brushes.White, Margin = new(0, 0, 0, 0) }; Grid.SetRow(graph, 2); right.Children.Add(graph);
+        var graph = new Grid(); var graphCard = Card(graph); Grid.SetRow(graphCard, 2); right.Children.Add(graphCard);
         graph.RowDefinitions.Add(new() { Height = GridLength.Auto }); graph.RowDefinitions.Add(new() { Height = GridLength.Auto }); graph.RowDefinitions.Add(new() { Height = new GridLength(260) }); graph.RowDefinitions.Add(new() { Height = GridLength.Auto }); graph.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var cards = new UniformGridCompat(3) { Margin = new(18, 10, 18, 0) }; graph.Children.Add(cards);
-        cards.Children.Add(Metric("BEFORE SHADING · kWh/m²", beforeEnergy, new SolidColorBrush(Color.FromRgb(185, 121, 26)))); cards.Children.Add(Metric("AFTER SHADING · kWh/m²", afterEnergy, accent)); cards.Children.Add(Metric("ESTIMATED LOSS", reduction, ink));
+        cards.Children.Add(Metric("Before shading · kWh/m²", beforeEnergy, IrradianceChart.BeforeBrush));
+        cards.Children.Add(Metric("After shading · kWh/m²", afterEnergy, IrradianceChart.AfterBrush));
+        cards.Children.Add(Metric("Estimated loss", reduction, StudioTheme.Ink));
         var toolbar = new WrapPanel { Margin = new(14, 4, 10, 0), VerticalAlignment = VerticalAlignment.Center }; Grid.SetRow(toolbar, 1); graph.Children.Add(toolbar);
         var component = new ComboBox { ItemsSource = new[] { "Total irradiance", "Direct component", "Sky diffuse component" }, SelectedIndex = 0, Width = 170 }; component.SelectionChanged += (_, _) => { chart.Component = component.SelectedIndex; chart.InvalidateVisual(); }; toolbar.Children.Add(component);
-        toolbar.Children.Add(Button("Full period", chart.Reset)); graphDay = new DatePicker { Width = 125, Margin = new(4, 0, 0, 0) }; graphDay.SelectedDateChanged += (_, _) => { if (graphDay.SelectedDate is { } d) chart.Day(d); }; toolbar.Children.Add(graphDay);
-        toolbar.Children.Add(Label("  ● Before", 12, new SolidColorBrush(Color.FromRgb(185, 121, 26)))); toolbar.Children.Add(Label("  ● After", 12, accent));
+        AutomationProperties.SetName(component, "Irradiance component");
+        var fullPeriod = Button("Full period", chart.Reset);
+        StudioTheme.Help(fullPeriod, "Show the entire study period. Scroll over the plot to zoom, drag to pan, or choose a day.");
+        StudioTheme.Help(component, "Both curves show irradiance on the panel. The model treats unobserved sky as blocked and excludes ground reflection.");
+        toolbar.Children.Add(fullPeriod); graphDay = new DatePicker { Width = 125, Margin = new(4, 0, 0, 0) }; graphDay.SelectedDateChanged += (_, _) => { if (graphDay.SelectedDate is { } d) chart.Day(d); }; toolbar.Children.Add(graphDay);
+        AutomationProperties.SetName(graphDay, "Day to display");
+        toolbar.Children.Add(Label("  ● Before", 12, IrradianceChart.BeforeBrush)); toolbar.Children.Add(Label("  ● After", 12, IrradianceChart.AfterBrush));
         chart.HoverText = text => hover.Text = text; Grid.SetRow(chart, 2); graph.Children.Add(chart); hover.Margin = new(18, 4, 10, 0); Grid.SetRow(hover, 3); graph.Children.Add(hover);
         provenance.Margin = new(18, 0, 14, 0); provenance.TextWrapping = TextWrapping.Wrap; Grid.SetRow(provenance, 4); graph.Children.Add(provenance);
         
@@ -299,26 +317,24 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         else _ = DisposeAfterObservation();
         async Task DisposeAfterObservation() { await inputWork; controller.Dispose(); }
     }
-    private void AddStyles()
+    private static Border Card(UIElement? content = null) => new()
     {
-        var text = new Style(typeof(TextBox)); text.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 5, 8, 5))); text.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(202, 215, 219)))); text.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0, 3, 6, 7))); Resources.Add(typeof(TextBox), text);
-        var combo = new Style(typeof(ComboBox)); combo.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(6, 5, 6, 5))); combo.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0, 3, 6, 7))); Resources.Add(typeof(ComboBox), combo);
-        var button = new Style(typeof(Button)); button.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 7, 12, 7))); button.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0, 3, 6, 5))); button.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.White)); button.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(191, 209, 214)))); button.Setters.Add(new Setter(Control.ForegroundProperty, ink)); button.Setters.Add(new Setter(Control.CursorProperty, Cursors.Hand)); Resources.Add(typeof(Button), button);
-    }
-    public static TextBlock Label(string text, double size = 13, Brush? brush = null) => new() { Text = text, FontSize = size, Foreground = brush ?? new SolidColorBrush(Color.FromRgb(73, 94, 104)), TextWrapping = TextWrapping.Wrap };
-    private static StackPanel Metric(string name, TextBlock value, Brush color) { value.Foreground = color; var p = new StackPanel(); p.Children.Add(Label(name, 10)); p.Children.Add(value); return p; }
-    private void Section(Panel parent, string text)
+        Child = content, Background = StudioTheme.Surface, BorderBrush = StudioTheme.Line, BorderThickness = new(1), CornerRadius = new(7)
+    };
+    public static TextBlock Label(string text, double size = 13, Brush? brush = null) => new() { Text = text, FontSize = size, Foreground = brush ?? StudioTheme.Muted, TextWrapping = TextWrapping.Wrap };
+    private static StackPanel Metric(string name, TextBlock value, Brush color)
     {
-        var title = Label(text, 14, ink); title.FontWeight = FontWeights.Bold;
-        parent.Children.Add(new Border
-        {
-            Child = title, Background = new SolidColorBrush(Color.FromRgb(235, 244, 242)),
-            BorderBrush = accent, BorderThickness = new(4, 0, 0, 0),
-            Padding = new(10, 8, 8, 8), Margin = new(0, 14, 0, 10)
-        });
+        value.Foreground = color; value.FontWeight = FontWeights.SemiBold;
+        var metric = new StackPanel(); metric.Children.Add(Label(name, 12)); metric.Children.Add(value); return metric;
     }
-    private Button Button(string text, Action click, bool primary = false) { var b = new Button { Content = text }; if (primary) { b.Background = accent; b.Foreground = Brushes.White; } b.Click += (_, _) => click(); return b; }
-    private void Field(Panel parent, string label, string property) { parent.Children.Add(Label(label, 12)); var t = MakeField(property); parent.Children.Add(t); }
+    private static void Section(Panel parent, string text)
+    {
+        var title = Label(text, 15, StudioTheme.Ink); title.FontWeight = FontWeights.SemiBold;
+        parent.Children.Add(new Border { Child = title, BorderBrush = StudioTheme.Line, BorderThickness = new(0, 0, 0, 1),
+            Padding = new(0, 0, 0, 6), Margin = new(0, parent.Children.Count == 0 ? 0 : 15, 0, 8) });
+    }
+    private Button Button(string text, Action click, bool primary = false) { var b = new Button { Content = text }; if (primary) { b.Background = StudioTheme.Blue; b.Foreground = Brushes.White; } b.Click += (_, _) => click(); return b; }
+    private void Field(Panel parent, string label, string property) { parent.Children.Add(Label(label, 12)); var t = MakeField(property); System.Windows.Automation.AutomationProperties.SetName(t, label); parent.Children.Add(t); }
     private TextBox MakeField(string property)
     {
         var t = new TextBox { Tag = property }; fields[property] = t;
@@ -375,8 +391,19 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void SmallField(Grid grid, int col, string label, string property) { var p = new StackPanel(); Grid.SetColumn(p, col); grid.Children.Add(p); Field(p, label, property); }
     private void PathField(Panel p, string label, string property, Action browse)
-    { p.Children.Add(Label(label, 12)); var row = new DockPanel(); var b = Button("…", browse); DockPanel.SetDock(b, Dock.Right); row.Children.Add(b); var t = MakeField(property); t.IsReadOnly = true; row.Children.Add(t); p.Children.Add(row); }
-    private static ComboBox Combo(Panel p, string label, string[] items) { p.Children.Add(Label(label, 12)); var c = new ComboBox { ItemsSource = items }; p.Children.Add(c); return c; }
+    {
+        p.Children.Add(Label(label, 12));
+        var row = new DockPanel(); var b = Button("…", browse);
+        AutomationProperties.SetName(b, "Choose " + label.ToLowerInvariant());
+        DockPanel.SetDock(b, Dock.Right); row.Children.Add(b);
+        var t = MakeField(property); t.IsReadOnly = true;
+        AutomationProperties.SetName(t, label); row.Children.Add(t); p.Children.Add(row);
+    }
+    private static ComboBox Combo(Panel p, string label, string[] items)
+    {
+        p.Children.Add(Label(label, 12)); var c = new ComboBox { ItemsSource = items };
+        AutomationProperties.SetName(c, label); p.Children.Add(c); return c;
+    }
     private void LoadFields()
     {
         loading = true; invalidFields.Clear(); phoneTiltEditOrigin = null;
@@ -396,13 +423,12 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         bool imported = !WeatherSourceSelection.UsesServices(settings), previous = loading; loading = true;
         weatherMode.IsChecked = !imported; weatherMode.Content = imported ? "Import Own Excel" : "Use Data Services";
         System.Windows.Automation.AutomationProperties.SetName(weatherMode, (string)weatherMode.Content);
-        weatherMode.ToolTip = "Switch right to use a weather data service, or left to import your Excel or CSV file.";
         provider.SelectedIndex = settings.Provider;
         serviceWeatherControls.Visibility = imported ? Visibility.Collapsed : Visibility.Visible;
         importWeatherControls.Visibility = imported ? Visibility.Visible : Visibility.Collapsed;
-        weatherSource.Text = imported ? string.IsNullOrWhiteSpace(settings.ImportPath) ? "Choose an Excel or CSV file to enable Update results."
-            : "Selected file: " + Path.GetFileName(settings.ImportPath) + "\nUpdate results rereads changed files. No weather download is used."
-            : "Matching weather data is reused locally. Download weather again requests a fresh copy from the selected provider.";
+        weatherSource.Visibility = imported ? Visibility.Visible : Visibility.Collapsed;
+        weatherSource.Text = !imported ? "" : string.IsNullOrWhiteSpace(settings.ImportPath) ? "Choose an Excel or CSV file."
+            : "Selected file: " + Path.GetFileName(settings.ImportPath);
         weatherSource.ToolTip = imported && !string.IsNullOrWhiteSpace(settings.ImportPath) ? PortablePaths.Resolve(settings.ImportPath) : null;
         loading = previous;
         RefreshButtons();
@@ -459,9 +485,15 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         bool previous = loading; loading = true;
         try { maskChoice.ItemsSource = choices; maskChoice.SelectedItem = choices.First(c => c.Id == settings.SelectedMaskId); }
         finally { loading = previous; }
-        bool imported = (maskChoice.SelectedItem as MaskChoice)?.Imported == true;
+        SetMaskOptions((maskChoice.SelectedItem as MaskChoice)?.Imported == true);
+    }
+    private void SetMaskOptions(bool imported)
+    {
+        const string importedHelp = "This imported mask is used directly. Choose the AI mask to enable model and resolution settings.";
         model.IsEnabled = resolution.IsEnabled = !imported;
-        model.ToolTip = resolution.ToolTip = imported ? "The imported mask is used directly. Choose AI mask to use these settings." : null;
+        StudioTheme.Help(model, imported ? importedHelp : "Select the AI model used to separate open sky from obstructions.");
+        StudioTheme.Help(resolution, imported ? importedHelp : "Select the resolution used for AI segmentation.");
+        StudioTheme.Help(maskChoice, imported ? importedHelp : "Use Update results to generate the AI mask, or choose a saved mask for this photograph.");
     }
     private void SelectMaskChoice()
     {
@@ -482,7 +514,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 if (choice.Id == null) settings.LastMaskByPhoto.Remove(hash);
                 else settings.LastMaskByPhoto[hash] = choice.Id;
             }
-            Changed(); ShowSelectedMaskPreview();
+            SetMaskOptions(choice.Imported); Changed(); ShowSelectedMaskPreview();
         }
         catch (Exception ex) { RefreshMaskChoices(); ShowError(ex); }
     }
@@ -501,7 +533,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     photo.SetImage(Bitmap(displayedPhoto), unmaskedPhoto.Width, unmaskedPhoto.Height);
                     orientedPhotoWidth = unmaskedPhoto.Width; orientedPhotoHeight = unmaskedPhoto.Height;
                     RefreshFieldOfView();
-                    maskInfo.Text = "Photo selected · Update results for AI, or import an existing mask";
+                    maskInfo.Text = "Mask pending";
                 }
                 else { orientedPhotoWidth = orientedPhotoHeight = 0; RefreshFieldOfView(); }
                 return;
@@ -646,7 +678,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             if (geometryChanged) { photo.ClearImage(); displayedPhoto = null; orientedPhotoWidth = orientedPhotoHeight = 0; }
             maskPreview.ClearImage(); displayedMaskPng = null;
             displayedAsset = null; editMask.IsEnabled = false;
-            maskInfo.Text = "Sky inputs changed · click Update results";
+            maskInfo.Text = "Mask pending";
         }
         if ((groups & (ArtifactGroup.Profile | ArtifactGroup.Mask)) != 0) RefreshFieldOfView();
         if ((groups & ArtifactGroup.Orientation) != 0) InvalidateOrientation("Cardinal directions waiting for Update results");
@@ -667,7 +699,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     {
         string? problem = InputProblem();
         SetUpdateState(problem == null ? UpdateState.UpdateRequired : UpdateState.NeedsAttention,
-            problem ?? "Inputs changed or not yet calculated. Click Update results when ready.");
+            problem ?? "");
     }
     private void SetUpdateState(UpdateState state, string message)
     {
@@ -679,20 +711,20 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             UpdateState.Stopped => "Update stopped", _ => "Update failed"
         };
         updateIndicator.Text = "● " + label;
-        updateIndicator.Foreground = state == UpdateState.UpToDate ? accent
-            : state is UpdateState.NeedsAttention or UpdateState.Failed ? Brushes.Firebrick : new SolidColorBrush(Color.FromRgb(145, 100, 0));
+        updateIndicator.Foreground = state == UpdateState.UpToDate ? StudioTheme.Teal
+            : state is UpdateState.NeedsAttention or UpdateState.Failed ? Brushes.Firebrick : StudioTheme.Amber;
         System.Windows.Automation.AutomationProperties.SetName(updateIndicator, label);
-        status.Text = label; detail.Text = message;
+        status.Text = ""; detail.Text = message;
         RefreshButtons();
     }
     private void RefreshButtons()
     {
         update.IsEnabled = refreshData.IsEnabled = !controller.DependentBusy && !updating && !calibrating && InputProblem() == null;
         refreshData.IsEnabled &= WeatherSourceSelection.UsesServices(settings);
-        update.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : "Recalculate changed inputs; reuse matching weather, calibration and masks.";
-        refreshData.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : WeatherSourceSelection.UsesServices(settings)
+        StudioTheme.Help(update, controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : "Update results reuses matching weather data, calibration and masks. Changed inputs are recalculated.");
+        StudioTheme.Help(refreshData, controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : WeatherSourceSelection.UsesServices(settings)
             ? "Download fresh weather from the selected provider, then update. Unchanged calibration and masks are reused."
-            : "Imported file selected: use Update results to reread it. There is no weather download to refresh.";
+            : "Use Update results to reread the imported file. Weather downloads are available when a data service is selected.");
         stop.IsEnabled = updating && pending?.IsCancellationRequested == false;
         controller.RefreshSource();
         export.IsEnabled = !controller.Verifying && !exporting && !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null &&
@@ -716,7 +748,6 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         bool previous = loading; loading = true;
         useSystemZone.IsChecked = settings.UseSystemTimeZone; zone.IsEnabled = !settings.UseSystemTimeZone;
         zone.SelectedValue = settings.Zone;
-        zone.ToolTip = (zone.SelectedItem as TimeZoneInfo)?.DisplayName;
         loading = previous;
     }
     private void ChangeTimeZoneMode(bool automatic)
@@ -782,7 +813,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         chart.SetData(result.Run.Rows, TimeZoneSelection.Resolve(result.Settings.Zone));
         beforeEnergy.Text = result.Run.BeforeEnergy.ToString("F2"); afterEnergy.Text = result.Run.AfterEnergy?.ToString("F2") ?? "—";
         reduction.Text = result.Run.LossPercent is { } loss ? loss.ToString("F1") + "%" : "—";
-        provenance.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1} for this panel. Unobserved sky assumed blocked. No ground reflection." : "Baseline ready. Add a compatible camera profile and sky photo for the shaded curve.";
+        provenance.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1}" : "Baseline only · add a camera profile and sky photo for shading.";
         bool complete = IrradianceReadiness.Inspect(services, result).IsReady;
         SetUpdateState(complete ? UpdateState.UpToDate : UpdateState.NeedsAttention,
             complete ? restored ? $"{result.Run.Rows.Count:N0} intervals · saved result restored · {result.Raw.Source} · {result.Settings.Zone}"
@@ -812,14 +843,17 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         var disk = displayedAsset?.Disk;
         var view = SkyPhotoFieldOfView.Load(settings, orientedPhotoWidth, orientedPhotoHeight,
             disk == null ? null : new ImageDisk(disk.CenterX, disk.CenterY, disk.Radius));
-        fieldOfViewInfo.Text = view.Text; fieldOfViewInfo.ToolTip = view.Explanation;
+        fieldOfViewInfo.Text = view.Text;
+        StudioTheme.Help(fieldOfViewInfo, view.Explanation);
+        StudioTheme.Help(images, view.Explanation);
     }
     public static string OrientationInputKey(UserSettings s) => AppData.Key(new
     { s.SkyImage, s.ProfilePath, s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle, s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
     private void InvalidateOrientation(string message)
     {
         orientationRevision++;
-        photo.ClearOverlay(); displayedCardinals = null; currentCardinals = null; cardinalInfo.Text = message;
+        photo.ClearOverlay(); displayedCardinals = null; currentCardinals = null;
+        SetOverlayStatus(cardinalInfo, showCardinals, message, false);
     }
     private void ShowCardinals(CardinalDirectionOverlayResult? result)
     {
@@ -827,11 +861,11 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if (result == null)
         {
             photo.ClearOverlay(); displayedCardinals = null;
-            cardinalInfo.Text = "Cardinal directions unavailable · add a calibrated sky photo"; return;
+            SetOverlayStatus(cardinalInfo, showCardinals, "Add a calibrated sky photo to project compass bearings.", false); return;
         }
         if (!ReferenceEquals(displayedCardinals, result.Png)) { photo.SetOverlay(Bitmap(result.Png)); displayedCardinals = result.Png; }
         photo.ShowOverlay = settings.ShowCardinalDirections;
-        cardinalInfo.Text = result.HasMarkers ? "Cardinal bearings · calibrated image boundary" : "No cardinal bearings inside the calibrated view";
+        SetOverlayStatus(cardinalInfo, showCardinals, result.HasMarkers ? "The compass marks bearings at the edge of the calibrated view." : "No cardinal bearings inside this view.", !result.HasMarkers);
     }
     private void SetCardinalVisibility()
     {
@@ -841,13 +875,19 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         try { AppData.SaveSettings(settings); } catch (Exception ex) { detail.Text = "Could not save settings: " + ex.Message; }
     }
     private void ClearSunPath(string message)
-    { maskPreview.ClearOverlay(); sunPathIsCurrent = false; sunPathInfo.Text = message; }
+    { maskPreview.ClearOverlay(); sunPathIsCurrent = false; SetOverlayStatus(sunPathInfo, showSunPath, message, false); }
     private void ShowSunPath(SunPathOverlayResult? result)
     {
         if (result == null) { ClearSunPath("Sun path unavailable · add a calibrated sky photo"); return; }
         maskPreview.SetOverlay(Bitmap(result.Png)); maskPreview.ShowOverlay = settings.ShowSunPath;
         sunPathIsCurrent = true;
-        sunPathInfo.Text = result.HasPaths ? "Sun path · selected period" : "No sun path inside the calibrated view for this period";
+        SetOverlayStatus(sunPathInfo, showSunPath, result.HasPaths ? "The sun path shows the study period on the calibrated mask." : "No sun path inside this view for the selected period.", !result.HasPaths);
+    }
+    private static void SetOverlayStatus(TextBlock notice, CheckBox toggle, string text, bool showNotice)
+    {
+        StudioTheme.Help(toggle, text);
+        notice.Text = showNotice ? text : "";
+        notice.Visibility = showNotice ? Visibility.Visible : Visibility.Collapsed;
     }
     private void SetSunPathVisibility()
     {
@@ -884,10 +924,11 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         var panel = new StackPanel { Margin = new(20) }; dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         panel.Children.Add(Label("Photo: " + Path.GetFileName(settings.SkyImage), 13));
         panel.Children.Add(Label("Mask: " + Path.GetFileName(pick.FileName), 13));
-        panel.Children.Add(Label("Use the same pixel dimensions as the oriented photo. Gray, colored and transparent pixels are rejected. Pixels outside the photo's lens disk become black.", 12));
         panel.Children.Add(Label("Mask name", 12)); var name = new TextBox { Text = Path.GetFileNameWithoutExtension(pick.FileName), MaxLength = 100 }; panel.Children.Add(name);
         var polarity = Combo(panel, "Meaning of the source pixels", ["White = open sky; black = obstruction", "Black = open sky; white = obstruction (invert)"]); polarity.SelectedIndex = 0;
+        StudioTheme.Help(polarity, "Import an opaque black-and-white mask with the same pixel dimensions as the oriented photo. Choose which pixel color marks open sky.");
         var disk = Combo(panel, "Lens disk in the photograph", ["Detect from photo", "Centered full disk"]); disk.SelectedIndex = settings.CenteredDisk ? 1 : 0;
+        StudioTheme.Help(disk, "Pixels outside the photograph’s lens disk become black in the imported mask.");
         var error = Label("", 12); error.Foreground = Brushes.Firebrick; panel.Children.Add(error);
         var commands = new WrapPanel(); panel.Children.Add(commands);
         bool importing = false;
@@ -958,11 +999,13 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         reviewedProfileFingerprint = fingerprint;
         reviewCalibration.IsEnabled = calibrationReview != null;
         calibrationInfo.Text = string.IsNullOrWhiteSpace(settings.ProfilePath) ? "No camera profile selected" :
-            "Camera profile: " + settings.ProfilePath;
+            "Profile · " + Path.GetFileName(settings.ProfilePath);
         if (calibrationReview != null) calibrationInfo.Text += "\n" + calibrationReview.Summary;
         if (calibrationReview?.FitSummary != null) calibrationInfo.Text += "\n" + calibrationReview.FitSummary;
         if (calibrationReview?.Report.Failure != null) calibrationInfo.Text += "\nLast calibration failed; open the review for details.";
         calibrationInfo.ToolTip = string.IsNullOrWhiteSpace(settings.ProfilePath) ? null : PortablePaths.Resolve(settings.ProfilePath);
+        const string profileHelp = "Choose camera-profile.json for this lens and oriented image size. The profile includes the calibrated field of view.";
+        StudioTheme.Help(loadProfile, calibrationInfo.ToolTip is string path ? profileHelp + "\n" + path : profileHelp);
     }
     private string? ProfileFingerprint()
     {
@@ -981,7 +1024,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void PickImport() { var p = new OpenFileDialog { Title = "Choose horizontal irradiance: timestamp, BHI and DHI in W/m²", Filter = "Horizontal irradiance|*.xlsx;*.csv" }; if (p.ShowDialog(owner) == true) SelectWeatherFile(p.FileName); else RefreshWeatherSource(); }
     public void SelectWeatherFile(string path)
-    { WeatherSourceSelection.SelectFile(settings, path); Changed(); RefreshWeatherSource(); status.Text = "Imported source selected · check dates, site, time zone and source interval metadata"; detail.Text = path; }
+    { WeatherSourceSelection.SelectFile(settings, path); Changed(); RefreshWeatherSource(); status.Text = "Weather file selected"; detail.Text = path; }
     private void ShowWeatherOrigin(Evaluation result)
     {
         RefreshWeatherSource();
