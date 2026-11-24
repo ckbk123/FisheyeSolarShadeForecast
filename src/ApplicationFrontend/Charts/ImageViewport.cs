@@ -9,7 +9,7 @@ using System.Windows.Media.Imaging;
 namespace SolarShade.Desktop;
 
 /// <summary>Fits, zooms and pans one native-pixel plane for an image and its registered overlays.</summary>
-internal abstract class ImageViewport : Canvas
+internal class ImageViewport : Canvas
 {
     protected Grid Plane { get; } = new() { ClipToBounds = true, UseLayoutRounding = false };
     private readonly MatrixTransform transform = new();
@@ -58,7 +58,7 @@ internal abstract class ImageViewport : Canvas
     }
 
     internal virtual void RequestDetail() { }
-    protected abstract void OnDisplayScaleChanged(double scale);
+    protected virtual void OnDisplayScaleChanged(double scale) { }
 
     internal void Fit()
     {
@@ -171,4 +171,39 @@ internal sealed class MaskViewport() : ImageViewport(new MaskOverlayPreview(), "
     // Inspect individual binary pixels when magnified, keeping the sun-path layer antialiased.
     protected override void OnDisplayScaleChanged(double scale) =>
         Layers.SetImageScalingMode(scale > 1 ? BitmapScalingMode.NearestNeighbor : BitmapScalingMode.Linear);
+}
+
+internal sealed class ImageZoomTools : StackPanel
+{
+    internal ImageZoomTools(ImageViewport viewport, string id, string name)
+    {
+        Orientation = Orientation.Horizontal;
+        HorizontalAlignment = HorizontalAlignment.Right;
+        VerticalAlignment = VerticalAlignment.Bottom;
+        Margin = new Thickness(3);
+        var minus = AddButton("−", $"Zoom {name} out", "Zoom out around the center.", $"Zoom{id}Out");
+        var plus = AddButton("+", $"Zoom {name} in", "Zoom in around the center. Scroll to zoom toward the pointer.", $"Zoom{id}In");
+        var fit = AddButton("Fit", $"Fit {name}", $"Center the whole {name} and its overlays.", $"Fit{id}");
+        Point Center() => new(viewport.ActualWidth / 2, viewport.ActualHeight / 2);
+        minus.Click += (_, _) => viewport.ZoomAt(Center(), 1 / 1.5);
+        plus.Click += (_, _) => viewport.ZoomAt(Center(), 1.5);
+        fit.Click += (_, _) => viewport.Fit();
+        void UpdateButtons()
+        {
+            plus.IsEnabled = viewport.HasImage;
+            minus.IsEnabled = fit.IsEnabled = viewport.Zoom > 1;
+        }
+        viewport.ViewChanged += UpdateButtons;
+        UpdateButtons();
+    }
+
+    internal Button AddButton(string text, string action, string help, string controlId)
+    {
+        var button = new Button { Content = text, MinWidth = 23, Padding = new(5, 2, 5, 2), Margin = new(1), FontSize = 11 };
+        AutomationProperties.SetName(button, action);
+        AutomationProperties.SetAutomationId(button, controlId);
+        StudioTheme.Help(button, help);
+        Children.Add(button);
+        return button;
+    }
 }

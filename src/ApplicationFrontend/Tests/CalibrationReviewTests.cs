@@ -1,5 +1,7 @@
 using System.IO;
 using System.Text.Json;
+using System.Windows.Automation;
+using System.Windows.Controls;
 using OpenCvSharp;
 using SolarShade.Calibration.Solver;
 using SolarShade.Calibration.Validation;
@@ -171,8 +173,45 @@ public sealed class CalibrationReviewTests
             var stamp = ReviewStamp(window);
             Assert.Equal(System.Windows.Visibility.Visible, stamp.Visibility);
             Assert.Equal("CALIBRATION FAILED", System.Windows.Automation.AutomationProperties.GetName(stamp));
+            var pane = Assert.IsType<Grid>(stamp.Parent);
+            pane.Measure(new System.Windows.Size(400, 360));
+            pane.Arrange(new System.Windows.Rect(0, 0, 400, 360));
+            pane.UpdateLayout();
+            var viewport = Assert.Single(pane.Children.OfType<ImageViewport>());
+            var tools = Assert.Single(pane.Children.OfType<ImageZoomTools>());
+            Button Find(string id) => tools.Children.OfType<Button>().Single(b => AutomationProperties.GetAutomationId(b) == id);
+            var plus = Find("ZoomCheckerboardIn");
+            var minus = Find("ZoomCheckerboardOut");
+            var fit = Find("FitCheckerboard");
+            static void Click(Button button)
+            {
+                Assert.True(button.IsEnabled);
+                button.RaiseEvent(new System.Windows.RoutedEventArgs(Button.ClickEvent));
+            }
+            Assert.Contains("Drag to pan", AutomationProperties.GetHelpText(viewport));
+            var originalBounds = viewport.ImageBounds;
+            Assert.False(originalBounds.IsEmpty);
+            Click(plus);
+            Assert.Equal(1.5 * originalBounds.Height, viewport.ImageBounds.Height, 6);
+            double top = viewport.ImageBounds.Top;
+            viewport.PanBy(new(0, 24));
+            Assert.Equal(top + 24, viewport.ImageBounds.Top, 6);
+            Assert.Same(pane, stamp.Parent);
+            Click(minus);
+            Assert.Equal(originalBounds, viewport.ImageBounds);
+            Click(plus);
+            Click(fit);
+            Assert.Equal(originalBounds, viewport.ImageBounds);
+            Click(plus);
+            window.SelectPhoto(review.Report.Images.ToList().FindIndex(p => p.Name == "blank.png"));
+            Assert.True(window.HasPreview);
+            Assert.False(fit.IsEnabled);
+            Assert.Equal(1, viewport.Zoom);
+            Click(plus);
             window.SelectPhoto(review.Report.Images.ToList().FindIndex(p => p.Name == "unreadable.jpg"));
             Assert.False(window.HasPreview);
+            Assert.False(plus.IsEnabled); Assert.False(minus.IsEnabled); Assert.False(fit.IsEnabled);
+            Assert.True(viewport.ImageBounds.IsEmpty);
             Assert.Equal(System.Windows.Visibility.Visible, stamp.Visibility);
         }
         finally { window.Close(); }
