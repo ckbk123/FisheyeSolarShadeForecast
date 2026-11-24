@@ -50,6 +50,21 @@ public static class SmokeTest
                 await Task.Delay(500);
                 if (window.Completed != null || window.ExportEnabledForTest)
                     throw new InvalidOperationException("Loading inputs calculated or enabled export.");
+                if (startsExample)
+                {
+                    var refine = Find<Button>(window, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "RefineMaskEdge");
+                    refine.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    var dialog = window.OwnedWindows.OfType<MaskEdgeWindow>().Single();
+                    try
+                    {
+                        await Until(() => dialog.IsLoaded, 10); await dialog.Analysis;
+                        var slider = Find<Slider>(dialog, s => System.Windows.Automation.AutomationProperties.GetAutomationId(s) == "ApparentFovSlider");
+                        var showMask = Find<CheckBox>(dialog, b => Equals(b.Content, "Show mask"));
+                        if (!showMask.IsEnabled || slider.Value != 180 || window.Completed != null || window.ExportEnabledForTest)
+                            throw new InvalidOperationException("The first-use edge proposal requires a prepared mask and must not run the irradiance study.");
+                    }
+                    finally { dialog.Close(); }
+                }
                 window.Calculate();
                 await Until(() => window.Completed != null, 120);
                 var first = window.Completed!; double firstMs = timer.Elapsed.TotalMilliseconds;
@@ -88,7 +103,7 @@ public static class SmokeTest
                 if (!window.CardinalsVisibleForTest || !ReferenceEquals(first.Cardinals, window.CardinalsForTest))
                     throw new InvalidOperationException("Cardinal display toggle replaced or lost the cached overlay.");
                 await VerifySkyPhoto(window, originalPhoto, first, output);
-                if (startsExample) await VerifyMaskEdge(window, first, output);
+                if (startsExample) await VerifyRefinedEdge(window, first, output);
                 long toggleRevision = window.RevisionForTest;
                 window.SetSunPathVisibleForTest(false);
                 if (window.SunPathVisibleForTest || AppData.ReadSettings()?.ShowSunPath != false)
@@ -310,8 +325,8 @@ public static class SmokeTest
         await Until(() => photo.HasNativePhoto, 30);
         window.UpdateLayout();
         var enlarged = photo.ImageBounds;
-        if (enlarged.Height <= 1.5 * fitted.Height || !photo.HasCalibratedOutline || !window.CardinalsVisibleForTest)
-            throw new InvalidOperationException("Magnified sky photo is missing its native image, calibrated limit or compass.");
+        if (enlarged.Height <= 1.5 * fitted.Height || photo.EdgeOutline == null || !window.CardinalsVisibleForTest)
+            throw new InvalidOperationException("Magnified sky photo is missing its native image, study edge or compass.");
         Capture(photo, Path.Combine(output, "sky-photo-zoom.png"));
         Capture(window, Path.Combine(output, "sky-photo-expanded.png"));
         photo.PanBy(new Vector(0, 35));
@@ -329,80 +344,58 @@ public static class SmokeTest
             NativePhotoZoomed = true, PanAndFit = true, CardinalAndFovVisible = true, FieldOfView = window.Irradiance.FieldOfViewTextForTest });
     }
 
-    private static async Task VerifyMaskEdge(MainWindow window, Evaluation study, string output)
+    private static async Task VerifyRefinedEdge(MainWindow window, Evaluation study, string output)
     {
+        if (study.MaskEdge is not { BlackPercent: 95, EffectiveFullDegrees: 180, ManualFullFovDegrees: null } proposed ||
+            Math.Abs(proposed.MeasuredFullDegrees - 132.86) > .01 || proposed.UnknownAtCap != 1440)
+            throw new InvalidOperationException("The bundled mask should propose 180° from incomplete outer coverage and use it on the first calculation.");
         long revision = window.RevisionForTest;
-        var state = window.UpdateStateForTest;
-        var open = Find<Button>(window, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "EstimateMaskEdge");
-        if (!open.IsEnabled) throw new InvalidOperationException("The example's mask edge experiment is unavailable.");
+        var open = Find<Button>(window, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "RefineMaskEdge");
         open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var dialog = window.OwnedWindows.OfType<MaskEdgeWindow>().Single();
-        double apparentFullDegrees;
         try
         {
             await Until(() => dialog.IsLoaded, 10); await dialog.Analysis;
-            var threshold = Find<ComboBox>(dialog, _ => true);
-            var result = Find<TextBlock>(dialog, t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "MaskEdgeResult");
-            var sky = Find<TextBlock>(dialog, t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "MaskEdgeOuterSky");
-            if (!sky.Text.StartsWith("Open sky sampled beyond calibration") || !Equals(threshold.SelectedItem, 100) ||
-                !result.Text.StartsWith("180° scan cap"))
-                throw new InvalidOperationException("The example's fully black ring depends on clipped pixels. " + result.Text);
-            Capture(dialog, Path.Combine(output, "mask-edge-example-100.png"));
-            threshold.SelectedItem = 95;
-            if (!result.Text.StartsWith("180° scan cap"))
-                throw new InvalidOperationException("The example's sampled mask cannot verify a dark band through 180°. " + result.Text);
-            Capture(dialog, Path.Combine(output, "mask-edge-example-95.png"));
-            var manualMode = Find<RadioButton>(dialog, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "ManualApparentFovMode");
-            manualMode.IsChecked = true;
             var entry = Find<TextBox>(dialog, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "ApparentFullFovDegrees");
             var slider = Find<Slider>(dialog, s => System.Windows.Automation.AutomationProperties.GetAutomationId(s) == "ApparentFovSlider");
             var preview = Find<SkyPhotoViewport>(dialog, _ => true);
-            var apply = Find<Button>(dialog, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "ApplyMaskEdge");
+            var save = Find<Button>(dialog, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "SaveRefinedEdge");
             var showMask = Find<CheckBox>(dialog, b => Equals(b.Content, "Show mask"));
-            showMask.IsChecked = true;
+            if (slider.Value != proposed.EffectiveFullDegrees || slider.Maximum != 270 || preview.EdgeOutline == null)
+                throw new InvalidOperationException("The edge editor did not start at the proposal used for the study.");
+            entry.Text = "270";
+            if (slider.Value != 270 || !save.IsEnabled || preview.EdgeOutline.Bounds.Width / 2 <= 970.36)
+                throw new InvalidOperationException("The 270° edge did not extend the angular map.");
             entry.Text = "152";
             await dialog.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            apparentFullDegrees = slider.Value;
-            // The demo fit maps a full field of 152° to a native radius of 883.39 px.
-            if (!apply.IsEnabled || apparentFullDegrees != 152 ||
-                preview.ManualOutline?.Bounds.Width / 2 is not (> 883 and < 884))
-                throw new InvalidOperationException("The manual field control and its circle disagree on the example mask.");
+            if (!save.IsEnabled || slider.Value != 152 || preview.EdgeOutline?.Bounds.Width / 2 is not (> 883 and < 884))
+                throw new InvalidOperationException("The refined edge and its 152° circle disagree.");
             await preview.RequestNativePhotoAsync();
             preview.ZoomAt(new Point(preview.ActualWidth / 2, preview.ActualHeight / 2), 1.8);
             dialog.UpdateLayout();
-            Capture(dialog, Path.Combine(output, "apparent-fov-152-mask.png"));
+            showMask.IsChecked = true;
+            Capture(dialog, Path.Combine(output, "refined-edge-mask.png"));
             showMask.IsChecked = false;
-            Capture(dialog, Path.Combine(output, "apparent-fov-152-photo.png"));
+            Capture(dialog, Path.Combine(output, "refined-edge-photo.png"));
         }
         finally { dialog.Close(); }
-        using var comparison = new AppServices(Path.Combine(output, "mask-edge-debug"));
-        var extended = await comparison.Evaluate(study.Settings with { MaskEdgeThresholdPercent = 100 },
-            false, _ => { }, null, CancellationToken.None);
-        if (extended.MaskEdge is not { BlackPercent: 100, EffectiveFullDegrees: 180 } applied ||
-            Math.Abs(applied.MeasuredFullDegrees - 132.86) > .01 ||
-            !study.Run.Rows.Select(r => r.IntervalId).SequenceEqual(extended.Run.Rows.Select(r => r.IntervalId)) ||
-            Math.Abs(study.Run.BeforeEnergy - extended.Run.BeforeEnergy) > 1e-8 ||
-            study.Run.AfterEnergy is not double before || extended.Run.AfterEnergy is not double after || after <= before)
-            throw new InvalidOperationException("The example's capped mask calculation did not preserve the baseline and add irradiation from visible outer sky.");
-        var manual = await comparison.Evaluate(study.Settings with { ApparentFullFovDegrees = apparentFullDegrees },
-            false, _ => { }, null, CancellationToken.None);
-        if (manual.MaskEdge is not { } manualEdge || manualEdge.ManualFullFovDegrees != apparentFullDegrees ||
-            manualEdge.EffectiveFullDegrees != apparentFullDegrees ||
-            !study.Run.Rows.Select(r => r.IntervalId).SequenceEqual(manual.Run.Rows.Select(r => r.IntervalId)) ||
-            Math.Abs(study.Run.BeforeEnergy - manual.Run.BeforeEnergy) > 1e-8 ||
-            manual.Run.AfterEnergy is not double manualAfter || manualAfter <= before || manualAfter > after + 1e-8)
-            throw new InvalidOperationException("The apparent field did not constrain the example's accepted irradiation between its measured and 180° values.");
-        AppData.Write(Path.Combine(output, "mask-edge-comparison.json"), new
+        using var comparison = new AppServices(Path.Combine(output, "edge-check"));
+        var rows = new List<object>();
+        foreach (double full in new[] { 152d, 270d })
         {
-            Rows = study.Run.Rows.Count, applied.MeasuredFullDegrees, applied.EffectiveFullDegrees, applied.BlackPercent,
-            Measured = new { study.Run.BeforeEnergy, study.Run.AfterEnergy, study.Run.SkyCoverage },
-            Extended = new { extended.Run.BeforeEnergy, extended.Run.AfterEnergy, extended.Run.SkyCoverage },
-            Manual = new { ApparentFullDegrees = apparentFullDegrees, manual.Run.BeforeEnergy, manual.Run.AfterEnergy, manual.Run.SkyCoverage },
-            AddedKWhPerSquareMetre = after - before, applied.ObservedTerminalBand, applied.Explanation
-        });
-        if (window.Completed != study || window.RevisionForTest != revision ||
-            window.UpdateStateForTest != state || !window.ExportEnabledForTest)
-            throw new InvalidOperationException("The mask edge experiment changed the accepted study.");
+            var result = await comparison.Evaluate(study.Settings with { ApparentFullFovDegrees = full },
+                false, _ => { }, null, CancellationToken.None);
+            if (result.MaskEdge?.EffectiveFullDegrees != full || result.MaskEdge.ManualFullFovDegrees != full ||
+                !study.Run.Rows.Select(r => r.IntervalId).SequenceEqual(result.Run.Rows.Select(r => r.IntervalId)) ||
+                Math.Abs(study.Run.BeforeEnergy - result.Run.BeforeEnergy) > 1e-8 ||
+                result.Run.AfterEnergy is not double shaded || !double.IsFinite(shaded) || shaded < 0 || shaded > result.Run.BeforeEnergy)
+                throw new InvalidOperationException($"The shipped study did not use the {full}° edge consistently.");
+            rows.Add(new { FullFovDegrees = full, result.Run.BeforeEnergy, result.Run.AfterEnergy, result.Run.SkyCoverage });
+        }
+        AppData.Write(Path.Combine(output, "refined-edge-result.json"), new { Rows = study.Run.Rows.Count,
+            Proposal = proposed, study.Run.BeforeEnergy, study.Run.AfterEnergy, Refined = rows });
+        if (window.Completed != study || window.RevisionForTest != revision || !window.ExportEnabledForTest)
+            throw new InvalidOperationException("Cancelling the edge editor changed the accepted study.");
     }
 
     private static async Task VerifyPv(MainWindow window, string output)
@@ -455,7 +448,7 @@ public static class SmokeTest
                     throw new InvalidOperationException("The secondary editor did not block the main study window.");
                 var legend = Find<TextBlock>(editor, text => System.Windows.Automation.AutomationProperties.GetAutomationId(text) == "MaskEditorFieldOfView");
                 if (!legend.Text.Contains("°") || !legend.Text.Contains("FOV"))
-                    throw new InvalidOperationException("The mask editor did not identify the calibrated angular boundary.");
+                    throw new InvalidOperationException("The mask editor did not identify the study edge.");
                 Capture(editor, Path.Combine(output, "mask-editor-fit.png"));
                 var maskOpacity = Find<Slider>(editor, s => s.Minimum == 0 && s.Maximum == 100);
                 maskOpacity.Value = 30;

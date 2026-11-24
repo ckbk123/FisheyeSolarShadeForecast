@@ -14,11 +14,7 @@ public sealed record MaskEditorRequest(byte[] OrientedPhotoPng, byte[] OpeningMa
     double DiskX, double DiskY, double DiskRadius, string SuggestedName,
     Func<byte[], string, bool> Save)
 {
-    public Geometry? CalibratedOutline { get; init; }
-    public Geometry? UsableOutline { get; init; }
-    public Geometry? MaskBandOutline { get; init; }
-    public Geometry? ScanCapOutline { get; init; }
-    public Geometry? ManualOutline { get; init; }
+    public Geometry? EdgeOutline { get; init; }
     public string FieldOfViewLabel { get; init; } = "FOV unavailable";
     public string? FieldOfViewHelp { get; init; }
 }
@@ -99,7 +95,7 @@ public sealed class MaskEditorWindow : Window
         top.Children.Add(Button("Undo", () => { document.Undo(); Redraw(); }));
         top.Children.Add(Button("Redo", () => { document.Redo(); Redraw(); }));
         top.Children.Add(Button("Reset", () => { document.Reset(); Redraw(); }));
-        bool hasFov = request.CalibratedOutline != null;
+        bool hasFov = request.EdgeOutline != null;
         var guide = new TextBlock { Text = hasFov ? request.FieldOfViewLabel : request.FieldOfViewLabel + " · dashed gray line: detected lens disk",
             ToolTip = request.FieldOfViewHelp, Margin = new(16, 0, 16, 7), TextWrapping = TextWrapping.Wrap,
             Foreground = hasFov ? new SolidColorBrush(Color.FromRgb(0x80, 0xee, 0xaa)) : Brushes.LightGray };
@@ -127,8 +123,7 @@ public sealed class MaskEditorWindow : Window
         canvas = new Grid { Width = width, Height = height, Cursor = Cursors.Cross, Background = Brushes.Transparent, ClipToBounds = true };
         canvas.Children.Add(new Image { Source = photoBitmap, Width = width, Height = height, Stretch = Stretch.Fill, IsHitTestVisible = false });
         canvas.Children.Add(maskImage);
-        fieldOfView.SetOutlines(request.CalibratedOutline, request.UsableOutline);
-        fieldOfView.SetMaskScan(request.MaskBandOutline, request.ScanCapOutline, request.ManualOutline);
+        fieldOfView.SetEdge(request.EdgeOutline);
         canvas.Children.Add(fieldOfView);
         if (!hasFov)
         {

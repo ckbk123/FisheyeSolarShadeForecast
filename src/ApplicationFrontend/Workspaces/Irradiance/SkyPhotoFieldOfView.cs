@@ -57,7 +57,7 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
         string Format(double value) => value.ToString("0.##", CultureInfo.CurrentCulture);
         string text = $"Calibrated FOV: {Format(fullAngle)}° full ({Format(halfAngle)}° half-angle)";
         string legend = $"FOV limit {Format(halfAngle)}° from lens axis · {Format(fullAngle)}° full";
-        string explanation = "The solid green circle traces the maximum calibrated incident angle around the optical axis. " +
+        string explanation = "The measured field extends to the maximum calibrated incident angle around the optical axis. " +
             "The full field of view is twice that angle. The calculation applies the selected profile and any saved coverage override. " + profile.CoverageNote;
         double cx = calibration.PrincipalPoint[0], cy = calibration.PrincipalPoint[1];
         double low = 0, high = halfAngle * Math.PI / 180;
@@ -106,10 +106,10 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
             var clippedDisk = Geometry.Combine(disk, image, GeometryCombineMode.Intersect, null, tolerancePixels, ToleranceType.Absolute);
             usable = Geometry.Combine(cone, clippedDisk, GeometryCombineMode.Intersect, null, tolerancePixels, ToleranceType.Absolute);
             usable.Freeze();
-            string edge = usable.IsEmpty() ? " · no usable area on this photo" : " · dashed usable photo boundary";
+            string edge = usable.IsEmpty() ? " · no usable area on this photo" : " · clipped by the photo coverage";
             legend += edge;
             text += edge;
-            explanation += " The dashed boundary traces the intersection of the calibrated cone, photo lens disk and image rectangle. Its angle can vary around a cropped or off-center photo.";
+            explanation += " The usable area is the intersection of the calibrated cone, photo lens disk and image rectangle. Its angle can vary around a cropped or off-center photo.";
         }
         return new(fullAngle, circular, text, explanation) { EffectiveCalibration = calibration, CalibratedOutline = cone, UsableOutline = usable, OutlineLabel = legend };
     }

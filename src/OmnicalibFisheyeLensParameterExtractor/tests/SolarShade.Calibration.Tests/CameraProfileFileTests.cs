@@ -35,6 +35,7 @@ public sealed class CameraProfileFileTests : IDisposable
     [InlineData(113.25)]
     [InlineData(130)]
     [InlineData(152.5)]
+    [InlineData(270)]
     public void ManualFullFieldRetainsOriginalCoverageAndDiskInJsonAndYaml(double full)
     {
         var selected = CalibrationRadialMap.WithApparentFullFov(Calibration, full);

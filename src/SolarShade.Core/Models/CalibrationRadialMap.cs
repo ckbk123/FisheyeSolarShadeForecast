@@ -3,6 +3,7 @@ namespace SolarShade.Core.Models;
 /// <summary>Incident angle (radians) to native radius (pixels). The polynomial is measured up to an optional tangent join.</summary>
 public sealed class CalibrationRadialMap
 {
+    public const double MaximumRefinedFullDegrees = 270;
     private readonly double[] coefficients;
     private readonly double joinRadians = double.PositiveInfinity;
     private readonly double joinRadius, joinSlope;
@@ -14,8 +15,8 @@ public sealed class CalibrationRadialMap
         Coefficients = Array.AsReadOnly(coefficients);
         if (calibration.LinearExtensionStartDegrees is not double start) return;
         if (!double.IsFinite(start) || start <= 0 || !double.IsFinite(calibration.MaximumIncidentAngleDegrees) ||
-            start >= calibration.MaximumIncidentAngleDegrees || calibration.MaximumIncidentAngleDegrees > 90)
-            throw new ArgumentException("The radial extension needs a positive measured angle below its effective limit of at most 90°.", nameof(calibration));
+            start >= calibration.MaximumIncidentAngleDegrees || calibration.MaximumIncidentAngleDegrees > MaximumRefinedFullDegrees / 2)
+            throw new ArgumentException("The radial extension needs a positive measured angle below its effective limit of at most 135° from the lens axis.", nameof(calibration));
         joinRadians = start * Math.PI / 180;
         joinRadius = Polynomial(coefficients, joinRadians);
         joinSlope = PolynomialSlope(coefficients, joinRadians);
@@ -39,13 +40,13 @@ public sealed class CalibrationRadialMap
     {
         var measured = MeasuredProfile(calibration);
         double full = 2 * measured.MaximumIncidentAngleDegrees;
-        if (full >= 180) return full;
+        if (full >= MaximumRefinedFullDegrees) return MaximumRefinedFullDegrees;
         double radians = measured.MaximumIncidentAngleDegrees * Math.PI / 180;
         var coefficients = measured.IncidentAngleToRadiusPolynomial;
         double radius = Polynomial(coefficients, radians), slope = PolynomialSlope(coefficients, radians);
-        double cap = radius + slope * (Math.PI / 2 - radians);
+        double cap = radius + slope * (MaximumRefinedFullDegrees * Math.PI / 360 - radians);
         return double.IsFinite(radius) && radius > 0 && double.IsFinite(slope) && slope > 0 &&
-            double.IsFinite(cap) && cap > radius ? 180 : full;
+            double.IsFinite(cap) && cap > radius ? MaximumRefinedFullDegrees : full;
     }
 
     /// <summary>Use the original polynomial inside the measured field and its endpoint tangent beyond it.</summary>
@@ -66,8 +67,8 @@ public sealed class CalibrationRadialMap
     {
         if (maximumHalfAngleDegrees == measured.MaximumIncidentAngleDegrees) return measured;
         if (measured.LinearExtensionStartDegrees.HasValue || !double.IsFinite(maximumHalfAngleDegrees) ||
-            maximumHalfAngleDegrees < measured.MaximumIncidentAngleDegrees || maximumHalfAngleDegrees > 90)
-            throw new ArgumentOutOfRangeException(nameof(maximumHalfAngleDegrees), "Extend a measured profile up to a maximum of 90° from the lens axis.");
+            maximumHalfAngleDegrees < measured.MaximumIncidentAngleDegrees || maximumHalfAngleDegrees > MaximumRefinedFullDegrees / 2)
+            throw new ArgumentOutOfRangeException(nameof(maximumHalfAngleDegrees), "Extend a measured profile up to a maximum of 135° from the lens axis.");
         var effective = measured with { LinearExtensionStartDegrees = measured.MaximumIncidentAngleDegrees,
             MaximumIncidentAngleDegrees = maximumHalfAngleDegrees };
         _ = new CalibrationRadialMap(effective);

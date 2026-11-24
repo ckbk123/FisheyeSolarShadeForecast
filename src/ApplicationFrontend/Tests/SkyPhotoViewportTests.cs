@@ -87,6 +87,68 @@ public sealed class SkyPhotoViewportTests
     });
 
     [Fact]
+    public void ARefinedEdgeStopsAtThePhotoPixelsInThePreviewAndEditor() => ManualUpdateTests.Sta(() =>
+    {
+        var photo = Bitmap(100, 200);
+        var viewport = new SkyPhotoViewport { Width = 300, Height = 200 };
+        viewport.SetPhoto(photo, 100, 200, "");
+        viewport.SetEdge(49.5, 99.5, 70);
+        viewport.Measure(new Size(300, 200)); viewport.Arrange(new Rect(0, 0, 300, 200));
+        VerifyClip(viewport, () => viewport.ImageBounds);
+        viewport.ZoomAt(new Point(150, 70), 1.5); viewport.PanBy(new Vector(10, -10));
+        VerifyClip(viewport, () => viewport.ImageBounds);
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(photo));
+        using var stream = new MemoryStream();
+        encoder.Save(stream);
+        byte[] png = stream.ToArray();
+        var editor = new MaskEditorWindow(new(png, png, 49.5, 99.5, 50, "Test mask", (_, _) => true)
+        {
+            EdgeOutline = viewport.EdgeOutline, FieldOfViewLabel = "Edge"
+        }) { Width = 780, Height = 500, ShowActivated = false };
+        try
+        {
+            editor.Show(); editor.UpdateLayout();
+            var root = (StackPanel)((ScrollViewer)editor.Content).Content;
+            var scroll = Assert.Single(root.Children.OfType<ScrollViewer>());
+            var plane = (Grid)scroll.Content;
+            var zoom = Assert.Single(root.Children.OfType<WrapPanel>()).Children.OfType<Slider>().Single(s => s.Maximum == 800);
+            Rect PhotoBounds() => plane.TransformToAncestor(scroll).TransformBounds(new Rect(0, 0, 100, 200));
+            zoom.Value = 100;
+            VerifyClip(scroll, PhotoBounds);
+            zoom.Value = 220;
+            scroll.ScrollToVerticalOffset(72);
+            VerifyClip(scroll, PhotoBounds);
+        }
+        finally { editor.Close(); }
+        return Task.CompletedTask;
+
+        static void VerifyClip(FrameworkElement surface, Func<Rect> photoBounds)
+        {
+            surface.UpdateLayout();
+            Rect bounds = photoBounds();
+            int width = (int)surface.ActualWidth, height = (int)surface.ActualHeight;
+            Assert.True(bounds.Left > 1 || bounds.Right < width - 1); // Visible letterbox beside the native photo.
+            var render = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            render.Render(surface);
+            byte[] pixels = new byte[width * height * 4];
+            render.CopyPixels(pixels, width * 4, 0);
+            int green = 0;
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                int offset = (y * width + x) * 4;
+                if (pixels[offset + 1] < 120 || pixels[offset + 1] < pixels[offset + 2] + 40 ||
+                    pixels[offset + 1] < pixels[offset] + 25) continue;
+                green++;
+                Assert.True(bounds.Contains(new Point(x + .5, y + .5)), $"Edge pixel ({x}, {y}) outside photo {bounds}");
+            }
+            Assert.True(green > 15);
+        }
+    });
+
+    [Fact]
     public void FailedCalibrationStampStaysOnTheVisiblePhotoAndClearsForAValidProfile() => ManualUpdateTests.Sta(() =>
     {
         using var fixture = new ManualUpdateTests.Fixture();
@@ -100,7 +162,7 @@ public sealed class SkyPhotoViewportTests
         Assert.Equal("CALIBRATION FAILED", AutomationProperties.GetName(stamp));
         Assert.Contains("Too few complete boards.", AutomationProperties.GetHelpText(viewport));
         Assert.False(stamp.IsHitTestVisible);
-        Assert.False(viewport.HasCalibratedOutline);
+        Assert.Null(viewport.EdgeOutline);
         Assert.False(viewport.Photo.OverlayVisible);
         void StampCoversVisiblePhoto()
         {
@@ -122,7 +184,7 @@ public sealed class SkyPhotoViewportTests
         Assert.Contains("dimensions", AutomationProperties.GetHelpText(stamp));
         viewport.SetFieldOfView(SkyPhotoFieldOfView.Load(fixture.Settings, 201, 303, null));
         Assert.Equal(Visibility.Collapsed, stamp.Visibility);
-        Assert.True(viewport.HasCalibratedOutline);
+        Assert.NotNull(viewport.EdgeOutline);
         viewport.SetFieldOfView(mismatched);
         viewport.ClearPhoto();
         Assert.Equal(Visibility.Collapsed, stamp.Visibility);

@@ -67,7 +67,7 @@ public static class CameraProfileFiles
                 coverage.Value, radius, null, 0, [], File.GetLastWriteTimeUtc(path),
                 fileLimit.HasValue ? "Native OmniCalib YAML with SolarShade effective field of view" : "Native OmniCalib YAML; caller-provided angular coverage")
                 { LinearExtensionStartDegrees = tangentStart, OriginalMaximumIncidentAngleDegrees = manualMeasured }, path,
-                manualMeasured.HasValue ? "Saved user-selected apparent full field of view." :
+                manualMeasured.HasValue ? "Saved effective full field of view." :
                 tangentStart.HasValue ? "Saved effective limit with a linear continuation of the measured radial map." :
                 "Caller-provided maximum incident angle; not inferred from lens advertising or polynomial extrapolation.") { NativeYaml = yaml };
         }

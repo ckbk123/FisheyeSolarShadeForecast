@@ -7,6 +7,7 @@ public sealed record MaskEdgeFinding(int BlackPercent, double? RadiusPixels, str
 public readonly record struct MaskRingSample(double RadiusPixels, int BlackSamples, int ObservedBlackSamples, int UnknownSamples);
 public sealed record MaskEdgeScan(IReadOnlyList<MaskEdgeFinding> Findings, IReadOnlyList<MaskRingSample> Samples)
 {
+    public MaskEdgeFinding Proposal => Findings.Single(f => f.BlackPercent == MaskEdgeProbe.ProposalBlackPercent);
     public double CalibratedFullDegrees { get; init; }
     public double? LimitRadiusPixels { get; init; }
     public bool AlreadyCovers180 => CalibratedFullDegrees >= 180;
@@ -31,9 +32,10 @@ public sealed record MaskEdgeScan(IReadOnlyList<MaskEdgeFinding> Findings, IRead
 public static class MaskEdgeProbe
 {
     public const int SamplesPerRing = 1440;
+    public const int ProposalBlackPercent = 95;
     private static readonly (double Sin, double Cos)[] Bearings = Enumerable.Range(0, SamplesPerRing)
         .Select(i => Math.SinCos(i * Math.Tau / SamplesPerRing)).ToArray();
-    private static readonly int[] Thresholds = [80, 90, 95, 100];
+    private static readonly int[] Thresholds = [80, 90, ProposalBlackPercent, 100];
 
     public static MaskEdgeScan AnalyzeTo180(byte[] maskPng, int width, int height, double centerX, double centerY,
         double[] coefficients, double calibratedHalfAngleDegrees, LensDisk? supportDisk, MaskCrop? aiCrop, CancellationToken ct = default,

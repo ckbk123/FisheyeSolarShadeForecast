@@ -10,6 +10,17 @@ using SolarShade.SkyPhotoMasking;
 
 namespace SolarShade.Desktop;
 
+public sealed record RefinedEdgeSources(string PhotoSha256, string ProfileSha256)
+{
+    internal static RefinedEdgeSources? From(InputDependencies? inputs) =>
+        inputs is { Image.HasDigest: true, Profile.HasDigest: true }
+            ? new(inputs.Image.Content, inputs.Profile.Content) : null;
+
+    internal bool HasReplacement(InputDependencies current) =>
+        current.Image.HasDigest && current.Image.Content != PhotoSha256 ||
+        current.Profile.HasDigest && current.Profile.Content != ProfileSha256;
+}
+
 public sealed partial record UserSettings
 {
     public bool FirstRun { get; set; }
@@ -47,9 +58,30 @@ public sealed partial record UserSettings
     public int Resolution { get; set; } = 1024;
     public double CoverageAngle { get; set; } // zero: use saved profile value
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    public int? MaskEdgeThresholdPercent { get; set; }
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public double? ApparentFullFovDegrees { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public RefinedEdgeSources? ApparentFovSources { get; set; }
+
+    internal void SetRefinedEdge(double? fullDegrees, InputDependencies? sources = null)
+    {
+        ApparentFullFovDegrees = fullDegrees;
+        ApparentFovSources = fullDegrees.HasValue ? RefinedEdgeSources.From(sources) : null;
+    }
+
+    internal bool VerifyRefinedEdge(InputDependencies sources)
+    {
+        if (ApparentFovSources != null)
+        {
+            if (ApparentFullFovDegrees.HasValue && !ApparentFovSources.HasReplacement(sources)) return false;
+            SetRefinedEdge(null);
+            return true;
+        }
+        // Keep fits saved by older versions and bind them once both inputs are available.
+        if (!ApparentFullFovDegrees.HasValue || RefinedEdgeSources.From(sources) is not { } identity) return false;
+        ApparentFovSources = identity;
+        return true;
+    }
+
     public bool CenteredDisk { get; set; }
     public int Substeps { get; set; } = 60;
     public bool Isotropic { get; set; }
@@ -65,7 +97,14 @@ public static class AppData
         Path.Combine(AppContext.BaseDirectory, "Data");
     public static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     public static string PathFor(string name) { Directory.CreateDirectory(Root); return Path.Combine(Root, name); }
-    public static UserSettings? ReadSettings() => Read<UserSettings>(PathFor("settings.json"));
+    public static UserSettings? ReadSettings()
+    {
+        var settings = Read<UserSettings>(PathFor("settings.json"));
+        // Older releases allowed hand fits through the native field on cameras wider than 270°.
+        if (settings?.ApparentFullFovDegrees is > SolarShade.Core.Models.CalibrationRadialMap.MaximumRefinedFullDegrees and <= 360)
+            settings.ApparentFullFovDegrees = SolarShade.Core.Models.CalibrationRadialMap.MaximumRefinedFullDegrees;
+        return settings;
+    }
     public static void SaveSettings(UserSettings settings) => Write(PathFor("settings.json"), PortablePaths.Map(settings, path => PortablePaths.Store(path)));
     public static T? Read<T>(string path)
     { try { return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) : default; } catch (JsonException) { return default; } catch (IOException) { return default; } }

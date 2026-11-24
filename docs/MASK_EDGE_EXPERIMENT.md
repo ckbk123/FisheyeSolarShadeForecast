@@ -1,22 +1,14 @@
-# Searching for open sky beyond calibration
+# Refining the sky image edge
 
-SolarShade can inspect the selected sky mask between the calibrated field of view and **180° full FOV** (90° from the lens axis). The default **100%** setting finds where a completely blocked band begins, provided it continues all the way to 180°. If sky reappears, the scan looks beyond that opening. If the outer ring still contains sky or the photograph or mask runs out, the result is the 180° search cap. The dialog gives the reason. A calibration that already covers 180° or more keeps its measured field.
+SolarShade uses one edge for the sky grid, sun path and shading. The first calculation uses the mask's suggested edge. To adjust it, open **Refine edge…**, move the slider or enter the full FOV, then choose **Save edge**. Run **Update results** to recalculate. Zoom or toggle **Show mask** to align the green circle with the visible rim.
 
-## Using the result in a study
-
-1. Choose the mask for calculation and open **Estimate edge…** beside the sky photograph. The green circle is the calibrated limit. Blue marks the 180° cap. An amber circle appears where a qualifying dark band starts.
-2. Start at **100%**. Try 95%, 90% or 80% to see how accepting gaps changes the result. **Show mask** lets you compare classifications against the photograph. The readout also reports whether the scan found any classified open sky beyond calibration.
-3. Choose **Use for calculation** and then **Update results** to apply the selected threshold to the study’s selected mask. The camera profile retains its measured calibration. **Use calibration only** restores the calibrated field on the next update.
-
-To fit a visible rim yourself, choose **Set apparent FOV**. The slider and angle entry move the pink circle over the photo or mask. The angle spans the entire field, so **152° full** puts the rim **76° from the lens axis**. You can also bring the circle inside the green calibration boundary. Once applied, the study uses your chosen angle for the sky grid, sun path and irradiance. The mask still determines how much sunlight reaches the panel within that circle.
-
-**Use full-frame mask…** accepts an opaque, binary PNG at the sky photograph’s oriented dimensions. Supply the original classification with white for open sky and black for blocked directions. A black border baked into a previously cropped PNG can mimic an obstruction. A file opened in this dialog is for inspection. To calculate with it, first import it as the study mask.
+The value spans the full field. A **152°** edge is **76°** from the lens axis. With a usable outward lens fit, you can refine the full field up to **270°**. Parts of the circle beyond the photo are clipped on screen. The calculation still needs an in-frame, observed mask sample for sunlight to reach the panel.
 
 ## What the rings measure
 
 Each ring samples 1,440 bearings at the original image resolution, centered on the calibrated lens center. The radius increases by 1 px, or by 2 px for images whose shorter side is at least 1,000 px. The scan also samples the exact 180° endpoint when a complete circle fits in the photograph.
 
-Starting at the cap and working inward, SolarShade finds the first radius of the final continuous band that meets the chosen percentage. At 100%, one observed white sample or one unknown sample breaks a band. At 95%, at least 1,368 of the 1,440 samples on **every** ring in the band must be observed black. Pixels excluded by SolarShade’s known disk, AI crop or circular model output count as unknown. A band that is already dark at the calibrated limit needs no extension.
+Starting at 180° and working inward, SolarShade finds the beginning of the final band in which every ring has at least **1,368 observed black samples out of 1,440** (95%). Pixels excluded by the photo, lens disk or classifier crop cannot count toward that threshold. When sky reappears, it looks farther out. If the mask cannot establish a terminal band, the proposal is 180°. Calibrations already reaching 180° use their measured range up to the study’s 270° ceiling. Refining the proposal above 180° is a visual adjustment.
 
 Angles outside calibration are estimates. SolarShade continues the slope of the lens’s angle-to-radius curve at the last calibrated angle. For the bundled photograph the polynomial turns inward after 78.79° incident angle, so simply extending that polynomial could assign two angles to one radius. The endpoint slope gives a consistent outward projection. An independently measured direction near the edge would be needed to test its angular accuracy.
 
@@ -28,6 +20,8 @@ The calibrated field is **132.86° full** at **823.94 px**. The estimated 180° 
 
 ![Bundled sky photograph with calibrated and 180-degree circles beside a plot of observed sky, obstruction and unknown coverage](images/mask-edge-experiment.png)
 
+The original field trial compared four thresholds. SolarShade uses the 95% column.
+
 | Mask preparation | 100% | 95% | 90% | 80% | Observed at the 180° cap |
 | --- | ---: | ---: | ---: | ---: | --- |
 | Automatic disk | 180° cap | 180° cap | 180° cap | 180° cap | All 1,440 samples unknown |
@@ -37,15 +31,16 @@ The photograph’s visible transition to the housing lies around **880–886 px*
 
 On this photograph, that visible rim corresponds to about **151–153° full** under the extrapolated lens model. Try **152°** in the preview. The automatic scan reached 180° because all 1,440 samples at its outer circle fell outside classified coverage. A different image can reach the same cap because white mask pixels are still visible there.
 
-![SolarShade at 152° full FOV, with the dashed pink circle aligned to the visible lens rim and the measured field shown in green](images/apparent-fov-152.png)
+![Refine edge showing the single green study edge aligned to the visible rim at 152° full FOV](images/apparent-fov-152.png)
 
 | Bundled 744-hour study | Shaded panel energy |
 | --- | ---: |
 | Measured 132.86° | 107.3974 kWh/m² |
 | Apparent 152° | 109.2394 kWh/m² |
 | Automatic 180° cap | 109.2410 kWh/m² |
+| Refined 270° | 109.2410 kWh/m² |
 
-All three calculations used the same **131.3587 kWh/m²** of unshaded panel energy. The extra field from 152° to 180° contributed about **0.0016 kWh/m²** on this mask and panel orientation.
+All four calculations used the same **131.3587 kWh/m²** of unshaded panel energy. The extra field from 152° to 180° contributed about **0.0016 kWh/m²** on this mask and panel orientation. Extending the circle to 270° added no observed sky on this particular mask.
 
 ## Field trial with nominal 235° lenses
 

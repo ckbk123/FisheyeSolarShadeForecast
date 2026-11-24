@@ -97,7 +97,7 @@ public sealed class SkyPhotoFieldOfViewTests
         var view = SkyPhotoFieldOfView.Describe(profile, 201, 303, disk);
         var usable = view.UsableOutline!;
         Assert.True(usable.IsFrozen);
-        Assert.Contains("dashed", view.OutlineLabel);
+        Assert.Contains("clipped", view.OutlineLabel);
         int accepted = 0, rejected = 0;
         foreach (int azimuth in Enumerable.Range(0, 24).Select(n => n * 15))
             foreach (double incident in new[] { 10, 40, 65, 83, 94 })
@@ -126,15 +126,18 @@ public sealed class SkyPhotoFieldOfViewTests
         var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
         try
         {
-            Assert.Contains("140° full", window.Irradiance.FieldOfViewTextForTest);
-            Assert.Contains("usable circular FOV", window.Irradiance.FieldOfViewTextForTest);
+            await window.Irradiance.EdgePreviewReady;
+            Assert.StartsWith("Edge ·", window.Irradiance.FieldOfViewTextForTest);
+            Assert.Contains("140° full", window.Irradiance.FieldOfViewHelpForTest);
             window.IrradianceController.Settings.CoverageAngle = 55;
             window.Irradiance.SetCameraPoseForTest(180, 0, 0); await window.InputsSettled;
-            Assert.Contains("110° full (55° half-angle)", window.Irradiance.FieldOfViewTextForTest);
+            await window.Irradiance.EdgePreviewReady;
+            Assert.Contains("110° full", window.Irradiance.FieldOfViewHelpForTest);
             window.IrradianceController.Settings.CoverageAngle = 0;
             CameraProfileFiles.Export(Profile(60), fixture.Root);
             await window.RecheckSourcesAsync();
-            Assert.Contains("120° full", window.Irradiance.FieldOfViewTextForTest);
+            await window.Irradiance.EdgePreviewReady;
+            Assert.Contains("120° full", window.Irradiance.FieldOfViewHelpForTest);
             File.WriteAllText(fixture.Settings.ProfilePath, "invalid profile");
             await window.RecheckSourcesAsync();
             Assert.Equal("FOV unavailable", window.Irradiance.FieldOfViewTextForTest);
@@ -155,13 +158,14 @@ public sealed class SkyPhotoFieldOfViewTests
         try
         {
             window.Irradiance.SelectSkyPhotoForTest(sameSize); await window.InputsSettled;
-            Assert.Contains("140° full", window.Irradiance.FieldOfViewTextForTest);
-            Assert.Contains("coverage unconfirmed", window.Irradiance.FieldOfViewTextForTest);
+            Assert.Equal("Open Refine edge to preview the limit.", window.Irradiance.FieldOfViewTextForTest);
+            Assert.Contains("140° full", window.Irradiance.FieldOfViewHelpForTest);
             window.Irradiance.SelectSkyPhotoForTest(wrongSize); await window.InputsSettled;
             Assert.Equal("FOV unavailable", window.Irradiance.FieldOfViewTextForTest);
             window.Irradiance.SelectSkyPhotoForTest(fixture.Settings.SkyImage); await window.InputsSettled;
-            Assert.Contains("140° full", window.Irradiance.FieldOfViewTextForTest);
-            Assert.Contains("usable circular FOV", window.Irradiance.FieldOfViewTextForTest);
+            await window.Irradiance.EdgePreviewReady;
+            Assert.StartsWith("Edge ·", window.Irradiance.FieldOfViewTextForTest);
+            Assert.Contains("140° full", window.Irradiance.FieldOfViewHelpForTest);
             Assert.Null(window.Completed); Assert.False(Directory.Exists(Path.Combine(AppData.Root, "models-v1")));
         }
         finally { window.Close(); }

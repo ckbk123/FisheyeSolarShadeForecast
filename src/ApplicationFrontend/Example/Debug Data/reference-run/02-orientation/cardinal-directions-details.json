@@ -16,32 +16,33 @@
       90.17908124542645,
       -116.02812744232502
     ],
-    "MaximumIncidentAngleDegrees": 66.43000000000002,
+    "MaximumIncidentAngleDegrees": 90,
     "ImageDisk": {
       "CenterX": 1521.8750635782878,
       "CenterY": 2003.1250317891438,
       "RadiusPixels": 882.9166889190674
-    }
+    },
+    "LinearExtensionStartDegrees": 66.43
   },
   "Markers": [
     {
       "Name": "N",
       "AzimuthDegrees": 0,
       "Visible": true,
-      "BoundaryZenithDegrees": 38.42999999999999,
+      "BoundaryZenithDegrees": 47.067074986860945,
       "BoundaryX": 1530.5316248189056,
-      "BoundaryY": 1173.903141544619,
+      "BoundaryY": 1120.250780539683,
       "LabelX": 1396,
-      "LabelY": 1150,
-      "Status": "Calibrated coverage boundary.",
+      "LabelY": 1096,
+      "Status": "Effective projection boundary.",
       "TickPoints": [
         {
           "X": 1530.5316248189056,
-          "Y": 1173.903141544619
+          "Y": 1120.250780539683
         },
         {
           "X": 1530.5316248189056,
-          "Y": 1293.903141544619
+          "Y": 1240.250780539683
         }
       ]
     },
@@ -49,20 +50,20 @@
       "Name": "E",
       "AzimuthDegrees": 90,
       "Visible": true,
-      "BoundaryZenithDegrees": 63.07139734549585,
-      "BoundaryX": 729.0628897148345,
-      "BoundaryY": 1806.7186858386617,
-      "LabelX": 471,
-      "LabelY": 1932,
-      "Status": "Calibrated coverage boundary.",
+      "BoundaryZenithDegrees": 75.46904017800969,
+      "BoundaryX": 646.2048983412358,
+      "BoundaryY": 1890.2372942552415,
+      "LabelX": 388,
+      "LabelY": 2015,
+      "Status": "Effective projection boundary.",
       "TickPoints": [
         {
-          "X": 729.0628897148345,
-          "Y": 1806.7186858386617
+          "X": 646.2048983412358,
+          "Y": 1890.2372942552415
         },
         {
-          "X": 849.0628897148345,
-          "Y": 1806.7186858386617
+          "X": 766.2048983412358,
+          "Y": 1890.2372942552415
         }
       ]
     },
@@ -91,20 +92,20 @@
       "Name": "W",
       "AzimuthDegrees": 270,
       "Visible": true,
-      "BoundaryZenithDegrees": 63.07139734549585,
-      "BoundaryX": 2332.0003599229767,
-      "BoundaryY": 1806.7186858386617,
-      "LabelX": 2356,
-      "LabelY": 1932,
-      "Status": "Calibrated coverage boundary.",
+      "BoundaryZenithDegrees": 72.28848431805665,
+      "BoundaryX": 2394.43978829809,
+      "BoundaryY": 1868.3189460716787,
+      "LabelX": 2418,
+      "LabelY": 1993,
+      "Status": "Effective projection boundary.",
       "TickPoints": [
         {
-          "X": 2332.0003599229767,
-          "Y": 1806.7186858386617
+          "X": 2394.43978829809,
+          "Y": 1868.3189460716787
         },
         {
-          "X": 2212.0003599229767,
-          "Y": 1806.7186858386617
+          "X": 2274.43978829809,
+          "Y": 1868.3189460716787
         }
       ]
     }
@@ -124,19 +125,24 @@
       "IncidentAngleDegrees": 60,
       "RadiusPixels": 776.1855448462485,
       "Visible": true
+    },
+    {
+      "IncidentAngleDegrees": 90,
+      "RadiusPixels": 970.3565235731854,
+      "Visible": false
     }
   ],
-  "MeridianDotCount": 67,
+  "MeridianDotCount": 74,
   "Options": {
     "Opacity": 0.85
   },
   "Timings": {
-    "GeometryMilliseconds": 14.7486,
-    "RenderMilliseconds": 39.1258,
-    "EncodeMilliseconds": 358.8875,
-    "TotalMilliseconds": 412.7857
+    "GeometryMilliseconds": 20.5598,
+    "RenderMilliseconds": 46.5708,
+    "EncodeMilliseconds": 377.6354,
+    "TotalMilliseconds": 444.7844
   },
-  "GeometryConvention": "EXIF-oriented native pixels; x right, y down; true azimuth clockwise from North. N/E/S/W anchors mark the furthest resolved visible zenith on their upper-hemisphere constant-azimuth meridians. Cyan cross: fitted lens center. Cyan rings: incident angle from the optical axis at 30-degree steps. Magenta dots: projected N-S and E-W vertical great circles, including covered directions below the horizon. Their larger magenta dot marks true zenith when visible. Gaps and the undefined optical antipode split paths. Ring and meridian strokes are clipped to calibrated incidence, image disk and rectangle. The fitted center is marked wherever it falls on the photo. Letters label geographic anchors. TickPoints retain the legacy display-glyph coordinates. A horizon endpoint has zenith 90 degrees. Upward camera with a north-pointing top: N top, E left, S bottom, W right.",
+  "GeometryConvention": "EXIF-oriented native pixels; x right, y down; true azimuth clockwise from North. N/E/S/W anchors mark the furthest resolved visible zenith on their upper-hemisphere constant-azimuth meridians. Cyan cross: fitted lens center. Cyan rings: incident angle from the optical axis at 30-degree steps. Magenta dots: projected N-S and E-W vertical great circles, including covered directions below the horizon. Their larger magenta dot marks true zenith when visible. Gaps and the undefined optical antipode split paths. Ring and meridian strokes are clipped to the projection\u0027s angular limit, image disk and rectangle. The fitted center is marked wherever it falls on the photo. Letters label geographic anchors. TickPoints retain the legacy display-glyph coordinates. A horizon endpoint has zenith 90 degrees. Upward camera with a north-pointing top: N top, E left, S bottom, W right. The measured radial polynomial ends at 66.43\u00B0 from the lens axis. Its tangent continues to the effective limit of 90\u00B0 from the axis.",
   "PoseConvention": "Projection inputs: ImageTopAzimuthDegrees is the pre-roll image-top bearing clockwise from true north, TiltDegrees is the signed optical-axis rotation from up toward that bearing, and RollDegrees rotates the image around the lens.",
   "Color": "Cyan (#00D9F5) lens center and rings; magenta (#FF00B4) compass meridians, labels and zenith; straight-alpha PNG",
   "AnnotationOnly": true,

@@ -1,13 +1,13 @@
 {
   "Owner": "SolarShade.CurrentDebugData.v1",
-  "Id": "10e5e2011fec4dd1a453e1a08add18f9",
+  "Id": "c1ea1b1638824736841bcc1d4beed526",
   "Kind": "calculation",
   "UpdateNumber": 1,
-  "Software": "01D737136E4799A196B7E311A2CF49AE4F3AD8F256AC0C3D2781AB1BD5B7B1C0",
+  "Software": "1386C339478C3117F78351CB37C4360BA74EF4BD38AB5256B30918832B248A68",
   "Status": "Complete",
-  "StartedUtc": "2026-11-24T15:24:51.7060272+00:00",
-  "UpdatedUtc": "2026-11-24T15:24:57.7323108+00:00",
-  "LastSuccessfulUpdateUtc": "2026-11-24T15:24:57.7321989+00:00",
+  "StartedUtc": "2026-11-24T17:12:54.4427828+00:00",
+  "UpdatedUtc": "2026-11-24T17:13:00.1299977+00:00",
+  "LastSuccessfulUpdateUtc": "2026-11-24T17:13:00.1285568+00:00",
   "Settings": {
     "FirstRun": false,
     "CalibrationFolder": "Example/Calib Images",
@@ -50,6 +50,15 @@
     "Start": "2025-04-30T23:00:00+07:00",
     "End": "2025-05-31T23:00:00+07:00"
   },
+  "MaskEdge": {
+    "MeasuredFullDegrees": 132.86,
+    "EffectiveFullDegrees": 180,
+    "BlackPercent": 95,
+    "ObservedTerminalBand": false,
+    "Explanation": "Mask coverage at 180\u00B0 is incomplete. The cap is an extrapolation.",
+    "ObservedSkyAtCap": 0,
+    "UnknownAtCap": 1440
+  },
   "StoredEquipmentConvention": "Settings.PanelAzimuth and Settings.BottomAzimuth are solver inputs clockwise from true north. PanelAzimuth also stores the bearing opposite the marked panel top when flat. BottomAzimuth references image bottom before roll. CameraTilt is signed from up toward image top before roll. CameraRoll rotates the image around the lens. EquipmentAngles gives both top headings when laid flat and the physical normal azimuths.",
   "EquipmentAngles": {
     "PhoneLensAzimuthClockwiseFromSouthDegrees": 0,
@@ -68,38 +77,38 @@
   },
   "Inputs": {
     "sky-mask": {
-      "Fingerprint": "161534A779D430F03D097DC2CC4E3F9B17622E65FB17B5ACAB81DB0682979E86"
+      "Fingerprint": "62DA7663DD6B2500473598A3B3B45FF4C37D8D1CE6E422B43719B735C9DCD63E"
     },
     "camera-profile": {
-      "Fingerprint": "69B386167B03FDCEE17EE15ADCE0B6DFCC7144D6C73D9E3109651084E33D4167"
+      "Fingerprint": "248DF77ECC0AB3851894FECE7332B87ACB3A8C8A35E33733D9C69490245E50E6"
     },
     "cardinal-directions": {
-      "Fingerprint": "657BEFDDA4E805ED69FA3F57596C10FFBC73B67502F5A0A8C2227AA5E8A80D99"
+      "Fingerprint": "5530A32F338B7B45745E70BD7843D54D5C50DFEB7B809BB57BA88988D16FBBEB"
     },
     "irradiance-request": {
-      "Fingerprint": "C842431AC4A469BB8D619C9F8050F7B80F9645FDA487A19103474157A097D71A"
+      "Fingerprint": "216F0A2F2DF731D0D346977A56DA7343FF4A9A3E03C9A0C5FD7C7FBF41FF918B"
     },
     "source-dataset": {
-      "Fingerprint": "FCDA11FA8321CC112DFB2F966699E375CB17CF39AF241CA649019A7318D050C5",
+      "Fingerprint": "BF3E9D839C0B79268525AA5FA76AEEBE03B9FB4C4B389D13955C564A549F1D41",
       "Source": "Imported: horizontal-irradiance.xlsx",
-      "FetchedUtc": "2026-11-24T15:24:54.9181407\u002B00:00"
+      "FetchedUtc": "2026-11-24T17:12:55.5107917\u002B00:00"
     },
     "solar-timeline": {
-      "Fingerprint": "3BE1E77C92ECF1212AAA0AFCA5719A6DF69CE180D3099424382BE23ECFD75EDF"
+      "Fingerprint": "C928B7C117F2C13DE12777D85DF03065445FB281AFA699C31E8EB21DDFD8474E"
     },
     "sun-path-overlay": {
-      "Fingerprint": "097BC76B9B195553352AE875038838D24D4B917BD3DB6515DCD3B3507D7CF8C6",
+      "Fingerprint": "C76E6FFC5587D23857C45C308D3A48A52151ECD7DF943316D23A3497DB6AA9E4",
       "Origin": "Computed"
     },
     "camera-scene": {
-      "Fingerprint": "482D79E928CE5F1FBAF74379B947D373DD2AE6037C5E4A7F1A62B1D8B2C30772"
+      "Fingerprint": "85E5CBD9C1BA32CCD91A596ABAD1531B5D3541C2DA8F792B0F08CA4E27EF78CF"
     }
   },
   "Stages": {
     "01-calibration": {
       "Status": "Complete",
       "Origin": "Loaded effective camera profile",
-      "LibraryVersion": "2cb0712a-3264-422a-90c5-9339f3abb1f5",
+      "LibraryVersion": "46b82417-8468-46ba-9f34-6d05313a1047",
       "Artifacts": [
         "01-calibration/calibration.yml",
         "01-calibration/camera-profile.json"
@@ -107,8 +116,8 @@
     },
     "02-sky-mask": {
       "Status": "Complete",
-      "Origin": "Computed by SkyPhotoMasker",
-      "LibraryVersion": "282020a6-ee13-42bc-9980-06f26d1ee23d",
+      "Origin": "Reused in-memory mask",
+      "LibraryVersion": "d9157c2d-39d7-4860-8e88-002e4f21db3e",
       "Artifacts": [
         "02-sky-mask/mask-details.json",
         "02-sky-mask/mask-provenance.json",
@@ -118,7 +127,7 @@
     "02-orientation": {
       "Status": "Complete",
       "Origin": "Computed",
-      "LibraryVersion": "c3117149-0c78-4bbb-b74d-76261fc07090",
+      "LibraryVersion": "fce5dd41-89e5-43b4-af7b-37ef74d1e7ab",
       "Artifacts": [
         "02-orientation/cardinal-directions-details.json",
         "02-orientation/cardinal-directions-overlay.png",
@@ -128,7 +137,7 @@
     "03-irradiance": {
       "Status": "Complete",
       "Origin": "Imported",
-      "LibraryVersion": "66aaf718-e62a-4d37-bd22-804b86c17bce",
+      "LibraryVersion": "36eb5762-a377-4225-a040-99fa93b5813d",
       "Artifacts": [
         "03-irradiance/horizontal-irradiance.xlsx"
       ]
@@ -136,7 +145,7 @@
     "04-solar-positions": {
       "Status": "Complete",
       "Origin": "Computed",
-      "LibraryVersion": "c3117149-0c78-4bbb-b74d-76261fc07090",
+      "LibraryVersion": "fce5dd41-89e5-43b4-af7b-37ef74d1e7ab",
       "Artifacts": [
         "04-solar-positions/solar-integration-samples.xlsx",
         "04-solar-positions/solar-positions.xlsx",
@@ -148,7 +157,7 @@
     "05-transposition": {
       "Status": "Complete",
       "Origin": "Computed",
-      "LibraryVersion": "0d3d6bb4-252d-4a04-b52d-fce19a700712",
+      "LibraryVersion": "8653f6e4-fead-42d5-b283-365baade142d",
       "Artifacts": [
         "05-transposition/panel-unshaded.xlsx"
       ]
@@ -156,7 +165,7 @@
     "06-shading": {
       "Status": "Complete",
       "Origin": "Computed",
-      "LibraryVersion": "6956613e-09cb-4dbe-9c19-9367d6f47880",
+      "LibraryVersion": "e42d76cc-0394-452c-ad68-14a80d822243",
       "Artifacts": [
         "06-shading/panel-results.json",
         "06-shading/panel-shaded.xlsx",
@@ -168,34 +177,34 @@
   "PendingGroups": {},
   "ArtifactHashes": {
     "02-sky-mask/sky-mask.png": "3A14460ED696E1738531BB6E9223ECCE6BA1740A3C55376461781E4EF183C7F7",
-    "02-sky-mask/mask-details.json": "AFB7366A7367C405023A82254C41F87C1D61061A87D087B137B9FFDC919C6BDB",
+    "02-sky-mask/mask-details.json": "539AB5B61198B0A9ED241709CC3EFF116EB4F627EC7210EC422016007AE61DFC",
     "02-sky-mask/mask-provenance.json": "4339607EBD7487754E9472C2F04A84F2968318875B6C7519C3826FD506CF8115",
-    "01-calibration/calibration.yml": "0DF78BA2D7697D68ED8032C8FA9E4E89D88120169EE98AA6666079B0BFC2792D",
-    "01-calibration/camera-profile.json": "532F4164C1F5D3B6B56B72DF71E763F7FC56DB05E85AACCB93B3CADBB9B0846C",
-    "02-orientation/cardinal-directions-overlay.png": "5E4BA09D4074D02BE838D09C26DBD6AEE892401B44F37871E5B997A413EC4D99",
-    "02-orientation/cardinal-directions.xlsx": "E8AC4E0BCC7FA88834A4737FFDF8CACD830A63854292B4ED4B608CC3E7B14B1D",
-    "02-orientation/cardinal-directions-details.json": "44F58D03DF5180B538826482F4CAAC1FC2CA95705EBFE1FF954003808DF0E97B",
-    "03-irradiance/horizontal-irradiance.xlsx": "562EECF4DE9113BD97465452CE25139250EE93AC0FAE9F4F98FC3DBAC069A538",
-    "04-solar-positions/sun-path-overlay.png": "BB8B4CFC4896AD150155F4EEFA3DFD63131E43BB0B07B0AB62083996FE164798",
-    "04-solar-positions/sun-path-projection.xlsx": "15C5F509C99ED27459DD756EC5AC342A72EBBD13517483169E968EF04B742C41",
-    "04-solar-positions/sun-path-details.json": "FFDAE36EBE1F731B60F8580491463BE1AC9F5B4E88279B0D2F719AE97986CB89",
+    "01-calibration/calibration.yml": "0FDEB8BC311D59489F5DFBD4092B457095C121A8E475306BA8AC7CAD2821D34A",
+    "01-calibration/camera-profile.json": "1A578CE15142C1778A7139A41CBC308C41FC94B26C5697F2947934BC481435E8",
+    "02-orientation/cardinal-directions-overlay.png": "59C224ABEB545D14BFC104EBE2AEFDE6AEBC447C7B7E0F4A246FA13462AB0A1B",
+    "02-orientation/cardinal-directions.xlsx": "CE5D9B24DCB68493D71E86E5BB553BC3B0A674C7B1B432E53DCF6114BFA163DA",
+    "02-orientation/cardinal-directions-details.json": "4098C5BD46E82E0A0DD87A43417B08BEC88D30DDB3037258DFE65C41470123E2",
+    "03-irradiance/horizontal-irradiance.xlsx": "0A79DE1694917F18F7A7E0EA9B37A34742944D9D4504AFC00864894C4033E1DF",
+    "04-solar-positions/sun-path-overlay.png": "0ABBA4EDBFCC20BF8A72EB0665ABC2B1DEB031256FECBB07514D81520B4C2E2C",
+    "04-solar-positions/sun-path-projection.xlsx": "0843349FB83C072544BFE58D795F5749E2E141E394ADDF638B4897B73AE70B16",
+    "04-solar-positions/sun-path-details.json": "6AC114CF2ADD8DD9938778254F3352D2DEA54AC7CB904100B0B87A099A579755",
     "04-solar-positions/solar-positions.xlsx": "5A030A61F070DC585A135E3A5CD4912A0FB3EE920531C2AFB05D3FB761BF062D",
     "04-solar-positions/solar-integration-samples.xlsx": "48FFB129A8DDA482062F013E7DA22058F3AAA2DF2DCEB4FF2ED1498DE36F5496",
     "05-transposition/panel-unshaded.xlsx": "376711CB2C538909FDD323B5678778E46FE5D7931F1A582495A93CF779283283",
-    "06-shading/panel-shaded.xlsx": "2320BFDB5F09035094657453207BAEA0C032561868BB8FE27617D77672EBE357",
-    "06-shading/shading-correction-factors.xlsx": "0BC971776EACF4007F4EDE58F724B5337FC0341A6B4E43A90D757772F4026485",
-    "06-shading/shading-visibility.xlsx": "12A66AAEE1C2926108ADB4E9AEA5B339B8FF710FB11FF87E030AD4553ABC0ECF",
-    "06-shading/panel-results.json": "9DEEBCD4193003A5499990D5C9C9B06A6CC4F431F5FE66980E4587D2EAB402CA"
+    "06-shading/panel-shaded.xlsx": "17686411373F215320ABE6CB18F6C03342F202EBC91A131E5C3167A31DBAE68E",
+    "06-shading/shading-correction-factors.xlsx": "FD1FD44074A06FED851DCEC4121854AA57A849191037CC94CD885D6DCD82644C",
+    "06-shading/shading-visibility.xlsx": "6AEBB43D1DDD376DEC5A69262A194FC7447F70B668E898715155D7EDF95FCAB3",
+    "06-shading/panel-results.json": "82E52F540283C87457EFD6024FFCB896226CC3A55C068A7A78A3FB3679394F9A"
   },
   "Keys": {
-    "Mask": "2793A4E579B670C6D13330004600D76DB3E2407FDCEB28A44D77905FF443C8B5",
-    "Profile": "5EAD0589A319F86E0D67D3279B589970D395E8562D17A29EF5863607117B614A",
-    "Orientation": "EF2FA780F13E97959F2C4DD6CC13353A31680120EE62B288AAF11441218461DA",
-    "Irradiance": "C842431AC4A469BB8D619C9F8050F7B80F9645FDA487A19103474157A097D71A",
-    "Solar": "733C534291E236D984236CFFBB1E0CD2889F6651D0828AE20A2C33D6F7614082",
-    "SunPath": "ADE8A8AFFA2F92E47A25E702E0BD2CF269CDAE00360CB379EA5289DC4C976F24",
-    "Transposition": "9D056278AD47317311A842D844492E12574E2A96D4B4AE5A77C0DEFE90F50177",
-    "Shading": "0ACC9D23E7777D010AE7EF05EE877CB9337A317B5CDB5FAC7004022711E1A094"
+    "Mask": "69D3365EDBF6ED3430D4715701D33A95683549F53A86B0920912C35018EBCDF0",
+    "Profile": "AA4C63618123F7CE60C326990CDE31D46EFFE63F3FDB75CCAE34B03B0345547C",
+    "Orientation": "4C51E3A7A90D5D8C78747C82C2D75531E55B50D8EA0D798DAF44A237B223E3B3",
+    "Irradiance": "216F0A2F2DF731D0D346977A56DA7343FF4A9A3E03C9A0C5FD7C7FBF41FF918B",
+    "Solar": "6EF3BB51AC47FAA9B87ED64DFE95715942B39377827B42ACD90B9586617C9B4C",
+    "SunPath": "B81E170CBE7333F10FFBF4F8942DA24CD7647306ACF5F95B78547FD6E384BC19",
+    "Transposition": "38C05B0D80F961F7644E71199F458FBD74720B5A47648824FCF0B3FA50D309FA",
+    "Shading": "43204199D863AE1A39CCBE2CEC54100B9F82560225292AB036A7A913F49A8205"
   },
   "Invalidated": 0,
   "InvalidatedGroups": [],

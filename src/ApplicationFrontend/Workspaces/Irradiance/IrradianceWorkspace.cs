@@ -67,10 +67,14 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private readonly TextBlock beforeEnergy = Label("—", 27), afterEnergy = Label("—", 27), reduction = Label("—", 27), hover = Label("", 12);
     private readonly TextBlock provenance = Label("", 12);
     private readonly SkyPhotoViewport skyViewport = new();
-    private readonly Button estimateEdge = new() { Content = "Estimate edge…", IsEnabled = false };
-    private readonly WrapPanel calculationCoverage = new();
-    private readonly TextBlock calculationFov = Label("", 12, StudioTheme.Ink);
-    private readonly Button calibratedOnly = new() { Content = "Use calibration only", Margin = new(6, 0, 0, 0) };
+    private readonly Button refineEdge = new() { Content = "Refine edge…", IsEnabled = false };
+    private MaskAsset? proposalSource;
+    private string? proposalLens;
+    private CancellationTokenSource? proposalRequest;
+    private Task<AppliedMaskEdge?> proposalWork = Task.FromResult<AppliedMaskEdge?>(null);
+    private AppliedMaskEdge? proposalResult;
+    private string? proposalError;
+    internal Task EdgePreviewReady => proposalWork;
     private MaskEdgeWindow? maskEdgeWindow;
     private ImageOverlayPreview photo => skyViewport.Photo;
     private readonly CheckBox showCardinals = new() { Content = "Show sky grid", VerticalAlignment = VerticalAlignment.Center, Margin = new(8, 0, 8, 0) };
@@ -272,22 +276,17 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         previewHeader.Children.Add(showSunPath);
         showSunPath.Checked += (_, _) => SetSunPathVisibility(); showSunPath.Unchecked += (_, _) => SetSunPathVisibility();
         StudioTheme.Help(showSunPath, "Update the study to project the sun path for the study period onto the mask. This switch controls its visibility.");
-        previewHeader.Children.Add(estimateEdge);
-        AutomationProperties.SetAutomationId(estimateEdge, "EstimateMaskEdge");
-        estimateEdge.Click += (_, _) => OpenMaskEdge();
-        StudioTheme.Help(estimateEdge, "Inspect the mask for open sky and a dark outer band between the calibrated limit and 180° full angle.");
+        previewHeader.Children.Add(refineEdge);
+        AutomationProperties.SetAutomationId(refineEdge, "RefineMaskEdge");
+        refineEdge.Click += (_, _) => OpenMaskEdge();
+        StudioTheme.Help(refineEdge, "Adjust the field of view used for irradiance on this photo.");
         var pair = CreatePreviewPair(preview.RowDefinitions[1]);
         Grid.SetRow(pair, 1);
         preview.Children.Add(pair);
         editMask.Click += (_, _) => OpenMaskEditor();
         var previewInfo = new StackPanel { Margin = new(16, 6, 16, 10) };
         maskInfo.Focusable = true;
-        previewInfo.Children.Add(fieldOfViewInfo); previewInfo.Children.Add(calculationCoverage); previewInfo.Children.Add(maskInfo);
-        calculationFov.VerticalAlignment = VerticalAlignment.Center;
-        calculationCoverage.Children.Add(calculationFov); calculationCoverage.Children.Add(calibratedOnly);
-        AutomationProperties.SetAutomationId(calculationFov, "CalculationFieldOfView");
-        calibratedOnly.Click += (_, _) => SetCalculationCoverage(null);
-        StudioTheme.Help(calibratedOnly, "Restore the calibrated field for the next Update results.");
+        previewInfo.Children.Add(fieldOfViewInfo); previewInfo.Children.Add(maskInfo);
         sunPathInfo.Visibility = cardinalInfo.Visibility = Visibility.Collapsed;
         previewInfo.Children.Add(sunPathInfo); previewInfo.Children.Add(cardinalInfo);
         System.Windows.Automation.AutomationProperties.SetAutomationId(fieldOfViewInfo, "SkyPhotoFieldOfView");
@@ -321,9 +320,14 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         
         settings = services.PrepareInputs(settings);
         LoadFields();
+        uiInputs = InputDependencies.Capture(settings);
+        if (settings.VerifyRefinedEdge(uiInputs))
+        {
+            uiInputs = InputDependencies.Capture(settings, uiInputs, false);
+            SaveInputs();
+        }
         ShowSelectedMaskPreview();
         services.ObserveInputs(settings, refreshSources: true);
-        uiInputs = InputDependencies.Capture(settings);
         WatchSources();
         RefreshInputState();
         loadFirstExample = loadExampleOnFirstRun && settings.FirstRun;
@@ -346,6 +350,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     {
         if (closing) return;
         closing = true; revision++; pending?.Cancel();
+        proposalRequest?.Cancel();
         skyViewport.ClearPhoto();
         owner.ContentRendered -= OnContentRendered; owner.Activated -= OnActivated;
         SystemEvents.TimeChanged -= SystemTimeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged;
@@ -623,11 +628,8 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     settings.LastMaskByPhoto = new(settings.LastMaskByPhoto) { [photoHash] = variant.Id };
                     Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
                     return true;
-                }) { CalibratedOutline = currentFieldOfView.CalibratedOutline, UsableOutline = currentFieldOfView.UsableOutline,
-                    MaskBandOutline = skyViewport.BandOutline, ScanCapOutline = skyViewport.CapOutline, ManualOutline = skyViewport.ManualOutline,
-                    FieldOfViewLabel = currentFieldOfView.OutlineLabel +
-                        (skyViewport.BandOutline != null || skyViewport.CapOutline != null || skyViewport.ManualOutline != null ? " · " + calculationFov.Text : ""),
-                    FieldOfViewHelp = currentFieldOfView.Explanation }) { Owner = owner };
+                }) { EdgeOutline = skyViewport.EdgeOutline, FieldOfViewLabel = fieldOfViewInfo.Text,
+                    FieldOfViewHelp = AutomationProperties.GetHelpText(fieldOfViewInfo) }) { Owner = owner };
             WindowWorkArea.FitToOwner(editor, owner); editor.ShowDialog();
         }
         catch (Exception ex) { ShowError(ex); }
@@ -650,7 +652,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                  !string.Equals(uiInputs.Profile.Path, next.Profile.Path, StringComparison.OrdinalIgnoreCase)))
             {
                 // A visually chosen rim belongs to the selected photo and its lens calibration.
-                settings.ApparentFullFovDegrees = null;
+                settings.SetRefinedEdge(null);
                 next = InputDependencies.Capture(settings, next, false);
             }
             var forced = invalidFields.Aggregate(ArtifactGroup.None, (a, f) => a | InputDependencies.ForField(f, settings));
@@ -685,9 +687,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 var result = await Task.Run(() =>
                 {
                     var prepared = services.PrepareInputs(snapshot);
-                    var changed = services.ObserveInputs(prepared, invalid, refreshSources, verifyArtifacts);
-                    var verified = refreshSources && prepared.ApparentFullFovDegrees.HasValue &&
-                        (changed & (ArtifactGroup.Mask | ArtifactGroup.Profile)) != 0 ? InputDependencies.Capture(prepared) : null;
+                    var changed = services.ObserveInputs(prepared, out var verified, invalid, refreshSources, verifyArtifacts);
                     Evaluation? restored = null;
                     if (invalid.Length == 0 && (changed != ArtifactGroup.None || updateState != UpdateState.UpToDate))
                         restored = services.TryRestoreAccepted(prepared);
@@ -710,14 +710,19 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     WatchSources(); SaveInputs();
                 }
                 if (observedRevision != revision) return;
-                if (result.verified != null && uiInputs != null &&
-                    (uiInputs.Image.Content != result.verified.Image.Content || uiInputs.Profile.Content != result.verified.Profile.Content))
+                if (refreshSources)
                 {
                     uiInputs = result.verified;
-                    settings.ApparentFullFovDegrees = null;
-                    revision++; pending?.Cancel(); ApplyInvalidation(result.changed);
-                    Changed();
-                    return;
+                    if (settings.VerifyRefinedEdge(uiInputs))
+                    {
+                        if (!settings.ApparentFullFovDegrees.HasValue)
+                        {
+                            revision++; pending?.Cancel(); ApplyInvalidation(result.changed);
+                            Changed();
+                            return;
+                        }
+                        SaveInputs();
+                    }
                 }
                 if (refreshSources || reviewedProfile != settings.ProfilePath) RefreshCalibrationReview();
                 uiInputs = InputDependencies.Capture(settings, uiInputs, false);
@@ -806,10 +811,9 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         controller.RefreshSource();
         export.IsEnabled = !controller.Verifying && !exporting && !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null &&
             services.IsCurrent(completed) && completed.ManagedDebugRun?.HasCompleteDataset == true;
-        editMask.IsEnabled = displayedAsset != null && !updating && !calibrating && !exporting;
-        estimateEdge.IsEnabled = CanEstimateEdge;
+        refineEdge.IsEnabled = CanRefineEdge;
         maskEdgeWindow?.SetStudyEditable(CanChangeMaskCoverage);
-        RefreshCalculationCoverage();
+        RefreshEdgeDisplay();
         choosePhoto.IsEnabled = !calibrating && !exporting;
         importMask.IsEnabled = !updating && !calibrating && !exporting && File.Exists(PortablePaths.Resolve(settings.SkyImage));
         savedStudies.IsEnabled = !updating && !calibrating && !exporting && !controller.DependentBusy && !controller.Verifying;
@@ -954,78 +958,132 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             if (sunPathIsCurrent) ClearSunPath(currentFieldOfView.Explanation);
         }
         skyViewport.SetFieldOfView(currentFieldOfView);
-        estimateEdge.IsEnabled = CanEstimateEdge;
-        if (maskEdgeWindow != null && (!estimateEdge.IsEnabled ||
+        refineEdge.IsEnabled = CanRefineEdge;
+        if (maskEdgeWindow != null && (!refineEdge.IsEnabled ||
             !maskEdgeWindow.Matches(settings.SkyImage, displayedAsset, currentFieldOfView.EffectiveCalibration)))
             maskEdgeWindow.Close();
-        fieldOfViewInfo.Text = currentFieldOfView.Text;
-        fieldOfViewInfo.Foreground = currentFieldOfView.StampLabel != null ? Brushes.Firebrick :
-            currentFieldOfView.CalibratedOutline == null ? StudioTheme.Muted : Brushes.DarkGreen;
-        StudioTheme.Help(fieldOfViewInfo, currentFieldOfView.OutlineLabel + ". " + currentFieldOfView.Explanation);
-        StudioTheme.Help(images, currentFieldOfView.Explanation);
-        RefreshCalculationCoverage();
+        StudioTheme.Help(images, "Select the sky photo used for the mask and edge.");
+        PrepareEdgeProposal();
+        RefreshEdgeDisplay();
     }
-    private bool CanEstimateEdge => !calibrating && currentFieldOfView.EffectiveCalibration != null && displayedPhoto != null;
+
+    private bool CanRefineEdge => !calibrating && currentFieldOfView.EffectiveCalibration != null && displayedPhoto != null;
     private bool CanChangeMaskCoverage => !updating && !calibrating && !exporting && !controller.DependentBusy && !closing;
-    private void SetCalculationCoverage(int? threshold, double? manualFull = null)
+
+    private void PrepareEdgeProposal()
     {
-        if (!CanChangeMaskCoverage || (settings.MaskEdgeThresholdPercent == threshold && settings.ApparentFullFovDegrees == manualFull)) return;
-        settings.MaskEdgeThresholdPercent = threshold;
-        settings.ApparentFullFovDegrees = manualFull;
-        Changed();
-        RefreshCalculationCoverage();
-    }
-    private void RefreshCalculationCoverage()
-    {
-        calculationCoverage.Visibility = settings.MaskEdgeThresholdPercent.HasValue || settings.ApparentFullFovDegrees.HasValue ? Visibility.Visible : Visibility.Collapsed;
-        calibratedOnly.IsEnabled = CanChangeMaskCoverage;
-        var applied = updateState == UpdateState.UpToDate && completed?.Settings.MaskEdgeThresholdPercent == settings.MaskEdgeThresholdPercent &&
-            completed?.Settings.ApparentFullFovDegrees == settings.ApparentFullFovDegrees
-            ? completed?.MaskEdge : null;
-        if (applied != null && currentFieldOfView.EffectiveCalibration is { } measured &&
-            Math.Abs(2 * measured.MaximumIncidentAngleDegrees - applied.MeasuredFullDegrees) < .000001)
+        var asset = displayedAsset;
+        var measured = currentFieldOfView.EffectiveCalibration;
+        string? lens = measured == null ? null : AppData.Key(new { measured.PrincipalPoint,
+            measured.IncidentAngleToRadiusPolynomial, measured.MaximumIncidentAngleDegrees, measured.ImageWidth, measured.ImageHeight });
+        if (Equals(proposalSource?.Result, asset?.Result) && proposalSource?.Variant?.IsImported == asset?.Variant?.IsImported &&
+            proposalLens == lens) return;
+
+        proposalRequest?.Cancel();
+        proposalSource = asset; proposalLens = lens; proposalResult = null; proposalError = null;
+        if (asset == null || measured == null)
         {
-            string basis = $"{applied.BlackPercent}% black · calibrated";
-            if (applied.ManualFullFovDegrees is double manualFull)
-            {
-                double radius = SkyPhotoFieldOfView.RadiusForApparentFov(measured, manualFull);
-                skyViewport.SetMaskScan(measured.PrincipalPoint[0], measured.PrincipalPoint[1], null, null, radius);
-                basis = "pink · apparent FOV";
-            }
-            else if (applied.EffectiveFullDegrees > applied.MeasuredFullDegrees)
-            {
-                double radius = SkyPhotoFieldOfView.RadiusForApparentFov(measured, applied.EffectiveFullDegrees);
-                skyViewport.SetMaskScan(measured.PrincipalPoint[0], measured.PrincipalPoint[1],
-                    applied.ObservedTerminalBand ? radius : null, applied.ObservedTerminalBand ? null : radius);
-                basis = $"{applied.BlackPercent}% black · " + (applied.ObservedTerminalBand ? "amber band" : "blue extrapolated cap");
-            }
-            else skyViewport.SetMaskScan(0, 0, null, null);
-            calculationFov.Text = $"Calculation FOV · {applied.EffectiveFullDegrees:0.###}° full · {basis}";
-            StudioTheme.Help(calculationFov, applied.Explanation);
+            proposalRequest = null;
+            proposalWork = Task.FromResult<AppliedMaskEdge?>(null);
             return;
         }
-        skyViewport.SetMaskScan(0, 0, null, null);
-        string? requested = settings.ApparentFullFovDegrees is double chosen ? $"{chosen:0.###}° apparent" :
-            settings.MaskEdgeThresholdPercent is int percent ? $"{percent}% black" : null;
-        if (requested == null) return;
-        calculationFov.Text = $"For calculation · {requested} · " + (updating ? "updating…" : "update required");
-        StudioTheme.Help(calculationFov, "Update results to apply this angular coverage to shading and solar directions.");
+        proposalRequest = new();
+        proposalWork = ReadProposalAsync(asset, measured, proposalRequest);
     }
+
+    private async Task<AppliedMaskEdge?> ReadProposalAsync(MaskAsset asset, CalibrationResult measured, CancellationTokenSource request)
+    {
+        try
+        {
+            var edge = await Task.Run(() => asset.SuggestEdge(measured, request.Token), request.Token);
+            if (closing || request.IsCancellationRequested) return null;
+            proposalResult = edge;
+            return edge;
+        }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { return null; }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            if (!request.IsCancellationRequested) proposalError = ex.Message;
+            return null;
+        }
+        finally
+        {
+            if (ReferenceEquals(proposalRequest, request))
+            {
+                proposalRequest = null;
+                if (!closing) RefreshEdgeDisplay();
+            }
+            request.Dispose();
+        }
+    }
+
+    private void SaveRefinedEdge(double? full)
+    {
+        if (!CanChangeMaskCoverage || settings.ApparentFullFovDegrees == full) return;
+        settings.SetRefinedEdge(full, uiInputs);
+        Changed();
+        RefreshEdgeDisplay();
+    }
+
+    private void RefreshEdgeDisplay()
+    {
+        // The editor snapshots this outline when it opens.
+        editMask.IsEnabled = displayedAsset != null && !updating && !calibrating && !exporting &&
+            (settings.ApparentFullFovDegrees.HasValue || proposalRequest == null);
+        if (currentFieldOfView.EffectiveCalibration is not { } measured)
+        {
+            fieldOfViewInfo.Text = currentFieldOfView.Text;
+            fieldOfViewInfo.Foreground = currentFieldOfView.StampLabel != null ? Brushes.Firebrick : StudioTheme.Muted;
+            StudioTheme.Help(fieldOfViewInfo, currentFieldOfView.Explanation);
+            skyViewport.SetEdge(0, 0, null);
+            return;
+        }
+        double maximum = CalibrationRadialMap.MaximumApparentFullDegrees(measured);
+        double? full = settings.ApparentFullFovDegrees ?? proposalResult?.EffectiveFullDegrees;
+        string help;
+        if (full is double angle && angle / 2 > 0 && angle <= maximum)
+        {
+            skyViewport.SetEdge(measured.PrincipalPoint[0], measured.PrincipalPoint[1], SkyPhotoFieldOfView.RadiusForApparentFov(measured, angle));
+            fieldOfViewInfo.Text = $"Edge · {angle:0.###}° full FOV";
+            help = settings.ApparentFullFovDegrees.HasValue ? "Saved refinement used for irradiance." : proposalResult!.Explanation;
+        }
+        else
+        {
+            skyViewport.SetEdge(0, 0, null);
+            fieldOfViewInfo.Text = full.HasValue ? "Refine the edge for this lens." : proposalRequest != null ? "Finding the edge…" :
+                proposalError != null ? "Mask suggestion unavailable" : "Open Refine edge to preview the limit.";
+            help = proposalError ?? "Choose Refine edge to set a full field of view from the photo.";
+        }
+        fieldOfViewInfo.Foreground = full.HasValue ? Brushes.DarkGreen : StudioTheme.Muted;
+        StudioTheme.Help(fieldOfViewInfo, help + $" Measured calibration: {2 * measured.MaximumIncidentAngleDegrees:0.###}° full.");
+    }
+
     private void OpenMaskEdge()
     {
         RefreshFieldOfView();
-        if (!estimateEdge.IsEnabled || displayedPhoto == null) return;
+        if (!refineEdge.IsEnabled || displayedPhoto == null) return;
         if (maskEdgeWindow != null) { maskEdgeWindow.Activate(); return; }
+        var study = settings with { };
+        var sourceInputs = uiInputs;
         var dialog = new MaskEdgeWindow(owner, settings.SkyImage, Bitmap(displayedPhoto), displayedAsset, currentFieldOfView,
-            settings.MaskEdgeThresholdPercent, settings.ApparentFullFovDegrees, SetCalculationCoverage);
+            proposalWork, ct => services.PrepareEdgeMask(study, ct), settings.ApparentFullFovDegrees, SaveRefinedEdge);
         dialog.SetStudyEditable(CanChangeMaskCoverage);
         maskEdgeWindow = dialog;
-        dialog.Closed += (_, _) => maskEdgeWindow = null;
+        dialog.Closed += (_, _) =>
+        {
+            maskEdgeWindow = null;
+            if (!closing && displayedAsset == null && dialog.PreparedMask is { } prepared &&
+                sourceInputs?.Image == uiInputs?.Image && sourceInputs?.Profile == uiInputs?.Profile &&
+                dialog.Matches(settings.SkyImage, null, currentFieldOfView.EffectiveCalibration) &&
+                study.SelectedMaskId == settings.SelectedMaskId && study.Model == settings.Model &&
+                study.Resolution == settings.Resolution && study.CenteredDisk == settings.CenteredDisk)
+                ShowMask(prepared);
+        };
         dialog.Show();
     }
     public static string OrientationInputKey(UserSettings s) => AppData.Key(new
     { s.SkyImage, s.ProfilePath, s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle, s.BottomAzimuth, s.CameraTilt, s.CameraRoll,
-        s.MaskEdgeThresholdPercent, s.ApparentFullFovDegrees, Mask = s.MaskEdgeThresholdPercent.HasValue ? s.SelectedMaskId : null });
+        s.ApparentFullFovDegrees, s.SelectedMaskId });
     private void InvalidateOrientation(string message)
     {
         orientationRevision++;
@@ -1290,7 +1348,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             if (closing) return;
             if (!IsCurrentAttempt())
             { status.Text = "Calibration saved for the previous setup"; detail.Text = result.Path; return; }
-            settings.ApparentFullFovDegrees = null;
+            settings.SetRefinedEdge(null);
             SelectProfile(result.Path);
             status.Text = "Calibration saved"; detail.Text = result.Path; ShowCalibrationReview();
         }
@@ -1323,7 +1381,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         HelpWindow.OpenGuide(ref helpWindow, owner, $"Using SolarShade · preview {Program.PreviewVersion}",
         [
             ("Camera calibration", "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles."),
-            ("Sky photos and masks", "2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show sky grid marks the fitted lens center with a cyan cross. The rings measure 30° steps away from the lens axis. Dotted N–S and E–W lines follow geographic directions through true zenith. Tilting the phone moves zenith away from the lens center. Hover over Show sky grid for the center in original photo pixels. Scroll over either preview or use + and − to zoom, drag to pan, and choose Fit to see the whole frame. Expand gives the selected preview the width of both panes. The mask and its sun path zoom together. The solid green line marks the calibrated limit around the lens axis. A dashed line marks the usable boundary when the detected disk or image edges limit coverage.\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Original masks stay available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. The internal Debug Data includes mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Keep Data/Masks and Data/AcceptedResults when moving the application."),
+            ("Sky photos and masks", "2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show sky grid marks the fitted lens center with a cyan cross. The rings measure 30° steps away from the lens axis. Dotted N–S and E–W lines follow geographic directions through true zenith. Tilting the phone moves zenith away from the lens center. Hover over Show sky grid for the center in original photo pixels. Scroll over either preview or use + and − to zoom, drag to pan, and choose Fit to see the whole frame. Expand gives the selected preview the width of both panes. The mask and its sun path zoom together. The green line is the edge used for irradiance. Choose Refine edge to see the 95%-black suggestion, then adjust the full angle and save. Only the part of the circle inside the photo is shown.\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Original masks stay available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. The internal Debug Data includes mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Keep Data/Masks and Data/AcceptedResults when moving the application."),
             ("Phone, panel and site orientation", "Lay the panel flat, front up. Its top heading runs from its center toward the marked edge that you raise for tilt. On the phone, use the lens end as the top. Measure both headings clockwise from true north, with east 90°, south 180° and west 270°. Enter tilt from horizontal, 0° flat to 90° vertical. The top heading is always the bearing you would measure with the equipment laid flat. At vertical the raised edge points straight up, and the retained heading still determines the direction the front faces.\n\nThe calculated lens and panel front azimuths follow the outward axes, clockwise from geographic south. South is 0°, west +90°, north ±180° and east −90°. A south-facing 28° panel has a north top heading (0°) and a south front azimuth (0°). When flat, the front points up and has no azimuth. Turning the panel still rotates its marked top. Turning the phone rotates its photograph and overlays. With image top north, east appears on the left.\n\nCopy panel pose to phone aligns the phone’s lens end with the marked panel top and copies its tilt and heading once, including at 0° tilt. A saved camera with roll keeps its original image orientation. The pose readout identifies older placements that need the explicit uphill placement control before editing.\n\nEnter site coordinates in decimal degrees, for example latitude 43.56, longitude 1.48. Southern latitudes and western longitudes are negative. Solar azimuth is clockwise from true north. Study dates include the complete end day."),
             ("Weather, imports and calculation", "4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Download template saves an editable example. Upload weather file opens your XLSX or CSV. Its intervals set the study period, including partial days. Gaps are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the isotropic option in Weather data. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional."),
             ("Data exports", "Choose the Excel columns to export and a destination folder. Every row includes the source timestamp and its UTC offset. Choose source interval start and end to compare providers by the same physical hour. The default columns are direct and diffuse panel irradiance, the two shading factors and the final shaded total. A factor is blank when its unshaded component is zero. For weather diagnostics select Source GHI, Direct horizontal or Diffuse horizontal. Source GHI is available when the weather input saved the original global horizontal readings. The Weather source sheet identifies the source and explains the timestamp convention. The workbook and its receipt are saved in a new scenario folder after a complete shaded update. Cancel closes the window without writing files. The full diagnostic snapshot includes Summary.pdf and SunPathReport.pdf."),
@@ -1351,6 +1409,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     public Evaluation? Completed => completed;
     public string FieldOfViewTextForTest => fieldOfViewInfo.Text;
+    internal string FieldOfViewHelpForTest => AutomationProperties.GetHelpText(fieldOfViewInfo);
     public CalibrationReview? CalibrationReviewForTest => calibrationReview;
     public Task<(CalibrationProfile Profile, string Path, string Details)> CalibrateForTest(UserSettings inputs) => services.Calibrate(inputs);
     public void SetProfileForTest(string path) => SelectProfile(path);

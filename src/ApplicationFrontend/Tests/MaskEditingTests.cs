@@ -92,9 +92,9 @@ public sealed class MaskEditingTests
         using var service = new AppServices(fixture.Debug, (input, scene, ct) =>
         { applicationScene = scene; return ShadingCorrectionModule.ApplyToPanel(input, scene, ct); });
 
-        async Task<Evaluation> Evaluate(MaskVariant variant, double coverage = 0)
+        async Task<Evaluation> Evaluate(MaskVariant variant, double fullEdge = 140)
         {
-            var inputs = s with { SelectedMaskId = variant.Id, CoverageAngle = coverage };
+            var inputs = s with { SelectedMaskId = variant.Id, ApparentFullFovDegrees = fullEdge };
             service.ObserveInputs(inputs, refreshSources: true);
             return await service.Evaluate(inputs, false, _ => { }, null, CancellationToken.None);
         }
@@ -127,7 +127,7 @@ public sealed class MaskEditingTests
         Assert.InRange(visibility.Visible, 0.01, 0.99);
         Assert.Equal(direct.Disk(nearRim, normal), visibility);
         Assert.Equal(new FluxVisibility(0, 0), applicationScene.Disk(beyondRim, normal));
-        await Evaluate(edge, 80);
+        await Evaluate(edge, 160);
         Assert.Equal(1, applicationScene.Disk(beyondRim, normal).Known, 10);
     });
 

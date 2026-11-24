@@ -6,13 +6,9 @@ namespace SolarShade.MaskEditor;
 /// <summary>Display-only FOV contours in the oriented photograph's native pixel coordinates.</summary>
 public sealed class FieldOfViewOverlay : FrameworkElement
 {
-    private static readonly Brush Calibrated = FrozenBrush(Color.FromRgb(0x55, 0xe8, 0x95));
-    private static readonly Brush Usable = FrozenBrush(Color.FromRgb(0xb4, 0xff, 0xc0));
+    private static readonly Brush Green = FrozenBrush(Color.FromRgb(0x55, 0xe8, 0x95));
     private static readonly Brush Halo = FrozenBrush(Color.FromArgb(215, 14, 40, 28));
-    private static readonly Brush MaskEdge = FrozenBrush(Color.FromRgb(0xff, 0xbb, 0x32));
-    private static readonly Brush ScanCap = FrozenBrush(Color.FromRgb(0x78, 0xc6, 0xff));
-    private static readonly Brush Apparent = FrozenBrush(Color.FromRgb(0xff, 0x86, 0xb3));
-    private Geometry? calibrated, usable, maskTransition, scanCap, apparent;
+    private Geometry? edge;
     private double displayScale = 1;
 
     public FieldOfViewOverlay()
@@ -32,40 +28,21 @@ public sealed class FieldOfViewOverlay : FrameworkElement
         }
     }
 
-    public void SetOutlines(Geometry? calibrated, Geometry? usable)
+    public void SetEdge(Geometry? geometry)
     {
-        this.calibrated = calibrated;
-        this.usable = usable;
-        InvalidateVisual();
-    }
-
-    public void SetMaskScan(Geometry? transition, Geometry? cap) => SetMaskScan(transition, cap, null);
-
-    public void SetMaskScan(Geometry? transition, Geometry? cap, Geometry? manual)
-    {
-        maskTransition = transition; scanCap = cap; apparent = manual;
+        if (ReferenceEquals(edge, geometry)) return;
+        edge = geometry;
         InvalidateVisual();
     }
 
     protected override void OnRender(DrawingContext drawing)
     {
-        Draw(calibrated, Calibrated, false);
-        Draw(usable, Usable, true);
-        Draw(scanCap, ScanCap, true);
-        Draw(maskTransition, MaskEdge, true);
-        Draw(apparent, Apparent, true);
-
-        void Draw(Geometry? geometry, Brush brush, bool dashed)
+        if (edge == null || edge.IsEmpty()) return;
+        foreach (var (ink, thickness) in new[] { (Halo, 3.5), (Green, 1.8) })
         {
-            if (geometry == null || geometry.IsEmpty()) return;
-            foreach (var (ink, thickness) in new[] { (Halo, 3.5), (brush, 1.8) })
-            {
-                var pen = new Pen(ink, thickness / displayScale);
-                // Keep both strokes' dash endpoints aligned regardless of their widths or the zoom.
-                if (dashed) pen.DashStyle = new DashStyle([7 / thickness, 5 / thickness], 0);
-                pen.Freeze();
-                drawing.DrawGeometry(null, pen, geometry);
-            }
+            var pen = new Pen(ink, thickness / displayScale);
+            pen.Freeze();
+            drawing.DrawGeometry(null, pen, edge);
         }
     }
 

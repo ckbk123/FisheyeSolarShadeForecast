@@ -28,7 +28,7 @@ public sealed class CalibratedSkyProjection
     internal double? LinearExtensionStartDegrees { get; }
     internal double? OriginalMaximumIncidentAngleDegrees { get; }
     internal string CoverageNote => OriginalMaximumIncidentAngleDegrees is double original
-        ? FormattableString.Invariant($" The user selected an apparent full FOV of {MaximumIncidentAngleRadians * 360 / Math.PI:0.###}°. The measured full FOV is {2 * original:0.###}°.") :
+        ? FormattableString.Invariant($" The effective full FOV is {MaximumIncidentAngleRadians * 360 / Math.PI:0.###}°. The measured full FOV is {2 * original:0.###}°.") :
         LinearExtensionStartDegrees is double measured
         ? FormattableString.Invariant($" The measured radial polynomial ends at {measured:0.###}° from the lens axis. Its tangent continues to the effective limit of {MaximumIncidentAngleRadians * 180 / Math.PI:0.###}° from the axis.") : "";
 
