@@ -19,7 +19,8 @@ internal sealed class SkyPhotoViewport : ImageViewport
     internal bool HasCalibratedOutline { get; private set; }
     internal Geometry? BandOutline { get; private set; }
     internal Geometry? CapOutline { get; private set; }
-    private (double X, double Y, double? Band, double? Cap) scanCoordinates;
+    internal Geometry? ManualOutline { get; private set; }
+    private (double X, double Y, double? Band, double? Cap, double? Manual) scanCoordinates;
     private string? sourcePath;
     private long photoRevision;
     private bool requestedDetail;
@@ -65,10 +66,10 @@ internal sealed class SkyPhotoViewport : ImageViewport
         SetPreviewHelp(Gestures);
     }
 
-    internal void SetMaskScan(double cx, double cy, double? transition, double? cap)
+    internal void SetMaskScan(double cx, double cy, double? transition, double? cap, double? manual = null)
     {
-        if (scanCoordinates == (cx, cy, transition, cap)) return;
-        scanCoordinates = (cx, cy, transition, cap);
+        if (scanCoordinates == (cx, cy, transition, cap, manual)) return;
+        scanCoordinates = (cx, cy, transition, cap, manual);
         EllipseGeometry? Circle(double? radius)
         {
             if (radius is not double r) return null;
@@ -76,8 +77,8 @@ internal sealed class SkyPhotoViewport : ImageViewport
             circle.Freeze();
             return circle;
         }
-        BandOutline = Circle(transition); CapOutline = Circle(cap);
-        guide.SetMaskScan(BandOutline, CapOutline);
+        BandOutline = Circle(transition); CapOutline = Circle(cap); ManualOutline = Circle(manual);
+        guide.SetMaskScan(BandOutline, CapOutline, ManualOutline);
     }
 
     private void SetPreviewHelp(string detail)

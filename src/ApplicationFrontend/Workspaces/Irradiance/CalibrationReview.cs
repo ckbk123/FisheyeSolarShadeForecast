@@ -89,7 +89,8 @@ public sealed record CalibrationReview(string Directory, CalibrationDetectionRep
             try
             {
                 var saved = CameraProfileFiles.Load(profile);
-                fit = $"Fit RMSE {saved.Calibration.RmsError:F2} px · maximum incident angle {saved.Calibration.MaximumIncidentAngleDegrees:F2}°. {saved.CoverageNote}";
+                var measured = CalibrationRadialMap.MeasuredProfile(saved.Calibration);
+                fit = $"Fit RMSE {measured.RmsError:F2} px · maximum incident angle {measured.MaximumIncidentAngleDegrees:F2}°. {saved.CoverageNote}";
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or NotSupportedException) { }
         }

@@ -624,9 +624,9 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
                     return true;
                 }) { CalibratedOutline = currentFieldOfView.CalibratedOutline, UsableOutline = currentFieldOfView.UsableOutline,
-                    MaskBandOutline = skyViewport.BandOutline, ScanCapOutline = skyViewport.CapOutline,
+                    MaskBandOutline = skyViewport.BandOutline, ScanCapOutline = skyViewport.CapOutline, ManualOutline = skyViewport.ManualOutline,
                     FieldOfViewLabel = currentFieldOfView.OutlineLabel +
-                        (skyViewport.BandOutline != null || skyViewport.CapOutline != null ? " · " + calculationFov.Text : ""),
+                        (skyViewport.BandOutline != null || skyViewport.CapOutline != null || skyViewport.ManualOutline != null ? " · " + calculationFov.Text : ""),
                     FieldOfViewHelp = currentFieldOfView.Explanation }) { Owner = owner };
             WindowWorkArea.FitToOwner(editor, owner); editor.ShowDialog();
         }
@@ -645,6 +645,14 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 RefreshInputState();
             }
             var next = InputDependencies.Capture(settings, uiInputs, false);
+            if (settings.ApparentFullFovDegrees.HasValue && uiInputs != null &&
+                (!string.Equals(uiInputs.Image.Path, next.Image.Path, StringComparison.OrdinalIgnoreCase) ||
+                 !string.Equals(uiInputs.Profile.Path, next.Profile.Path, StringComparison.OrdinalIgnoreCase)))
+            {
+                // A visually chosen rim belongs to the selected photo and its lens calibration.
+                settings.ApparentFullFovDegrees = null;
+                next = InputDependencies.Capture(settings, next, false);
+            }
             var forced = invalidFields.Aggregate(ArtifactGroup.None, (a, f) => a | InputDependencies.ForField(f, settings));
             var changed = (uiInputs?.Difference(next) ?? ArtifactGroup.All) | forced | uiInvalid;
             uiInputs = next; uiInvalid = forced;
@@ -678,10 +686,12 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 {
                     var prepared = services.PrepareInputs(snapshot);
                     var changed = services.ObserveInputs(prepared, invalid, refreshSources, verifyArtifacts);
+                    var verified = refreshSources && prepared.ApparentFullFovDegrees.HasValue &&
+                        (changed & (ArtifactGroup.Mask | ArtifactGroup.Profile)) != 0 ? InputDependencies.Capture(prepared) : null;
                     Evaluation? restored = null;
                     if (invalid.Length == 0 && (changed != ArtifactGroup.None || updateState != UpdateState.UpToDate))
                         restored = services.TryRestoreAccepted(prepared);
-                    return (prepared, changed, restored);
+                    return (prepared, changed, restored, verified);
                 });
                 if (closing) return;
                 if (result.prepared != snapshot)
@@ -700,6 +710,15 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     WatchSources(); SaveInputs();
                 }
                 if (observedRevision != revision) return;
+                if (result.verified != null && uiInputs != null &&
+                    (uiInputs.Image.Content != result.verified.Image.Content || uiInputs.Profile.Content != result.verified.Profile.Content))
+                {
+                    uiInputs = result.verified;
+                    settings.ApparentFullFovDegrees = null;
+                    revision++; pending?.Cancel(); ApplyInvalidation(result.changed);
+                    Changed();
+                    return;
+                }
                 if (refreshSources || reviewedProfile != settings.ProfilePath) RefreshCalibrationReview();
                 uiInputs = InputDependencies.Capture(settings, uiInputs, false);
                 if (refreshSources && result.changed != ArtifactGroup.None)
@@ -948,41 +967,49 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private bool CanEstimateEdge => !calibrating && currentFieldOfView.EffectiveCalibration != null && displayedPhoto != null;
     private bool CanChangeMaskCoverage => !updating && !calibrating && !exporting && !controller.DependentBusy && !closing;
-    private void SetCalculationCoverage(int? threshold)
+    private void SetCalculationCoverage(int? threshold, double? manualFull = null)
     {
-        if (!CanChangeMaskCoverage || settings.MaskEdgeThresholdPercent == threshold) return;
+        if (!CanChangeMaskCoverage || (settings.MaskEdgeThresholdPercent == threshold && settings.ApparentFullFovDegrees == manualFull)) return;
         settings.MaskEdgeThresholdPercent = threshold;
+        settings.ApparentFullFovDegrees = manualFull;
         Changed();
         RefreshCalculationCoverage();
     }
     private void RefreshCalculationCoverage()
     {
-        calculationCoverage.Visibility = settings.MaskEdgeThresholdPercent.HasValue ? Visibility.Visible : Visibility.Collapsed;
+        calculationCoverage.Visibility = settings.MaskEdgeThresholdPercent.HasValue || settings.ApparentFullFovDegrees.HasValue ? Visibility.Visible : Visibility.Collapsed;
         calibratedOnly.IsEnabled = CanChangeMaskCoverage;
-        var applied = updateState == UpdateState.UpToDate && completed?.Settings.MaskEdgeThresholdPercent == settings.MaskEdgeThresholdPercent
+        var applied = updateState == UpdateState.UpToDate && completed?.Settings.MaskEdgeThresholdPercent == settings.MaskEdgeThresholdPercent &&
+            completed?.Settings.ApparentFullFovDegrees == settings.ApparentFullFovDegrees
             ? completed?.MaskEdge : null;
         if (applied != null && currentFieldOfView.EffectiveCalibration is { } measured &&
             Math.Abs(2 * measured.MaximumIncidentAngleDegrees - applied.MeasuredFullDegrees) < .000001)
         {
-            string basis = "calibrated";
-            if (applied.EffectiveFullDegrees > applied.MeasuredFullDegrees)
+            string basis = $"{applied.BlackPercent}% black · calibrated";
+            if (applied.ManualFullFovDegrees is double manualFull)
             {
-                double half = applied.EffectiveFullDegrees / 2;
-                var effective = CalibrationRadialMap.ExtendTo(measured, half);
-                double radius = new CalibrationRadialMap(effective).RadiusAt(half * Math.PI / 180);
+                double radius = SkyPhotoFieldOfView.RadiusForApparentFov(measured, manualFull);
+                skyViewport.SetMaskScan(measured.PrincipalPoint[0], measured.PrincipalPoint[1], null, null, radius);
+                basis = "pink · apparent FOV";
+            }
+            else if (applied.EffectiveFullDegrees > applied.MeasuredFullDegrees)
+            {
+                double radius = SkyPhotoFieldOfView.RadiusForApparentFov(measured, applied.EffectiveFullDegrees);
                 skyViewport.SetMaskScan(measured.PrincipalPoint[0], measured.PrincipalPoint[1],
                     applied.ObservedTerminalBand ? radius : null, applied.ObservedTerminalBand ? null : radius);
-                basis = applied.ObservedTerminalBand ? "amber band" : "blue extrapolated cap";
+                basis = $"{applied.BlackPercent}% black · " + (applied.ObservedTerminalBand ? "amber band" : "blue extrapolated cap");
             }
             else skyViewport.SetMaskScan(0, 0, null, null);
-            calculationFov.Text = $"Calculation FOV · {applied.EffectiveFullDegrees:0.##}° full · {applied.BlackPercent}% black · {basis}";
+            calculationFov.Text = $"Calculation FOV · {applied.EffectiveFullDegrees:0.###}° full · {basis}";
             StudioTheme.Help(calculationFov, applied.Explanation);
             return;
         }
         skyViewport.SetMaskScan(0, 0, null, null);
-        if (settings.MaskEdgeThresholdPercent is not int percent) return;
-        calculationFov.Text = $"For calculation · {percent}% black · " + (updating ? "updating…" : "update required");
-        StudioTheme.Help(calculationFov, "Update results to apply the mask-based angular coverage to shading and solar directions.");
+        string? requested = settings.ApparentFullFovDegrees is double chosen ? $"{chosen:0.###}° apparent" :
+            settings.MaskEdgeThresholdPercent is int percent ? $"{percent}% black" : null;
+        if (requested == null) return;
+        calculationFov.Text = $"For calculation · {requested} · " + (updating ? "updating…" : "update required");
+        StudioTheme.Help(calculationFov, "Update results to apply this angular coverage to shading and solar directions.");
     }
     private void OpenMaskEdge()
     {
@@ -990,7 +1017,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if (!estimateEdge.IsEnabled || displayedPhoto == null) return;
         if (maskEdgeWindow != null) { maskEdgeWindow.Activate(); return; }
         var dialog = new MaskEdgeWindow(owner, settings.SkyImage, Bitmap(displayedPhoto), displayedAsset, currentFieldOfView,
-            settings.MaskEdgeThresholdPercent, percent => SetCalculationCoverage(percent));
+            settings.MaskEdgeThresholdPercent, settings.ApparentFullFovDegrees, SetCalculationCoverage);
         dialog.SetStudyEditable(CanChangeMaskCoverage);
         maskEdgeWindow = dialog;
         dialog.Closed += (_, _) => maskEdgeWindow = null;
@@ -998,7 +1025,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     public static string OrientationInputKey(UserSettings s) => AppData.Key(new
     { s.SkyImage, s.ProfilePath, s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle, s.BottomAzimuth, s.CameraTilt, s.CameraRoll,
-        s.MaskEdgeThresholdPercent, Mask = s.MaskEdgeThresholdPercent.HasValue ? s.SelectedMaskId : null });
+        s.MaskEdgeThresholdPercent, s.ApparentFullFovDegrees, Mask = s.MaskEdgeThresholdPercent.HasValue ? s.SelectedMaskId : null });
     private void InvalidateOrientation(string message)
     {
         orientationRevision++;
@@ -1263,6 +1290,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             if (closing) return;
             if (!IsCurrentAttempt())
             { status.Text = "Calibration saved for the previous setup"; detail.Text = result.Path; return; }
+            settings.ApparentFullFovDegrees = null;
             SelectProfile(result.Path);
             status.Text = "Calibration saved"; detail.Text = result.Path; ShowCalibrationReview();
         }

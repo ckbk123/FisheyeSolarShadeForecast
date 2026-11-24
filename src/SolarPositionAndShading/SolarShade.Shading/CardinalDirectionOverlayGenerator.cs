@@ -20,6 +20,8 @@ public sealed record CardinalDirectionProjectionMetadata(double PrincipalPointX,
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public double? LinearExtensionStartDegrees { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? OriginalMaximumIncidentAngleDegrees { get; init; }
 }
 public sealed record CardinalDirectionOverlayResult(byte[] Png, int Width, int Height,
     IReadOnlyList<CardinalDirectionOverlayMarker> Markers, CameraPose Pose,
@@ -130,6 +132,7 @@ public static class CardinalDirectionOverlayGenerator
                 !labels.Any(r => r.Left < label.Right && r.Right > label.Left && r.Top < label.Bottom && r.Bottom > label.Top);
             if (fits) labels.Add(label);
             string status = zenith >= 90 ? "Horizon endpoint." :
+                projection.OriginalMaximumIncidentAngleDegrees.HasValue ? "User-selected apparent field boundary." :
                 projection.LinearExtensionStartDegrees.HasValue ? "Effective projection boundary." : "Calibrated coverage boundary.";
             if (!fits) status += " Label omitted: insufficient nonoverlapping image space.";
             markers.Add(new(name, azimuth, true, zenith, x, y, fits ? left : null, fits ? top+size.Height : null,
@@ -145,10 +148,10 @@ public static class CardinalDirectionOverlayGenerator
         double encodeMs = timer.Elapsed.TotalMilliseconds;
         ct.ThrowIfCancellationRequested();
         return new(png, projection.Width, projection.Height, markers.AsReadOnly(), projection.Pose,
-            new(geometryMs, renderMs, encodeMs, total.Elapsed.TotalMilliseconds), options, Convention + projection.ExtensionNote,
+            new(geometryMs, renderMs, encodeMs, total.Elapsed.TotalMilliseconds), options, Convention + projection.CoverageNote,
             new(projection.PrincipalPointX, projection.PrincipalPointY, projection.IncidentAnglePolynomial,
                 projection.MaximumIncidentAngleRadians * 180 / Math.PI, projection.CoverageDisk)
-                { LinearExtensionStartDegrees = projection.LinearExtensionStartDegrees })
+                { LinearExtensionStartDegrees = projection.LinearExtensionStartDegrees, OriginalMaximumIncidentAngleDegrees = projection.OriginalMaximumIncidentAngleDegrees })
         {
             Rings = grid.Rings, LensCenterVisible = grid.LensCenterVisible,
             Zenith = grid.Zenith, MeridianDotCount = grid.MeridianDotCount

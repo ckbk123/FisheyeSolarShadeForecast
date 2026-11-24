@@ -26,7 +26,10 @@ public sealed class CalibratedSkyProjection
     internal double PrincipalPointY => cy;
     internal IReadOnlyList<double> IncidentAnglePolynomial => radialMap.Coefficients;
     internal double? LinearExtensionStartDegrees { get; }
-    internal string ExtensionNote => LinearExtensionStartDegrees is double measured
+    internal double? OriginalMaximumIncidentAngleDegrees { get; }
+    internal string CoverageNote => OriginalMaximumIncidentAngleDegrees is double original
+        ? FormattableString.Invariant($" The user selected an apparent full FOV of {MaximumIncidentAngleRadians * 360 / Math.PI:0.###}°. The measured full FOV is {2 * original:0.###}°.") :
+        LinearExtensionStartDegrees is double measured
         ? FormattableString.Invariant($" The measured radial polynomial ends at {measured:0.###}° from the lens axis. Its tangent continues to the effective limit of {MaximumIncidentAngleRadians * 180 / Math.PI:0.###}° from the axis.") : "";
 
     public CalibratedSkyProjection(CalibrationResult calibration, CameraPose? pose = null, ImageDisk? imageDisk = null)
@@ -46,6 +49,7 @@ public sealed class CalibratedSkyProjection
         radialMap = new CalibrationRadialMap(calibration);
         var poly = radialMap.Coefficients;
         LinearExtensionStartDegrees = calibration.LinearExtensionStartDegrees;
+        OriginalMaximumIncidentAngleDegrees = calibration.OriginalMaximumIncidentAngleDegrees;
         cx = calibration.PrincipalPoint[0]; cy = calibration.PrincipalPoint[1];
         disk = imageDisk ?? new(cx, cy, calibration.ImageCircleRadiusPixels);
         if (!double.IsFinite(disk.CenterX) || !double.IsFinite(disk.CenterY) || !double.IsFinite(disk.RadiusPixels) || disk.RadiusPixels <= 0)

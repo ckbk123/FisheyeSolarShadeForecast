@@ -48,6 +48,8 @@ public sealed partial record UserSettings
     public double CoverageAngle { get; set; } // zero: use saved profile value
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public int? MaskEdgeThresholdPercent { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? ApparentFullFovDegrees { get; set; }
     public bool CenteredDisk { get; set; }
     public int Substeps { get; set; } = 60;
     public bool Isotropic { get; set; }

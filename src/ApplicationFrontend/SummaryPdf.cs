@@ -91,7 +91,8 @@ internal static class SummaryPdf
         Row("Sky image", Path.GetFileName(s.SkyImage), 2);
         Row("Active profile", Path.GetFileName(s.ProfilePath), 2);
         Row("Effective coverage", snapshot.MaskEdge is { } edge
-            ? $"{N(edge.MeasuredFullDegrees)}° measured / {N(edge.EffectiveFullDegrees)}° effective full FOV | {edge.BlackPercent}% black"
+            ? $"{N(edge.MeasuredFullDegrees)}° measured / {N(edge.EffectiveFullDegrees)}° effective full FOV | " +
+                (edge.ManualFullFovDegrees.HasValue ? "user-selected apparent FOV" : $"{edge.BlackPercent}% black")
             : Value(c, "MaximumIncidentAngleDegrees") + "° maximum incident angle | " + (s.CoverageAngle > 0 ? "user override" : "saved profile"));
         Row("Phone pose", angles.DescribePhone());
         Row("Photo orientation", angles.DescribeImage(), 2);

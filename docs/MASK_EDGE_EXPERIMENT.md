@@ -8,6 +8,8 @@ SolarShade can inspect the selected sky mask between the calibrated field of vie
 2. Start at **100%**. Try 95%, 90% or 80% to see how accepting gaps changes the result. **Show mask** lets you compare classifications against the photograph. The readout also reports whether the scan found any classified open sky beyond calibration.
 3. Choose **Use for calculation** and then **Update results** to apply the selected threshold to the study’s selected mask. The camera profile retains its measured calibration. **Use calibration only** restores the calibrated field on the next update.
 
+To fit a visible rim yourself, choose **Set apparent FOV**. The slider and angle entry move the pink circle over the photo or mask. The angle spans the entire field, so **152° full** puts the rim **76° from the lens axis**. You can also bring the circle inside the green calibration boundary. Once applied, the study uses your chosen angle for the sky grid, sun path and irradiance. The mask still determines how much sunlight reaches the panel within that circle.
+
 **Use full-frame mask…** accepts an opaque, binary PNG at the sky photograph’s oriented dimensions. Supply the original classification with white for open sky and black for blocked directions. A black border baked into a previously cropped PNG can mimic an obstruction. A file opened in this dialog is for inspection. To calculate with it, first import it as the study mask.
 
 ## What the rings measure
@@ -32,6 +34,18 @@ The calibrated field is **132.86° full** at **823.94 px**. The estimated 180° 
 | Centered disk | 180° cap | 165.06° | 148.96° | 145.09° | 28 classified open, 1,412 blocked |
 
 The photograph’s visible transition to the housing lies around **880–886 px**. Some pixels farther out on the housing also receive an open-sky label. A black ring can be made by a building or trees, and a classifier can mark a housing reflection as sky. For direct irradiance, an opening matters when the projected Sun passes through it.
+
+On this photograph, that visible rim corresponds to about **151–153° full** under the extrapolated lens model. Try **152°** in the preview. The automatic scan reached 180° because all 1,440 samples at its outer circle fell outside classified coverage. A different image can reach the same cap because white mask pixels are still visible there.
+
+![SolarShade at 152° full FOV, with the dashed pink circle aligned to the visible lens rim and the measured field shown in green](images/apparent-fov-152.png)
+
+| Bundled 744-hour study | Shaded panel energy |
+| --- | ---: |
+| Measured 132.86° | 107.3974 kWh/m² |
+| Apparent 152° | 109.2394 kWh/m² |
+| Automatic 180° cap | 109.2410 kWh/m² |
+
+All three calculations used the same **131.3587 kWh/m²** of unshaded panel energy. The extra field from 152° to 180° contributed about **0.0016 kWh/m²** on this mask and panel orientation.
 
 ## Field trial with nominal 235° lenses
 

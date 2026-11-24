@@ -337,6 +337,7 @@ public static class SmokeTest
         if (!open.IsEnabled) throw new InvalidOperationException("The example's mask edge experiment is unavailable.");
         open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var dialog = window.OwnedWindows.OfType<MaskEdgeWindow>().Single();
+        double apparentFullDegrees;
         try
         {
             await Until(() => dialog.IsLoaded, 10); await dialog.Analysis;
@@ -351,6 +352,27 @@ public static class SmokeTest
             if (!result.Text.StartsWith("180° scan cap"))
                 throw new InvalidOperationException("The example's sampled mask cannot verify a dark band through 180°. " + result.Text);
             Capture(dialog, Path.Combine(output, "mask-edge-example-95.png"));
+            var manualMode = Find<RadioButton>(dialog, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "ManualApparentFovMode");
+            manualMode.IsChecked = true;
+            var entry = Find<TextBox>(dialog, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "ApparentFullFovDegrees");
+            var slider = Find<Slider>(dialog, s => System.Windows.Automation.AutomationProperties.GetAutomationId(s) == "ApparentFovSlider");
+            var preview = Find<SkyPhotoViewport>(dialog, _ => true);
+            var apply = Find<Button>(dialog, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "ApplyMaskEdge");
+            var showMask = Find<CheckBox>(dialog, b => Equals(b.Content, "Show mask"));
+            showMask.IsChecked = true;
+            entry.Text = "152";
+            await dialog.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            apparentFullDegrees = slider.Value;
+            // The demo fit maps a full field of 152° to a native radius of 883.39 px.
+            if (!apply.IsEnabled || apparentFullDegrees != 152 ||
+                preview.ManualOutline?.Bounds.Width / 2 is not (> 883 and < 884))
+                throw new InvalidOperationException("The manual field control and its circle disagree on the example mask.");
+            await preview.RequestNativePhotoAsync();
+            preview.ZoomAt(new Point(preview.ActualWidth / 2, preview.ActualHeight / 2), 1.8);
+            dialog.UpdateLayout();
+            Capture(dialog, Path.Combine(output, "apparent-fov-152-mask.png"));
+            showMask.IsChecked = false;
+            Capture(dialog, Path.Combine(output, "apparent-fov-152-photo.png"));
         }
         finally { dialog.Close(); }
         using var comparison = new AppServices(Path.Combine(output, "mask-edge-debug"));
@@ -362,11 +384,20 @@ public static class SmokeTest
             Math.Abs(study.Run.BeforeEnergy - extended.Run.BeforeEnergy) > 1e-8 ||
             study.Run.AfterEnergy is not double before || extended.Run.AfterEnergy is not double after || after <= before)
             throw new InvalidOperationException("The example's capped mask calculation did not preserve the baseline and add irradiation from visible outer sky.");
+        var manual = await comparison.Evaluate(study.Settings with { ApparentFullFovDegrees = apparentFullDegrees },
+            false, _ => { }, null, CancellationToken.None);
+        if (manual.MaskEdge is not { } manualEdge || manualEdge.ManualFullFovDegrees != apparentFullDegrees ||
+            manualEdge.EffectiveFullDegrees != apparentFullDegrees ||
+            !study.Run.Rows.Select(r => r.IntervalId).SequenceEqual(manual.Run.Rows.Select(r => r.IntervalId)) ||
+            Math.Abs(study.Run.BeforeEnergy - manual.Run.BeforeEnergy) > 1e-8 ||
+            manual.Run.AfterEnergy is not double manualAfter || manualAfter <= before || manualAfter > after + 1e-8)
+            throw new InvalidOperationException("The apparent field did not constrain the example's accepted irradiation between its measured and 180° values.");
         AppData.Write(Path.Combine(output, "mask-edge-comparison.json"), new
         {
             Rows = study.Run.Rows.Count, applied.MeasuredFullDegrees, applied.EffectiveFullDegrees, applied.BlackPercent,
             Measured = new { study.Run.BeforeEnergy, study.Run.AfterEnergy, study.Run.SkyCoverage },
             Extended = new { extended.Run.BeforeEnergy, extended.Run.AfterEnergy, extended.Run.SkyCoverage },
+            Manual = new { ApparentFullDegrees = apparentFullDegrees, manual.Run.BeforeEnergy, manual.Run.AfterEnergy, manual.Run.SkyCoverage },
             AddedKWhPerSquareMetre = after - before, applied.ObservedTerminalBand, applied.Explanation
         });
         if (window.Completed != study || window.RevisionForTest != revision ||

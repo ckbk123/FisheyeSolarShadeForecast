@@ -28,6 +28,39 @@ public sealed class CalibrationRadialMap
 
     public double SlopeAt(double radians) => radians >= joinRadians ? joinSlope : PolynomialSlope(coefficients, radians);
 
+    public static CalibrationResult MeasuredProfile(CalibrationResult calibration)
+    {
+        double? measured = calibration.OriginalMaximumIncidentAngleDegrees ?? calibration.LinearExtensionStartDegrees;
+        return measured.HasValue ? calibration with { MaximumIncidentAngleDegrees = measured.Value,
+            LinearExtensionStartDegrees = null, OriginalMaximumIncidentAngleDegrees = null } : calibration;
+    }
+
+    public static double MaximumApparentFullDegrees(CalibrationResult calibration)
+    {
+        var measured = MeasuredProfile(calibration);
+        double full = 2 * measured.MaximumIncidentAngleDegrees;
+        if (full >= 180) return full;
+        double radians = measured.MaximumIncidentAngleDegrees * Math.PI / 180;
+        var coefficients = measured.IncidentAngleToRadiusPolynomial;
+        double radius = Polynomial(coefficients, radians), slope = PolynomialSlope(coefficients, radians);
+        double cap = radius + slope * (Math.PI / 2 - radians);
+        return double.IsFinite(radius) && radius > 0 && double.IsFinite(slope) && slope > 0 &&
+            double.IsFinite(cap) && cap > radius ? 180 : full;
+    }
+
+    /// <summary>Use the original polynomial inside the measured field and its endpoint tangent beyond it.</summary>
+    public static CalibrationResult WithApparentFullFov(CalibrationResult calibration, double fullDegrees)
+    {
+        var measured = MeasuredProfile(calibration);
+        double limit = MaximumApparentFullDegrees(measured);
+        double half = fullDegrees / 2;
+        if (!double.IsFinite(fullDegrees) || half <= 0 || fullDegrees > limit)
+            throw new ArgumentOutOfRangeException(nameof(fullDegrees), $"Apparent full FOV must be greater than zero and at most {limit:0.###}° for this profile.");
+        var effective = half > measured.MaximumIncidentAngleDegrees ? ExtendTo(measured, half) :
+            measured with { MaximumIncidentAngleDegrees = half };
+        return effective with { OriginalMaximumIncidentAngleDegrees = measured.MaximumIncidentAngleDegrees };
+    }
+
     /// <summary>Constructs a separate effective profile. An independent image disk still limits pixel coverage.</summary>
     public static CalibrationResult ExtendTo(CalibrationResult measured, double maximumHalfAngleDegrees)
     {
