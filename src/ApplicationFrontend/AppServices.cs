@@ -116,6 +116,10 @@ public sealed class AppServices : IIrradianceService
     }
 
     public ArtifactGroup ObserveInputs(UserSettings settings, IEnumerable<string>? invalidFields = null,
+        bool refreshSources = false, bool verifyArtifacts = false, bool refreshWeather = false) =>
+        ObserveInputs(settings, out _, invalidFields, refreshSources, verifyArtifacts, refreshWeather);
+
+    public ArtifactGroup ObserveInputs(UserSettings settings, out InputDependencies observed, IEnumerable<string>? invalidFields = null,
         bool refreshSources = false, bool verifyArtifacts = false, bool refreshWeather = false)
     {
         using var timing = PerformanceTrace.Phase("input-observation", verifyArtifacts ? "content-verification" : "settings");
@@ -125,7 +129,7 @@ public sealed class AppServices : IIrradianceService
             var forced = (invalidFields ?? []).Aggregate(ArtifactGroup.None, (a, f) => a | InputDependencies.ForField(f, settings));
             var changed = currentInputs == null ? ArtifactGroup.All : currentInputs.Difference(next);
             changed |= forced | invalidDraft;
-            invalidDraft = forced; currentInputs = next;
+            invalidDraft = forced; observed = currentInputs = next;
             if (activeRun is { } run)
             {
                 var dirty = run.Inputs.Difference(next) | forced | (refreshWeather ? InputDependencies.WeatherChain : ArtifactGroup.None);

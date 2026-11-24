@@ -687,9 +687,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 var result = await Task.Run(() =>
                 {
                     var prepared = services.PrepareInputs(snapshot);
-                    var changed = services.ObserveInputs(prepared, invalid, refreshSources, verifyArtifacts);
-                    var verified = refreshSources && (changed & (ArtifactGroup.Mask | ArtifactGroup.Profile)) != 0
-                        ? InputDependencies.Capture(prepared) : null;
+                    var changed = services.ObserveInputs(prepared, out var verified, invalid, refreshSources, verifyArtifacts);
                     Evaluation? restored = null;
                     if (invalid.Length == 0 && (changed != ArtifactGroup.None || updateState != UpdateState.UpToDate))
                         restored = services.TryRestoreAccepted(prepared);
@@ -712,7 +710,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     WatchSources(); SaveInputs();
                 }
                 if (observedRevision != revision) return;
-                if (result.verified != null)
+                if (refreshSources)
                 {
                     uiInputs = result.verified;
                     if (settings.VerifyRefinedEdge(uiInputs))
