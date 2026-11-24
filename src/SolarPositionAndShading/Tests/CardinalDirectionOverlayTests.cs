@@ -64,11 +64,12 @@ public sealed class CardinalDirectionOverlayTests(ITestOutputHelper output)
     [InlineData(0, 0, 0, 66)]
     [InlineData(52, 40, -73, 66)]
     [InlineData(35, 81, 17, 117.5)]
-    public void DisplayTicksPointTowardTheOpticalCenterAtTheProjectedCardinal(double heading, double tilt, double roll, double coverage)
+    public void TicksFollowTheHorizontalCompassBearingAtEachProjectedAnchor(double heading, double tilt, double roll, double coverage)
     {
         var profile = Profile(coverage) with { PrincipalPoint = [223, 239] };
         var projection = new CalibratedSkyProjection(profile, new(heading, tilt, roll), new(261, 253, 225));
         var result = CardinalDirectionOverlayGenerator.Generate(projection);
+        var (right, down, _) = projection.Pose.Axes();
         Assert.True(result.HasMarkers);
         foreach (var marker in result.Markers.Where(m => m.Visible))
         {
@@ -76,16 +77,52 @@ public sealed class CardinalDirectionOverlayTests(ITestOutputHelper output)
             Assert.Equal(new CardinalDirectionOverlayPoint(x, y), marker.TickPoints[0]);
             Assert.Equal(2, marker.TickPoints.Count);
             var end = marker.TickPoints[1];
-            double radialX = x - profile.PrincipalPoint[0], radialY = y - profile.PrincipalPoint[1];
-            double length = double.Hypot(x - end.X, y - end.Y);
-            Assert.Equal(radialX * (y - end.Y), radialY * (x - end.X), 7);
-            Assert.True((x - end.X) * radialX + (y - end.Y) * radialY > 0);
-            Assert.Equal(Math.Min(501 * .04, double.Hypot(radialX, radialY)), length, 7);
+            var bearing = Direction.FromAngles(marker.AzimuthDegrees, 90);
+            double expectedX = bearing.Dot(right), expectedY = bearing.Dot(down);
+            Assert.Equal(expectedX * (y - end.Y), expectedY * (x - end.X), 8);
+            Assert.True((x - end.X) * expectedX + (y - end.Y) * expectedY > 0);
+            Assert.InRange(double.Hypot(x - end.X, y - end.Y), 1, 501 * .04 + 1e-8);
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(31)]
+    [InlineData(90)]
+    public void SouthFacingExampleKeepsEastWestTicksLevelInTheUnrolledPhoto(double roll)
+    {
+        var result = CardinalDirectionOverlayGenerator.Generate(new(Profile(66.43), new(0, -28, roll)));
+        var east = result.Markers.Single(m => m.Name == "E");
+        var west = result.Markers.Single(m => m.Name == "W");
+        var (sin, cos) = Math.SinCos(roll * Math.PI / 180);
+        double length = 501 * .04;
+        Assert.Equal(east.TickPoints[0].X + length * cos, east.TickPoints[1].X, 9);
+        Assert.Equal(east.TickPoints[0].Y - length * sin, east.TickPoints[1].Y, 9);
+        Assert.Equal(west.TickPoints[0].X - length * cos, west.TickPoints[1].X, 9);
+        Assert.Equal(west.TickPoints[0].Y + length * sin, west.TickPoints[1].Y, 9);
+        if (roll == 0)
+        {
+            Assert.True(east.BoundaryX < 250 && west.BoundaryX > 250);
+            Assert.True(east.BoundaryY < 250);
+            Assert.Equal(east.BoundaryY!.Value, west.BoundaryY!.Value, 9);
         }
     }
 
     [Fact]
-    public void OffsetDiskClipsTheStraightTickWhenTheOpticalCenterIsOutside()
+    public void NearlyTangentialCompassTickStopsAtTheCalibratedFieldLimit()
+    {
+        var result = CardinalDirectionOverlayGenerator.Generate(new(Profile(10), new(75, 10)));
+        var north = result.Markers.Single(m => m.Name == "N");
+        Assert.Equal(2, north.TickPoints.Count);
+        var anchor = north.TickPoints[0];
+        var tip = north.TickPoints[1];
+        Assert.InRange(double.Hypot(tip.X - anchor.X, tip.Y - anchor.Y), 1, 501 * .04 - .1);
+        double calibratedRadius = 250 * 10 / 90d;
+        Assert.Equal(calibratedRadius, double.Hypot(tip.X - 250, tip.Y - 250), 7);
+    }
+
+    [Fact]
+    public void OffsetDiskClipsTheCompassTickAtTheOppositeEdge()
     {
         var result = CardinalDirectionOverlayGenerator.Generate(new(Profile(), imageDisk: new(280, 250, 4)));
         var marker = Assert.Single(result.Markers, m => m.Visible);
