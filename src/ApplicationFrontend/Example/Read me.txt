@@ -25,7 +25,8 @@ Irradiance
   horizontal-irradiance.xlsx is the original buffered Open-Meteo hourly input,
   with 744 rows labelled in May 2025. Each label represents the PRECEDING hour.
   Its first three columns are timestamp, direct horizontal BHI and diffuse
-  horizontal DHI in W/m2. The imported timestamps set the chart period.
+  horizontal DHI in W/m2. In UTC+07:00, the first interval starts at 23:00
+  on 30 April and the last ends at 23:00 on 31 May.
 
 Debug Data/reference-run
   A fixed calculation for the bundled phone and panel setup.
@@ -36,11 +37,11 @@ Debug Data/reference-run
   02-orientation contains the library-generated compass overlay PNG, numerical
   marker workbook and metadata shown over the original colour photograph.
   Read 06-shading/panel-results.json for its exact energy and loss summaries.
-  These are recorded calculated outputs, not manually populated sample values.
+  Across all 744 intervals the panel receives 131.36 kWh/m2 before shading
+  and 107.40 kWh/m2 after shading, an estimated loss of 18.24%.
 
 The site coordinates are illustrative. The selected time zone can differ from
-the fixed reference run. Read its run.json
-before comparing complete-period values. Unknown sky is treated as blocked;
+the fixed reference run. See run.json when comparing results. Unknown sky is treated as blocked;
 no ground reflection or electrical PV model is added.
 
 Every explicit Update results operation saves its actual stage outputs
