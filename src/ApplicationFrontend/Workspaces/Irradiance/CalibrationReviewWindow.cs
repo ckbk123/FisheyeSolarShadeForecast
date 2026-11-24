@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Media;
 using SolarShade.Calibration.Solver;
 
 namespace SolarShade.Desktop;
@@ -12,11 +11,11 @@ public sealed class CalibrationReviewWindow : Window
 {
     private readonly CalibrationReview review;
     private readonly ComboBox photos = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch };
-    private readonly Image preview = new() { Stretch = Stretch.Uniform };
+    private readonly ImageViewport preview = new(new ImageOverlayPreview(), "CheckerboardViewport", "Checkerboard detection preview") { Background = StudioTheme.Navy };
     private readonly CalibrationStamp stamp = new() { Name = "CheckerboardStatusStamp" };
     private readonly TextBlock feedback = IrradianceWorkspace.Label("", 13);
     public CalibrationImageDetection? SelectedPhoto => photos.SelectedItem is PhotoChoice choice ? choice.Image : null;
-    public bool HasPreview => preview.Source != null;
+    public bool HasPreview => preview.HasImage;
     public void SelectPhoto(int index) => photos.SelectedIndex = index;
     private sealed record PhotoChoice(CalibrationImageDetection Image)
     {
@@ -52,6 +51,7 @@ public sealed class CalibrationReviewWindow : Window
         photoPane.Children.Add(preview);
         AutomationProperties.SetAutomationId(stamp, "CheckerboardStatusStamp");
         photoPane.Children.Add(stamp);
+        photoPane.Children.Add(new ImageZoomTools(preview, "Checkerboard", "checkerboard photo"));
         root.Children.Add(photoPane);
         var footer = new StackPanel { Margin = new(0, 8, 0, 0) }; root.Children.Add(footer);
         footer.Children.Add(IrradianceWorkspace.Label("Saved review and diagnostics", 12));
@@ -74,7 +74,7 @@ public sealed class CalibrationReviewWindow : Window
 
     private void ShowPhoto()
     {
-        preview.Source = null;
+        preview.ClearImage();
         var image = SelectedPhoto;
         if (review.Report.Failure is { } reason) stamp.SetMessage(CalibrationStamp.FailureLabel, reason);
         else if (image is { Detected: false }) stamp.SetMessage("PHOTO REJECTED", image.Message);
@@ -89,7 +89,11 @@ public sealed class CalibrationReviewWindow : Window
         try
         {
             byte[]? bytes = review.Preview(image);
-            if (bytes != null) preview.Source = IrradianceWorkspace.Bitmap(bytes);
+            if (bytes != null)
+            {
+                var bitmap = IrradianceWorkspace.Bitmap(bytes);
+                preview.SetImage(bitmap, bitmap.PixelWidth, bitmap.PixelHeight);
+            }
             else feedback.Text += "\nNo preview is available for this photo.";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException)
