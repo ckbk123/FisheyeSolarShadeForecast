@@ -1,0 +1,13 @@
+{
+  "Source": "AI",
+  "VariantId": null,
+  "Label": null,
+  "AiAncestorSha256": "3A14460ED696E1738531BB6E9223ECCE6BA1740A3C55376461781E4EF183C7F7",
+  "ImportedFileName": null,
+  "ImportedFileSha256": null,
+  "ImportedAncestorSha256": null,
+  "ImportInverted": null,
+  "PixelConvention": "255 = open sky; 0 = obstruction or outside lens; no automatic inversion",
+  "ParentVariantId": null,
+  "ActiveMaskSha256": "3A14460ED696E1738531BB6E9223ECCE6BA1740A3C55376461781E4EF183C7F7"
+}

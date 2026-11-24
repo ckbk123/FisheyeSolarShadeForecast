@@ -1,5 +1,5 @@
 {
-  "Origin": "Reused in-memory mask",
+  "Origin": "Computed by SkyPhotoMasker",
   "Mask": {
     "Model": 1,
     "Width": 3000,
@@ -21,9 +21,9 @@
     "DiskMethod": "Auto",
     "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
     "AccelerationFallback": null,
-    "SessionLoadMilliseconds": 998.0489,
-    "InferenceMilliseconds": 144.2845,
-    "TotalMilliseconds": 1325.5511
+    "SessionLoadMilliseconds": 1200.0674,
+    "InferenceMilliseconds": 147.0738,
+    "TotalMilliseconds": 1553.9265
   },
   "PixelConvention": "255 = sky; 0 = obstruction or outside lens; EXIF-oriented image coordinates"
 }
