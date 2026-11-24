@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Automation;
@@ -19,9 +20,18 @@ internal sealed class MaskEdgeWindow : Window
     private readonly CalibrationResult calibration;
     private readonly SkyPhotoViewport preview = new();
     private readonly ComboBox threshold = new() { ItemsSource = new[] { 80, 90, 95, 100 }, SelectedItem = 100, MinWidth = 60 };
+    private readonly RadioButton automatic = new() { Content = "Automatic", VerticalAlignment = VerticalAlignment.Center };
+    private readonly RadioButton manual = new() { Content = "Set apparent FOV", VerticalAlignment = VerticalAlignment.Center, Margin = new(12, 0, 12, 0) };
+    private readonly Slider angleSlider = new() { SmallChange = .1, LargeChange = 1, IsMoveToPointEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBox angleText = new() { Width = 70, VerticalContentAlignment = VerticalAlignment.Center };
+    private readonly Grid angleControls = new() { Margin = new(2, 6, 2, 0) };
+    private readonly StackPanel thresholdControls = new() { Orientation = Orientation.Horizontal };
     private readonly Button useStudyMask = new() { Content = "Use study mask", Visibility = Visibility.Collapsed };
     private readonly Button apply = new() { Content = "Use for calculation", IsEnabled = false, Margin = new Thickness(0, 0, 6, 0) };
-    private bool usingStudyMask, studyEditable;
+    private bool inspectingStudyPhoto, studyEditable;
+    private bool syncingAngle, hasManualInput;
+    private readonly double? savedManual;
+    private string automaticStatus = "", automaticDetail = "";
     private readonly CheckBox showMask = new() { Content = "Show mask", IsEnabled = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock source = IrradianceWorkspace.Label("", 12);
     private readonly TextBlock status = IrradianceWorkspace.Label("", 15, StudioTheme.Ink);
@@ -34,12 +44,16 @@ internal sealed class MaskEdgeWindow : Window
     internal Task Analysis { get; private set; } = Task.CompletedTask;
 
     internal MaskEdgeWindow(Window owner, string photoPath, BitmapSource photo, MaskAsset? studyMask, SkyPhotoFieldOfView fov,
-        int? currentThreshold, Action<int> applyThreshold)
+        int? currentThreshold, double? currentManual, Action<int?, double?> applyCoverage)
     {
         this.photoPath = photoPath;
         this.studyMask = studyMask;
         calibration = fov.EffectiveCalibration ?? throw new ArgumentException("A usable camera profile is required.", nameof(fov));
+        savedManual = currentManual;
         threshold.SelectedItem = currentThreshold is 80 or 90 or 95 or 100 ? currentThreshold : 100;
+        angleSlider.Maximum = CalibrationRadialMap.MaximumApparentFullDegrees(calibration);
+        automatic.IsChecked = !currentManual.HasValue;
+        manual.IsChecked = currentManual.HasValue;
         Title = "Estimate edge from mask";
         Width = 780; Height = 650;
         WindowWorkArea.FitToOwner(this, owner);
@@ -47,9 +61,12 @@ internal sealed class MaskEdgeWindow : Window
         Content = root;
         var controls = new WrapPanel();
         DockPanel.SetDock(controls, Dock.Top); root.Children.Add(controls);
+        AutomationProperties.SetAutomationId(automatic, "AutomaticMaskEdgeMode");
+        AutomationProperties.SetAutomationId(manual, "ManualApparentFovMode");
+        controls.Children.Add(automatic); controls.Children.Add(manual);
         var label = new Label { Content = "Black pixels (%)", Target = threshold, VerticalAlignment = VerticalAlignment.Center };
-        controls.Children.Add(label);
-        controls.Children.Add(threshold);
+        thresholdControls.Children.Add(label); thresholdControls.Children.Add(threshold);
+        controls.Children.Add(thresholdControls);
         AutomationProperties.SetName(threshold, "Minimum black pixels (%)");
         StudioTheme.Help(threshold, "100% requires every sampled direction on every ring through the 180° full-angle cap to be observed black. Lower percentages allow gaps and give approximate bands.");
         threshold.SelectionChanged += (_, _) => ShowFinding();
@@ -69,6 +86,40 @@ internal sealed class MaskEdgeWindow : Window
         showMask.Unchecked += (_, _) => preview.Photo.ShowOverlay = false;
         controls.Children.Add(showMask);
 
+        angleControls.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        angleControls.ColumnDefinitions.Add(new());
+        angleControls.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        var angleLabel = new Label { Content = "Full FOV (°)", Target = angleText, VerticalAlignment = VerticalAlignment.Center };
+        angleSlider.Margin = new(6, 0, 12, 0);
+        Grid.SetColumn(angleSlider, 1); Grid.SetColumn(angleText, 2);
+        angleControls.Children.Add(angleLabel); angleControls.Children.Add(angleSlider); angleControls.Children.Add(angleText);
+        DockPanel.SetDock(angleControls, Dock.Top); root.Children.Add(angleControls);
+        AutomationProperties.SetName(angleText, "Apparent full field of view in degrees");
+        AutomationProperties.SetName(angleSlider, "Apparent full field of view in degrees");
+        AutomationProperties.SetAutomationId(angleSlider, "ApparentFovSlider");
+        AutomationProperties.SetAutomationId(angleText, "ApparentFullFovDegrees");
+        StudioTheme.Help(manual, "Fit the pink circle to the apparent rim on the photo or mask. The chosen full angle limits the directions used for shading.");
+        angleSlider.ValueChanged += (_, _) =>
+        {
+            if (syncingAngle) return;
+            hasManualInput = true;
+            double full = angleSlider.Value == angleSlider.Maximum ? angleSlider.Maximum : Math.Round(angleSlider.Value, 1);
+            SetAngle(Math.Min(full, angleSlider.Maximum));
+            ShowFinding();
+        };
+        angleText.TextChanged += (_, _) =>
+        {
+            if (syncingAngle) return;
+            hasManualInput = true;
+            if (ReadAngle() is double full)
+            {
+                syncingAngle = true; angleSlider.Value = full; syncingAngle = false;
+            }
+            ShowFinding();
+        };
+        automatic.Checked += (_, _) => ShowFinding();
+        manual.Checked += (_, _) => ShowFinding();
+
         var summary = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
         DockPanel.SetDock(summary, Dock.Bottom); root.Children.Add(summary);
         summary.Children.Add(status); summary.Children.Add(outerSky); summary.Children.Add(explanation);
@@ -80,10 +131,13 @@ internal sealed class MaskEdgeWindow : Window
         StudioTheme.Help(legend, "The scan extends at most 90° from the lens axis (180° full angle). A band of dark obstructions can mimic the lens rim.");
         var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 5, 0, 0) };
         AutomationProperties.SetAutomationId(apply, "ApplyMaskEdge");
-        StudioTheme.Help(apply, "Use this threshold with the selected study mask on the next Update results. To use a different file, first import it as the study mask.");
+        StudioTheme.Help(apply, "Use this field of view with the selected study mask on the next Update results.");
         apply.Click += (_, _) =>
         {
-            if (apply.IsEnabled && threshold.SelectedItem is int percent) { applyThreshold(percent); if (IsVisible) Close(); }
+            if (!apply.IsEnabled) return;
+            if (manual.IsChecked == true) applyCoverage(null, ReadAngle());
+            else applyCoverage((int)threshold.SelectedItem, null);
+            if (IsVisible) Close();
         };
         var close = new Button { Content = "Close", MinWidth = 70 };
         close.Click += (_, _) => Close(); actions.Children.Add(apply); actions.Children.Add(close); summary.Children.Add(actions);
@@ -120,40 +174,47 @@ internal sealed class MaskEdgeWindow : Window
         RefreshApplyButton();
     }
 
-    private void RefreshApplyButton() => apply.IsEnabled = studyEditable && usingStudyMask && threshold.SelectedItem is int percent &&
-        scan?.Findings.Any(f => f.BlackPercent == percent && f.EstimatedLimitFullDegrees.HasValue) == true;
+    private void RefreshApplyButton() => apply.IsEnabled = studyEditable && inspectingStudyPhoto &&
+        (manual.IsChecked == true ? ReadAngle().HasValue : AutomaticFinding?.EstimatedLimitFullDegrees.HasValue == true);
+
+    private MaskEdgeFinding? AutomaticFinding => scan?.Findings.FirstOrDefault(f => Equals(f.BlackPercent, threshold.SelectedItem));
+
+    private double? ReadAngle() => double.TryParse(angleText.Text.Trim().Replace(',', '.'), NumberStyles.Float,
+        CultureInfo.InvariantCulture, out double value) && double.IsFinite(value) && value / 2 > 0 && value <= angleSlider.Maximum ? value : null;
+
+    private void SetAngle(double value)
+    {
+        syncingAngle = true;
+        angleText.Text = value.ToString("G", CultureInfo.CurrentCulture);
+        angleSlider.Value = Math.Clamp(value, 0, angleSlider.Maximum);
+        syncingAngle = false;
+    }
 
     private async Task AnalyzeAsync(string? fullFrameFile)
     {
         scan = null;
-        usingStudyMask = fullFrameFile == null && studyMask != null;
-        RefreshApplyButton();
-        preview.SetMaskScan(0, 0, null, null);
+        inspectingStudyPhoto = fullFrameFile == null;
+        hasManualInput = inspectingStudyPhoto && savedManual.HasValue;
+        if (hasManualInput && savedManual is double saved) SetAngle(saved);
         preview.Photo.ClearOverlay();
         showMask.IsEnabled = false;
-        explanation.Text = "";
         outerSky.Text = "";
-        legend.Text = CalibratedLegend;
-        StudioTheme.Help(status, "");
-        useStudyMask.Visibility = fullFrameFile != null && studyMask != null ? Visibility.Visible : Visibility.Collapsed;
+        automaticStatus = "Scanning concentric rings…";
+        automaticDetail = "";
+        useStudyMask.Content = studyMask == null ? "Use study photo" : "Use study mask";
+        useStudyMask.Visibility = fullFrameFile != null ? Visibility.Visible : Visibility.Collapsed;
         source.Text = fullFrameFile == null ? "Source · selected study mask" : "Full-frame mask · " + Path.GetFileName(fullFrameFile);
-        if (calibration.MaximumIncidentAngleDegrees >= 90)
-        {
-            source.Text = "Source · camera calibration";
-            status.Text = "Calibration already covers the 180° scan cap.";
-            explanation.Text = $"The calibrated full FOV is {2 * calibration.MaximumIncidentAngleDegrees:0.##}°.";
-            return;
-        }
         if (fullFrameFile == null && studyMask == null)
         {
             source.Text = "No study mask is available.";
-            status.Text = "Choose a full-frame mask to try the ring scan.";
+            automaticStatus = "Choose a full-frame mask to try the ring scan.";
+            ShowFinding();
             return;
         }
         using var request = new CancellationTokenSource();
         pending = request;
         var ct = request.Token;
-        status.Text = "Scanning concentric rings…";
+        ShowFinding();
         try
         {
             var result = await Task.Run(async () =>
@@ -183,17 +244,43 @@ internal sealed class MaskEdgeWindow : Window
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             if (ct.IsCancellationRequested) return;
-            status.Text = "Could not analyze this mask.";
-            explanation.Text = ex.Message;
+            automaticStatus = "Could not analyze this mask.";
+            automaticDetail = ex.Message;
+            ShowFinding();
         }
         finally { if (ReferenceEquals(pending, request)) pending = null; }
     }
 
     private void ShowFinding()
     {
-        if (scan == null || threshold.SelectedItem is not int percent) return;
-        var finding = scan.Findings.Single(f => f.BlackPercent == percent);
+        bool adjust = manual.IsChecked == true;
+        angleControls.Visibility = adjust ? Visibility.Visible : Visibility.Collapsed;
+        thresholdControls.Visibility = adjust ? Visibility.Collapsed : Visibility.Visible;
+        outerSky.Visibility = adjust ? Visibility.Collapsed : Visibility.Visible;
+        var finding = AutomaticFinding;
+        double measured = 2 * calibration.MaximumIncidentAngleDegrees;
+        if (adjust && !hasManualInput) SetAngle(finding?.EstimatedLimitFullDegrees ?? measured);
         RefreshApplyButton();
+        StudioTheme.Help(status, "");
+        legend.Text = CalibratedLegend;
+        if (adjust)
+        {
+            double? value = ReadAngle();
+            double? chosenRadius = value is double angle ? SkyPhotoFieldOfView.RadiusForApparentFov(calibration, angle) : null;
+            preview.SetMaskScan(calibration.PrincipalPoint[0], calibration.PrincipalPoint[1], null, null, chosenRadius);
+            status.Text = value.HasValue ? "" : $"Enter a full angle above 0° and up to {angleSlider.Maximum:G}°.";
+            explanation.Text = "";
+            if (value.HasValue) legend.Text += "     Pink · apparent FOV";
+            return;
+        }
+        if (scan == null || finding == null || calibration.MaximumIncidentAngleDegrees >= 90)
+        {
+            preview.SetMaskScan(0, 0, null, null);
+            status.Text = calibration.MaximumIncidentAngleDegrees >= 90 ? "Calibration already covers the 180° scan cap." : automaticStatus;
+            explanation.Text = calibration.MaximumIncidentAngleDegrees >= 90 ? $"The calibrated full FOV is {measured:0.##}°." : automaticDetail;
+            return;
+        }
+        int percent = finding.BlackPercent;
         double? radius = finding.RadiusPixels;
         preview.SetMaskScan(calibration.PrincipalPoint[0], calibration.PrincipalPoint[1], radius, scan.LimitRadiusPixels);
         legend.Text = CalibratedLegend + (scan.LimitRadiusPixels.HasValue ? "     Blue · 180° scan cap" : "") +
@@ -212,8 +299,8 @@ internal sealed class MaskEdgeWindow : Window
             if (scan.Reached180)
             {
                 var last = scan.Samples[^1];
-                help += $" At 180°, {last.ObservedBlackSamples / total:P0} is observed black, " +
-                    $"{(total - last.ObservedBlackSamples - last.UnknownSamples) / total:P0} is open sky and {last.UnknownSamples / total:P0} is unknown.";
+                int open = MaskEdgeProbe.SamplesPerRing - last.ObservedBlackSamples - last.UnknownSamples;
+                help += $" At 180° there are {open:N0} open, {last.ObservedBlackSamples:N0} blocked and {last.UnknownSamples:N0} unknown samples.";
             }
         }
         StudioTheme.Help(status, help);

@@ -14,6 +14,7 @@ public sealed class DependencyTests
         yield return ["ProfilePath", "other.json", ArtifactGroup.Profile | InputDependencies.PoseChain];
         yield return ["CoverageAngle", 100d, ArtifactGroup.Profile | InputDependencies.PoseChain];
         yield return [nameof(UserSettings.MaskEdgeThresholdPercent), 100, ArtifactGroup.Profile | InputDependencies.PoseChain];
+        yield return [nameof(UserSettings.ApparentFullFovDegrees), 150d, ArtifactGroup.Profile | InputDependencies.PoseChain];
         yield return ["Model", SolarShade.SkyPhotoMasking.SkyModel.EfficientNetB4, ArtifactGroup.Mask | ArtifactGroup.Shading];
         yield return ["Resolution", 512, ArtifactGroup.Mask | ArtifactGroup.Shading];
         yield return ["CenteredDisk", true, ArtifactGroup.Mask | InputDependencies.PoseChain];

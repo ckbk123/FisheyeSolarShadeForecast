@@ -11,7 +11,8 @@ public sealed class FieldOfViewOverlay : FrameworkElement
     private static readonly Brush Halo = FrozenBrush(Color.FromArgb(215, 14, 40, 28));
     private static readonly Brush MaskEdge = FrozenBrush(Color.FromRgb(0xff, 0xbb, 0x32));
     private static readonly Brush ScanCap = FrozenBrush(Color.FromRgb(0x78, 0xc6, 0xff));
-    private Geometry? calibrated, usable, maskTransition, scanCap;
+    private static readonly Brush Apparent = FrozenBrush(Color.FromRgb(0xff, 0x86, 0xb3));
+    private Geometry? calibrated, usable, maskTransition, scanCap, apparent;
     private double displayScale = 1;
 
     public FieldOfViewOverlay()
@@ -38,9 +39,11 @@ public sealed class FieldOfViewOverlay : FrameworkElement
         InvalidateVisual();
     }
 
-    public void SetMaskScan(Geometry? transition, Geometry? cap)
+    public void SetMaskScan(Geometry? transition, Geometry? cap) => SetMaskScan(transition, cap, null);
+
+    public void SetMaskScan(Geometry? transition, Geometry? cap, Geometry? manual)
     {
-        maskTransition = transition; scanCap = cap;
+        maskTransition = transition; scanCap = cap; apparent = manual;
         InvalidateVisual();
     }
 
@@ -50,6 +53,7 @@ public sealed class FieldOfViewOverlay : FrameworkElement
         Draw(usable, Usable, true);
         Draw(scanCap, ScanCap, true);
         Draw(maskTransition, MaskEdge, true);
+        Draw(apparent, Apparent, true);
 
         void Draw(Geometry? geometry, Brush brush, bool dashed)
         {

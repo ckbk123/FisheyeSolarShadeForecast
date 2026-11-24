@@ -71,6 +71,9 @@ public sealed record CalibrationResult(
     /// <summary>Measured half-angle at which the effective radial map switches to its endpoint tangent, when extended.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public double? LinearExtensionStartDegrees { get; init; }
+    /// <summary>Original measured half-angle when a study uses a user-selected apparent field.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? OriginalMaximumIncidentAngleDegrees { get; init; }
 }
 
 public sealed record SkyMask(int Width, int Height, byte[] Pixels)

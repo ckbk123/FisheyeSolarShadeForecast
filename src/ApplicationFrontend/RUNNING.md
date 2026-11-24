@@ -84,6 +84,8 @@ At the default upward pose with zero roll and image top facing North, the shared
 
 Choose **Use for calculation** on the selected study mask, then **Update results**. Shading, the sky grid and the sun path now use the fitted curve inside calibration and its ending slope outside. Each solar direction still samples the mask, and missing coverage contributes zero to the primary estimate. You can compare other thresholds or inspect a full-frame PNG in the dialog. [Experiment and measured examples](../../docs/MASK_EDGE_EXPERIMENT.md).
 
+To set the limit by eye, choose **Set apparent FOV** in the same dialog. Use the slider or type the full angle across the image. Zoom or toggle **Show mask** to line up the pink circle with the visible rim. Apply the angle and update the study. **Use calibration only** restores the fitted range.
+
 ## Sun-path preview
 
 **Show sun path** places semi-transparent yellow daily tracks over the black-and-white mask for the studied period. It uses the same solar positions, camera pose and calibrated projection as shading. Tracks also appear over obstructions so you can assess the alignment. Positions outside the calibrated view are omitted, and unrelated day/night segments are never joined.

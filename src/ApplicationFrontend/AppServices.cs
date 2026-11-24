@@ -17,9 +17,11 @@ public sealed record MaskAsset(byte[] OriginalPreview, byte[] MaskPreview, SkyMa
     public LensDisk Disk => Result.Disk;
     public string AiAncestorSha256 => Variant?.AiAncestorSha256 ?? Convert.ToHexString(SHA256.HashData(Png));
 }
-public sealed record AppliedMaskEdge(double MeasuredFullDegrees, double EffectiveFullDegrees, int BlackPercent,
+public sealed record AppliedMaskEdge(double MeasuredFullDegrees, double EffectiveFullDegrees, int? BlackPercent,
     bool ObservedTerminalBand, string Explanation)
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? ManualFullFovDegrees { get; init; }
     public int? ObservedSkyAtCap { get; init; }
     public int? UnknownAtCap { get; init; }
 }
@@ -542,7 +544,9 @@ public sealed class AppServices : IIrradianceService
             {
                 string nextProfile = AppData.Key(new { File = AppData.FileKey(s.ProfilePath), s.CoverageAngle,
                     activeMask.Result.Width, activeMask.Result.Height, Library = AppData.LibraryVersion(typeof(CameraProfileFiles)) });
-                if (s.MaskEdgeThresholdPercent is int threshold)
+                if (s.ApparentFullFovDegrees is double apparent)
+                    nextProfile = AppData.Key(new { Source = nextProfile, ApparentFullFovDegrees = apparent });
+                else if (s.MaskEdgeThresholdPercent is int threshold)
                     nextProfile = AppData.Key(new { Source = nextProfile, SelectedMask = maskKey, Threshold = threshold,
                         Probe = AppData.LibraryVersion(typeof(MaskEdgeProbe)) });
                 debug.RecordInput("camera-profile", new { Fingerprint = nextProfile });
@@ -599,11 +603,15 @@ public sealed class AppServices : IIrradianceService
     {
         var source = CameraProfileFiles.Load(s.ProfilePath, mask.Result.Width, mask.Result.Height,
             s.CoverageAngle > 0 ? s.CoverageAngle : null);
-        var measured = source.Calibration;
-        if (measured.LinearExtensionStartDegrees is double join)
-        {
-            measured = measured with { MaximumIncidentAngleDegrees = join, LinearExtensionStartDegrees = null };
+        var measured = CalibrationRadialMap.MeasuredProfile(source.Calibration);
+        if (!ReferenceEquals(measured, source.Calibration))
             source = source with { Calibration = measured, CoverageNote = "Measured portion of the saved effective profile." };
+        if (s.ApparentFullFovDegrees is double apparent)
+        {
+            var selected = CalibrationRadialMap.WithApparentFullFov(measured, apparent);
+            string explanation = FormattableString.Invariant($"User-selected apparent full FOV {apparent:0.###}°. Measured full FOV {2 * measured.MaximumIncidentAngleDegrees:0.###}°.");
+            return (source with { Calibration = selected, CoverageNote = source.CoverageNote + " " + explanation },
+                new AppliedMaskEdge(2 * measured.MaximumIncidentAngleDegrees, apparent, null, false, explanation) { ManualFullFovDegrees = apparent });
         }
         if (s.MaskEdgeThresholdPercent is not int percent) return (source, null);
         if (percent is not (80 or 90 or 95 or 100)) throw new InvalidDataException("Unsupported mask-edge threshold.");

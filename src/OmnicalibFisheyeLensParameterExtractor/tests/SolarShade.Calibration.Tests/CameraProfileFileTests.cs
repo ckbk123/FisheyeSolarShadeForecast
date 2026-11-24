@@ -31,6 +31,28 @@ public sealed class CameraProfileFileTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(113.25)]
+    [InlineData(130)]
+    [InlineData(152.5)]
+    public void ManualFullFieldRetainsOriginalCoverageAndDiskInJsonAndYaml(double full)
+    {
+        var selected = CalibrationRadialMap.WithApparentFullFov(Calibration, full);
+        var artifacts = CameraProfileFiles.Export(new(selected, "fixture", "apparent FOV"), directory);
+        foreach (var artifact in artifacts)
+        {
+            var effective = CameraProfileFiles.Load(artifact).Calibration;
+            Assert.Equal(full / 2, effective.MaximumIncidentAngleDegrees);
+            Assert.Equal(65, effective.OriginalMaximumIncidentAngleDegrees);
+            Assert.Equal(full > 130 ? 65d : (double?)null, effective.LinearExtensionStartDegrees);
+            Assert.Equal(Calibration.ImageCircleRadiusPixels, effective.ImageCircleRadiusPixels);
+            var measured = CalibrationRadialMap.MeasuredProfile(effective);
+            Assert.Equal(65, measured.MaximumIncidentAngleDegrees);
+            Assert.Null(measured.LinearExtensionStartDegrees);
+            Assert.Null(measured.OriginalMaximumIncidentAngleDegrees);
+        }
+    }
+
     [Fact]
     public void ExistingProfileJsonExportsEffectiveNativeParametersAndCoverageOverride()
     {

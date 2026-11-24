@@ -39,11 +39,15 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
         }
     }
 
+    internal static double RadiusForApparentFov(CalibrationResult measured, double fullDegrees)
+    {
+        var effective = CalibrationRadialMap.WithApparentFullFov(measured, fullDegrees);
+        return new CalibrationRadialMap(effective).RadiusAt(fullDegrees * Math.PI / 360);
+    }
+
     public static SkyPhotoFieldOfView Describe(CalibrationProfile profile, int width, int height, ImageDisk? selectedDisk)
     {
-        if (profile.Calibration.LinearExtensionStartDegrees is double measuredAngle)
-            profile = profile with { Calibration = profile.Calibration with
-                { MaximumIncidentAngleDegrees = measuredAngle, LinearExtensionStartDegrees = null } };
+        profile = profile with { Calibration = CalibrationRadialMap.MeasuredProfile(profile.Calibration) };
         CameraProfileFiles.Validate(profile.Calibration, width, height);
         // Certify the profile with the actual projection validator, including monotonicity.
         _ = new CalibratedSkyProjection(profile.Calibration, imageDisk: selectedDisk);

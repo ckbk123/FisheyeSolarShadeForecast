@@ -40,7 +40,9 @@ public static class ShadingFilePipeline
         var result = engine.Evaluate(sequence,cancellationToken);
         var shadeMs = stage.Elapsed.TotalMilliseconds; stage.Restart();
         ShadingWorkbook.WriteSolarPositions(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(outputXlsx))!,Path.GetFileNameWithoutExtension(outputXlsx)+"-solar-positions.xlsx"),allPositions,site,cancellationToken);
-        string coverage = calibration.LinearExtensionStartDegrees is double measured
+        string coverage = calibration.OriginalMaximumIncidentAngleDegrees is double original
+            ? FormattableString.Invariant($"user-selected apparent full FOV {2 * calibration.MaximumIncidentAngleDegrees} degrees, measured full FOV {2 * original} degrees") :
+            calibration.LinearExtensionStartDegrees is double measured
             ? FormattableString.Invariant($"measured maximum incident angle {measured} degrees, extended along the endpoint tangent to {calibration.MaximumIncidentAngleDegrees} degrees")
             : $"caller-validated max incident angle {validatedMaximumIncidentAngleDegrees.ToString(CultureInfo.InvariantCulture)} degrees";
         ShadingWorkbook.Write(outputXlsx,result,site,pose,

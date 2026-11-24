@@ -18,6 +18,7 @@ public sealed record MaskEditorRequest(byte[] OrientedPhotoPng, byte[] OpeningMa
     public Geometry? UsableOutline { get; init; }
     public Geometry? MaskBandOutline { get; init; }
     public Geometry? ScanCapOutline { get; init; }
+    public Geometry? ManualOutline { get; init; }
     public string FieldOfViewLabel { get; init; } = "FOV unavailable";
     public string? FieldOfViewHelp { get; init; }
 }
@@ -127,7 +128,7 @@ public sealed class MaskEditorWindow : Window
         canvas.Children.Add(new Image { Source = photoBitmap, Width = width, Height = height, Stretch = Stretch.Fill, IsHitTestVisible = false });
         canvas.Children.Add(maskImage);
         fieldOfView.SetOutlines(request.CalibratedOutline, request.UsableOutline);
-        fieldOfView.SetMaskScan(request.MaskBandOutline, request.ScanCapOutline);
+        fieldOfView.SetMaskScan(request.MaskBandOutline, request.ScanCapOutline, request.ManualOutline);
         canvas.Children.Add(fieldOfView);
         if (!hasFov)
         {
