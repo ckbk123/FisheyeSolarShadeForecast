@@ -40,7 +40,9 @@ no ground reflection or electrical PV model is added.
 
 Every explicit Update results operation saves its actual stage outputs
 in a new top-level Debug Data run. The fixed reference run remains unchanged.
-Export results copies a complete successful run into a new scenario folder.
+Export data opens a selection and destination dialog. Irradiance (.xlsx) saves
+all completed result intervals in a six-column workbook in a new scenario folder.
+Full scientific diagnostics remain in the current top-level Debug Data folder.
 
 settings.json here contains default paths relative to APPLICATION.exe. Current
 settings are stored in Data/settings.json. Data also holds validated weather/

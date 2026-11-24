@@ -669,6 +669,18 @@ public sealed class AppServices : IIrradianceService
         evaluation.ManagedDebugRun.CopyCurrent(destination);
         return destination;
     }
+    public static string Export(Evaluation evaluation, string directory, DataExportOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(evaluation);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        if (!options.Irradiance) throw new ArgumentException("Select at least one data product to export.", nameof(options));
+        if (evaluation.DebugDirectory == null) throw new InvalidOperationException("The result has no completed library artifacts.");
+        if (evaluation.Dependencies == null || evaluation.ManagedDebugRun == null) throw new InvalidOperationException("Result provenance is unavailable; update results before exporting.");
+        string destination = Path.Combine(directory, $"scenario-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}");
+        IrradianceDataExport.Publish(evaluation.ManagedDebugRun, destination);
+        return destination;
+    }
     private void ReleaseOperation()
     {
         lock (inputGate) { evaluationGate.Release(); if (disposeRequested) DisposeResources(); }

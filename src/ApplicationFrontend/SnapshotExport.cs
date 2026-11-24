@@ -82,7 +82,7 @@ internal static class SnapshotExport
         }
         catch { result.Dispose(); throw; }
     }
-    private static void CopyVerified(string source, string destination, string expected)
+    internal static void CopyVerified(string source, string destination, string expected)
     {
         DebugDataStore.SafePath(source);
         using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read);
