@@ -177,7 +177,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         StudioTheme.Help(importMask, "Select a sky photograph first. Import an opaque black-and-white PNG at the same oriented dimensions. White means open sky by default. You can invert the mask during import.");
         images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) { settings.SkyImage = Path.Combine(settings.SkyFolder, name); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } };
         model = Combo(inputs, "Sky segmentation", Enum.GetNames<SkyModel>()); model.SelectionChanged += (_, _) => { if (!loading && model.SelectedIndex >= 0) { settings.Model = (SkyModel)model.SelectedIndex; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
-        resolution = Combo(inputs, "Mask resolution", ["1024 · original quality", "512 · faster"]); resolution.SelectionChanged += (_, _) => { if (!loading) { settings.Resolution = resolution.SelectedIndex == 1 ? 512 : 1024; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
+        resolution = Combo(inputs, "Mask quality", ["Original Quality (Slower)", "Reduced Quality (Faster)"]); resolution.SelectionChanged += (_, _) => { if (!loading) { settings.Resolution = resolution.SelectedIndex == 1 ? 512 : 1024; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
         AddPhoneControls(inputs);
         Section(inputs, "Site location");
         Field(inputs, "Latitude, ° N (+) / S (−)", "Latitude"); Field(inputs, "Longitude, ° E (+) / W (−)", "Longitude"); Field(inputs, "Elevation above sea level, m", "Elevation");
@@ -500,7 +500,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         const string importedHelp = "This imported mask is used directly. Choose the AI mask to enable model and resolution settings.";
         model.IsEnabled = resolution.IsEnabled = !imported;
         StudioTheme.Help(model, imported ? importedHelp : "Select the AI model used to separate open sky from obstructions.");
-        StudioTheme.Help(resolution, imported ? importedHelp : "Select the resolution used for AI segmentation.");
+        StudioTheme.Help(resolution, imported ? importedHelp : "Original uses a 1024 px AI input. Reduced uses 512 px. The saved mask matches the photo size.");
         StudioTheme.Help(maskChoice, imported ? importedHelp : "Use Update results to generate the AI mask, or choose a saved mask for this photograph.");
     }
     private void SelectMaskChoice()

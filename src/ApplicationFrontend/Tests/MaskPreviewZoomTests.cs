@@ -12,6 +12,28 @@ using static ManualUpdateTests;
 [Collection("Manual update UI")]
 public sealed class MaskPreviewZoomTests
 {
+    [Theory]
+    [InlineData(1024, 0)]
+    [InlineData(512, 1)]
+    public void MaskQualityChoicesKeepSavedInferenceSizes(int savedSize, int choice) => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        AppData.SaveSettings(fixture.Settings with { Resolution = savedSize });
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try
+        {
+            window.Show();
+            var quality = Descendants<ComboBox>(window).Single(c => AutomationProperties.GetName(c) == "Mask quality");
+            Assert.Equal(new[] { "Original Quality (Slower)", "Reduced Quality (Faster)" }, quality.Items.Cast<string>());
+            Assert.Equal(choice, quality.SelectedIndex);
+            quality.SelectedIndex = 1 - choice;
+            await window.InputsSettled;
+            Assert.Equal(savedSize == 1024 ? 512 : 1024, AppData.ReadSettings()!.Resolution);
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
     [Fact]
     public void MaskControlsInspectTheNativeRasterAndSunPathIndependentlyOfThePhoto() => Sta(async () =>
     {
