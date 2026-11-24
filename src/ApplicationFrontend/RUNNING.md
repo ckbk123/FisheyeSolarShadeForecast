@@ -51,7 +51,7 @@ Click **Evaluate system**. The shared chart shows load demand and available PV e
 
 Choose a physical top edge on the panel. On the phone, use the lens end that corresponds to the top of the oriented photograph. Imagine the device lying flat, lens or panel front pointing up. **Top heading** is the compass bearing from the center toward that edge, clockwise from true north. North is 0°, east 90°, south 180° and west 270°. Set the **tilt from horizontal** by raising that edge. At 90° the marked edge is directly above the center in the illustrated placement. The heading still records which way the top points when you lower the device flat.
 
-Boitier’s convention defines **panel front azimuth** and **lens azimuth** using the horizontal projection of the outward panel normal and lens axis. Their zero is geographic south, increasing clockwise to west +90°, north ±180° and east −90°. Solar Irradiance displays these derived angles beside the inputs. A flat device has a top heading and an undefined facing azimuth.
+Boitier’s convention defines **panel front azimuth** and **lens azimuth** using the horizontal projection of the outward panel normal and lens axis. Their zero is geographic south, increasing clockwise to west +90°, north ±180° and east −90°. Hover over **Panel top heading** or **Phone top heading**, or focus the input and press **F1**, to see the corresponding azimuth. Open **Orientation map** to explore the angles. A flat device has a top heading and an undefined facing azimuth.
 
 | Physical placement with phone and panel tops aligned | Top heading on both devices | Tilt | Panel front and lens azimuth |
 | --- | --- | --- | --- |
