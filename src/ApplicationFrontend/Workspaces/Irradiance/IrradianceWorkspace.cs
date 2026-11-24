@@ -320,9 +320,14 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         
         settings = services.PrepareInputs(settings);
         LoadFields();
+        uiInputs = InputDependencies.Capture(settings);
+        if (settings.VerifyRefinedEdge(uiInputs))
+        {
+            uiInputs = InputDependencies.Capture(settings, uiInputs, false);
+            SaveInputs();
+        }
         ShowSelectedMaskPreview();
         services.ObserveInputs(settings, refreshSources: true);
-        uiInputs = InputDependencies.Capture(settings);
         WatchSources();
         RefreshInputState();
         loadFirstExample = loadExampleOnFirstRun && settings.FirstRun;
@@ -647,7 +652,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                  !string.Equals(uiInputs.Profile.Path, next.Profile.Path, StringComparison.OrdinalIgnoreCase)))
             {
                 // A visually chosen rim belongs to the selected photo and its lens calibration.
-                settings.ApparentFullFovDegrees = null;
+                settings.SetRefinedEdge(null);
                 next = InputDependencies.Capture(settings, next, false);
             }
             var forced = invalidFields.Aggregate(ArtifactGroup.None, (a, f) => a | InputDependencies.ForField(f, settings));
@@ -683,8 +688,8 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 {
                     var prepared = services.PrepareInputs(snapshot);
                     var changed = services.ObserveInputs(prepared, invalid, refreshSources, verifyArtifacts);
-                    var verified = refreshSources && prepared.ApparentFullFovDegrees.HasValue &&
-                        (changed & (ArtifactGroup.Mask | ArtifactGroup.Profile)) != 0 ? InputDependencies.Capture(prepared) : null;
+                    var verified = refreshSources && (changed & (ArtifactGroup.Mask | ArtifactGroup.Profile)) != 0
+                        ? InputDependencies.Capture(prepared) : null;
                     Evaluation? restored = null;
                     if (invalid.Length == 0 && (changed != ArtifactGroup.None || updateState != UpdateState.UpToDate))
                         restored = services.TryRestoreAccepted(prepared);
@@ -707,14 +712,19 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     WatchSources(); SaveInputs();
                 }
                 if (observedRevision != revision) return;
-                if (result.verified != null && uiInputs != null &&
-                    (uiInputs.Image.Content != result.verified.Image.Content || uiInputs.Profile.Content != result.verified.Profile.Content))
+                if (result.verified != null)
                 {
                     uiInputs = result.verified;
-                    settings.ApparentFullFovDegrees = null;
-                    revision++; pending?.Cancel(); ApplyInvalidation(result.changed);
-                    Changed();
-                    return;
+                    if (settings.VerifyRefinedEdge(uiInputs))
+                    {
+                        if (!settings.ApparentFullFovDegrees.HasValue)
+                        {
+                            revision++; pending?.Cancel(); ApplyInvalidation(result.changed);
+                            Changed();
+                            return;
+                        }
+                        SaveInputs();
+                    }
                 }
                 if (refreshSources || reviewedProfile != settings.ProfilePath) RefreshCalibrationReview();
                 uiInputs = InputDependencies.Capture(settings, uiInputs, false);
@@ -1012,7 +1022,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private void SaveRefinedEdge(double? full)
     {
         if (!CanChangeMaskCoverage || settings.ApparentFullFovDegrees == full) return;
-        settings.ApparentFullFovDegrees = full;
+        settings.SetRefinedEdge(full, uiInputs);
         Changed();
         RefreshEdgeDisplay();
     }
@@ -1340,7 +1350,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             if (closing) return;
             if (!IsCurrentAttempt())
             { status.Text = "Calibration saved for the previous setup"; detail.Text = result.Path; return; }
-            settings.ApparentFullFovDegrees = null;
+            settings.SetRefinedEdge(null);
             SelectProfile(result.Path);
             status.Text = "Calibration saved"; detail.Text = result.Path; ShowCalibrationReview();
         }

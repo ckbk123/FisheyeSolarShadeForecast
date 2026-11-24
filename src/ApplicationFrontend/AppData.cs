@@ -10,6 +10,17 @@ using SolarShade.SkyPhotoMasking;
 
 namespace SolarShade.Desktop;
 
+public sealed record RefinedEdgeSources(string PhotoSha256, string ProfileSha256)
+{
+    internal static RefinedEdgeSources? From(InputDependencies? inputs) =>
+        inputs is { Image.HasDigest: true, Profile.HasDigest: true }
+            ? new(inputs.Image.Content, inputs.Profile.Content) : null;
+
+    internal bool HasReplacement(InputDependencies current) =>
+        current.Image.HasDigest && current.Image.Content != PhotoSha256 ||
+        current.Profile.HasDigest && current.Profile.Content != ProfileSha256;
+}
+
 public sealed partial record UserSettings
 {
     public bool FirstRun { get; set; }
@@ -48,6 +59,29 @@ public sealed partial record UserSettings
     public double CoverageAngle { get; set; } // zero: use saved profile value
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public double? ApparentFullFovDegrees { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public RefinedEdgeSources? ApparentFovSources { get; set; }
+
+    internal void SetRefinedEdge(double? fullDegrees, InputDependencies? sources = null)
+    {
+        ApparentFullFovDegrees = fullDegrees;
+        ApparentFovSources = fullDegrees.HasValue ? RefinedEdgeSources.From(sources) : null;
+    }
+
+    internal bool VerifyRefinedEdge(InputDependencies sources)
+    {
+        if (ApparentFovSources != null)
+        {
+            if (ApparentFullFovDegrees.HasValue && !ApparentFovSources.HasReplacement(sources)) return false;
+            SetRefinedEdge(null);
+            return true;
+        }
+        // Keep fits saved by older versions and bind them once both inputs are available.
+        if (!ApparentFullFovDegrees.HasValue || RefinedEdgeSources.From(sources) is not { } identity) return false;
+        ApparentFovSources = identity;
+        return true;
+    }
+
     public bool CenteredDisk { get; set; }
     public int Substeps { get; set; } = 60;
     public bool Isotropic { get; set; }

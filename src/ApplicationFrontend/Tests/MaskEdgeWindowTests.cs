@@ -59,7 +59,10 @@ public sealed class MaskEdgeWindowTests
             dialog = await Open();
             Find<TextBox>(dialog, "ApparentFullFovDegrees").Text = "215,75";
             Click(Find<Button>(dialog, "SaveRefinedEdge")); await owner.InputsSettled;
-            Assert.Equal(215.75, AppData.ReadSettings()!.ApparentFullFovDegrees);
+            var pinned = AppData.ReadSettings()!;
+            Assert.Equal(215.75, pinned.ApparentFullFovDegrees);
+            Assert.Equal(new RefinedEdgeSources(AppData.FileKey(fixture.Settings.SkyImage), AppData.FileKey(fixture.Settings.ProfilePath)),
+                pinned.ApparentFovSources);
             owner.Calculate(); await Until(() => !owner.UpdatingForTest);
             Assert.Equal(215.75, owner.Completed!.MaskEdge!.EffectiveFullDegrees);
             Assert.Equal(215.75, Tree(owner.Irradiance).OfType<SkyPhotoViewport>().Single().EdgeOutline!.Bounds.Width, 8);
@@ -76,6 +79,7 @@ public sealed class MaskEdgeWindowTests
             Click(Tree(dialog).OfType<Button>().Single(b => Equals(b.Content, "Use suggestion")));
             Click(Find<Button>(dialog, "SaveRefinedEdge")); await owner.InputsSettled;
             Assert.Null(owner.IrradianceController.Settings.ApparentFullFovDegrees);
+            Assert.Null(AppData.ReadSettings()!.ApparentFovSources);
             owner.Calculate(); await Until(() => !owner.UpdatingForTest);
             Assert.Equal(suggestion, owner.Completed!.MaskEdge);
             Assert.Equal(baseline.Run.AfterEnergy, owner.Completed.Run.AfterEnergy);
@@ -211,6 +215,84 @@ public sealed class MaskEdgeWindowTests
             Assert.False(owner.ExportEnabledForTest);
         }
         finally { owner.Close(); }
+    });
+
+    [Fact]
+    public void FirstPinAfterAnExternalProfileChangeBindsTheReplacement() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        Setup120DegreeProfile(fixture);
+        using var service = new AppServices(fixture.Debug);
+        var owner = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false) { ShowActivated = false };
+        try
+        {
+            owner.Show(); await owner.RecheckSourcesAsync(); await owner.InputsSettled;
+            var original = CameraProfileFiles.Load(fixture.Settings.ProfilePath);
+            CameraProfileFiles.Export(original with { Calibration = original.Calibration with { MaximumIncidentAngleDegrees = 65 } }, fixture.Root);
+            await owner.RecheckSourcesAsync(); await owner.InputsSettled;
+            owner.Calculate(); await Until(() => !owner.UpdatingForTest);
+            Click(Find<Button>(owner.Irradiance, "RefineMaskEdge"));
+            var dialog = owner.OwnedWindows.OfType<MaskEdgeWindow>().Single();
+            await Until(() => dialog.IsLoaded); await dialog.Analysis;
+            Find<TextBox>(dialog, "ApparentFullFovDegrees").Text = "218";
+            Click(Find<Button>(dialog, "SaveRefinedEdge")); await owner.InputsSettled;
+            var saved = AppData.ReadSettings()!;
+            Assert.Equal(218d, saved.ApparentFullFovDegrees);
+            Assert.Equal(AppData.FileKey(fixture.Settings.ProfilePath), saved.ApparentFovSources!.ProfileSha256);
+        }
+        finally { owner.Close(); }
+    });
+
+    [Theory]
+    [InlineData("photo")]
+    [InlineData("profile")]
+    [InlineData("moved")]
+    [InlineData("temporarily missing")]
+    public void ReopeningVerifiesThePhotoAndProfileThatOwnASavedRefinement(string change) => Sta(() =>
+    {
+        using var fixture = new Fixture();
+        Setup120DegreeProfile(fixture);
+        // Older settings contain only the angle. The first launch preserves and binds that fit.
+        AppData.SaveSettings(fixture.Settings with { ApparentFullFovDegrees = 137.5 });
+        StartAndCheck(137.5);
+        var saved = AppData.ReadSettings()!;
+        var original = new RefinedEdgeSources(AppData.FileKey(fixture.Settings.SkyImage), AppData.FileKey(fixture.Settings.ProfilePath));
+        Assert.Equal(original, saved.ApparentFovSources);
+
+        if (change == "photo")
+        {
+            using var replacement = new Mat(303, 201, MatType.CV_8UC3, Scalar.Green);
+            Cv2.ImWrite(fixture.Settings.SkyImage, replacement);
+        }
+        else if (change == "profile")
+        {
+            var measured = CameraProfileFiles.Load(fixture.Settings.ProfilePath);
+            CameraProfileFiles.Export(measured with { Calibration = measured.Calibration with { MaximumIncidentAngleDegrees = 65 } }, fixture.Root);
+        }
+        else if (change == "moved")
+        {
+            var folder = Directory.CreateDirectory(Path.Combine(fixture.Root, "relocated")).FullName;
+            string copy = Path.Combine(folder, Path.GetFileName(saved.ProfilePath));
+            File.Copy(fixture.Settings.ProfilePath, copy);
+            AppData.SaveSettings(saved with { ProfilePath = copy });
+        }
+        else
+        {
+            File.Move(fixture.Settings.ProfilePath, fixture.Settings.ProfilePath + ".offline");
+        }
+        bool keep = change is "moved" or "temporarily missing";
+        StartAndCheck(keep ? 137.5 : null);
+        Assert.Equal(keep ? original : null, AppData.ReadSettings()!.ApparentFovSources);
+        Assert.Equal(0, fixture.Runs);
+        return Task.CompletedTask;
+
+        void StartAndCheck(double? angle)
+        {
+            using var service = new AppServices(fixture.Debug);
+            var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+            try { Assert.Equal(angle, window.IrradianceController.Settings.ApparentFullFovDegrees); }
+            finally { window.Close(); }
+        }
     });
 
     private static void Setup120DegreeProfile(Fixture fixture)

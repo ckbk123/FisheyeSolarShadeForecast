@@ -9,6 +9,9 @@ public enum ArtifactGroup
 
 public sealed record SourceIdentity(string Path, string Content)
 {
+    // Content holds either the SHA-256 digest or a short availability marker.
+    internal bool HasDigest => Content.Length == 64;
+
     public static SourceIdentity Read(string path, SourceIdentity? previous, bool refresh)
     {
         if (string.IsNullOrEmpty(path)) return new("", "");
