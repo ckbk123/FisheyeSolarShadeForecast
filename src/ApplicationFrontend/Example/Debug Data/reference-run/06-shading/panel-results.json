@@ -14894,7 +14894,7 @@
   "NativeCadence": "01:00:00",
   "SourceLatitude": null,
   "SourceLongitude": null,
-  "DatasetFingerprint": "55EE6E529D6A51B9FEFFE57727D230175A455EBF82A0E4E48CCDCE9CFCB1718E",
+  "DatasetFingerprint": "FCDA11FA8321CC112DFB2F966699E375CB17CF39AF241CA649019A7318D050C5",
   "SolarConvention": "Source interval labels and bounds preserved. Equal-weight midpoint quadrature; source interval and selected/clipped interval each have weights summing to one. Geometric NOAA/Meeus topocentric angles; apparent zenith uses the explicit standard-atmosphere NOAA refraction approximation. Azimuth clockwise from true north; zenith from vertical up. All rows, including diffuse-only and night, retain geometry.",
   "BeforeEnergy": 131.35865674644626,
   "AfterEnergy": 107.39735918596467,

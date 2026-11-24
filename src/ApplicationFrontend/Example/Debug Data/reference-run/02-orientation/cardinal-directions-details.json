@@ -109,18 +109,36 @@
       ]
     }
   ],
+  "LensCenterVisible": true,
+  "Zenith": {
+    "X": 1530.5316248189056,
+    "Y": 1602.0611806860436
+  },
+  "Rings": [
+    {
+      "IncidentAngleDegrees": 30,
+      "RadiusPixels": 423.23127000724395,
+      "Visible": true
+    },
+    {
+      "IncidentAngleDegrees": 60,
+      "RadiusPixels": 776.1855448462485,
+      "Visible": true
+    }
+  ],
+  "MeridianDotCount": 67,
   "Options": {
     "Opacity": 0.85
   },
   "Timings": {
-    "GeometryMilliseconds": 3.9438,
-    "RenderMilliseconds": 28.1462,
-    "EncodeMilliseconds": 349.4743,
-    "TotalMilliseconds": 381.5775
+    "GeometryMilliseconds": 14.7486,
+    "RenderMilliseconds": 39.1258,
+    "EncodeMilliseconds": 358.8875,
+    "TotalMilliseconds": 412.7857
   },
-  "GeometryConvention": "EXIF-oriented native pixels; x right, y down; true azimuth clockwise from North. N/E/S/W anchors mark the furthest resolved visible zenith on their upper-hemisphere constant-azimuth meridians. Each straight tick is a compass glyph along the horizontal world bearing projected onto the camera\u0027s right/down axes, with its outer end at the anchor. A dot marks an end-on bearing or an anchor with less than one pixel of room. Endpoints obey calibrated incident angle, actual image disk, and image rectangle. An endpoint at zenith 90 degrees is the horizon; other endpoints are coverage limits, not horizon locations. Default upward camera: N top, E left, S bottom, W right. Labels remain upright. Meridian search spacing 0.025 degrees; boundary refinement 40 bisections. Subpixel raster precision 1/256 pixel.",
+  "GeometryConvention": "EXIF-oriented native pixels; x right, y down; true azimuth clockwise from North. N/E/S/W anchors mark the furthest resolved visible zenith on their upper-hemisphere constant-azimuth meridians. Cyan cross: fitted lens center. Cyan rings: incident angle from the optical axis at 30-degree steps. Magenta dots: projected N-S and E-W vertical great circles, including covered directions below the horizon. Their larger magenta dot marks true zenith when visible. Gaps and the undefined optical antipode split paths. Ring and meridian strokes are clipped to calibrated incidence, image disk and rectangle. The fitted center is marked wherever it falls on the photo. Letters label geographic anchors. TickPoints retain the legacy display-glyph coordinates. A horizon endpoint has zenith 90 degrees. Upward camera with a north-pointing top: N top, E left, S bottom, W right.",
   "PoseConvention": "Projection inputs: ImageTopAzimuthDegrees is the pre-roll image-top bearing clockwise from true north, TiltDegrees is the signed optical-axis rotation from up toward that bearing, and RollDegrees rotates the image around the lens.",
-  "Color": "Magenta (#FF00B4), straight-alpha PNG",
+  "Color": "Cyan (#00D9F5) lens center and rings; magenta (#FF00B4) compass meridians, labels and zenith; straight-alpha PNG",
   "AnnotationOnly": true,
   "Artifacts": [
     "cardinal-directions-overlay.png",
