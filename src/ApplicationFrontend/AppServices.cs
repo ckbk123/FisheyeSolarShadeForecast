@@ -495,6 +495,15 @@ public sealed class AppServices : IIrradianceService
                 debug.CompleteStage("02-sky-mask", debug.NeedsWrite(ArtifactGroup.Mask) ? await Task.Run(() =>
                 {
                     var files = SkyMaskExporter.Export(activeMask.Result, directory, maskOrigin, ct).ToList();
+                    string pixelConvention = "255 = open sky; 0 = obstruction or outside lens; no automatic inversion";
+                    if (activeMask.Variant?.Source == "Edited")
+                    {
+                        pixelConvention = "255 = open sky; 0 = obstruction. Edited pixels cover the full oriented image. Only rays within calibrated coverage, the lens disk and the image are observed. At the boundary, in-range rays use normal bilinear sampling.";
+                        string detailsPath = Path.Combine(directory, "mask-details.json");
+                        var details = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(detailsPath))!.AsObject();
+                        details["PixelConvention"] = pixelConvention;
+                        AppData.Write(detailsPath, details);
+                    }
                     string provenance = Path.Combine(directory, "mask-provenance.json");
                     AppData.Write(provenance, new { Source = activeMask.Variant?.Source ?? "AI",
                         VariantId = activeMask.Variant?.Id, Label = activeMask.Variant?.Label,
@@ -503,7 +512,7 @@ public sealed class AppServices : IIrradianceService
                         ImportedFileSha256 = activeMask.Variant?.ImportedFileSha256,
                         ImportedAncestorSha256 = activeMask.Variant?.ImportedAncestorSha256,
                         ImportInverted = activeMask.Variant?.ImportInverted,
-                        PixelConvention = "255 = open sky; 0 = obstruction or outside lens; no automatic inversion",
+                        PixelConvention = pixelConvention,
                         ParentVariantId = activeMask.Variant?.ParentId,
                         ActiveMaskSha256 = Convert.ToHexString(SHA256.HashData(activeMask.Png)) });
                     files.Add(provenance); return files;

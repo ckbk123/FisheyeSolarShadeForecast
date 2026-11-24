@@ -13,7 +13,6 @@ public sealed class MaskCanvas
     private readonly Stack<Dictionary<int, byte>> undo = new();
     private readonly Stack<Dictionary<int, byte>> redo = new();
     private Dictionary<int, byte>? stroke;
-    private readonly double centerX, centerY, radiusSquared;
     private int dirtyLeft, dirtyTop, dirtyRight, dirtyBottom;
     public int Width { get; }
     public int Height { get; }
@@ -21,28 +20,24 @@ public sealed class MaskCanvas
     public bool CanUndo => undo.Count > 0;
     public bool CanRedo => redo.Count > 0;
 
-    public MaskCanvas(int width, int height, byte[] binaryPixels, double diskX, double diskY, double diskRadius)
+    public MaskCanvas(int width, int height, byte[] binaryPixels)
     {
         if (width <= 0 || height <= 0 || binaryPixels.Length != checked(width * height) ||
             binaryPixels.AsSpan().IndexOfAnyExcept((byte)0, (byte)255) >= 0)
             throw new ArgumentException("The opening mask must contain one black or white byte per image pixel.");
-        if (!double.IsFinite(diskX) || !double.IsFinite(diskY) || !double.IsFinite(diskRadius) || diskRadius <= 0)
-            throw new ArgumentException("The lens disk is invalid.");
         Width = width; Height = height; opening = (byte[])binaryPixels.Clone(); pixels = (byte[])binaryPixels.Clone();
-        centerX = diskX; centerY = diskY; radiusSquared = diskRadius * diskRadius;
         dirtyLeft = dirtyTop = 0; dirtyRight = width - 1; dirtyBottom = height - 1;
-        // Some older model exports retain white edge pixels outside the reported disk.
-        // Keep their immutable source bytes in the host, but normalize this editable copy.
-        for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++)
-                if (!Inside(x, y)) opening[y * width + x] = pixels[y * width + x] = 0;
     }
 
-    private bool Inside(int x, int y)
+    public MaskCanvas(int width, int height, byte[] binaryPixels, double diskX, double diskY, double diskRadius)
+        : this(width, height, binaryPixels)
     {
-        double dx = x - centerX, dy = y - centerY;
-        return dx * dx + dy * dy <= radiusSquared;
+        if (!double.IsFinite(diskX) || !double.IsFinite(diskY) || !double.IsFinite(diskRadius) || diskRadius <= 0)
+            throw new ArgumentException("The lens disk is invalid.");
     }
+
+    // WPF gives positions from the image corner; the brush and projection number pixel centers from zero.
+    public static Point PixelCenterCoordinates(Point imagePosition) => new(imagePosition.X - .5, imagePosition.Y - .5);
     public byte Pixel(int x, int y) => pixels[checked(y * Width + x)];
     public byte[] CopyPixels() => (byte[])pixels.Clone();
     public (Int32Rect Rectangle, byte[] Pixels)? TakeDirtyRegion()
@@ -75,6 +70,8 @@ public sealed class MaskCanvas
     }
     private void PaintDisk(double x, double y, double radius, byte value)
     {
+        // A one-pixel pencil selects the pixel under the pointer even near its corners.
+        if (radius == .5) { x = Math.Floor(x + .5); y = Math.Floor(y + .5); }
         int left = Math.Max(0, (int)Math.Floor(x - radius)), right = Math.Min(Width - 1, (int)Math.Ceiling(x + radius));
         int top = Math.Max(0, (int)Math.Floor(y - radius)), bottom = Math.Min(Height - 1, (int)Math.Ceiling(y + radius));
         double radiusSquared = radius * radius;
@@ -82,7 +79,7 @@ public sealed class MaskCanvas
             for (int xx = left; xx <= right; xx++)
             {
                 double dx = xx - x, dy = yy - y;
-                if (dx * dx + dy * dy > radiusSquared || !Inside(xx, yy)) continue;
+                if (dx * dx + dy * dy > radiusSquared) continue;
                 int index = yy * Width + xx;
                 if (pixels[index] == value) continue;
                 stroke!.TryAdd(index, pixels[index]); pixels[index] = value; MarkDirty(xx, yy);

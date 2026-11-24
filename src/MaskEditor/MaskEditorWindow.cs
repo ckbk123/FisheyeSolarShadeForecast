@@ -12,7 +12,13 @@ namespace SolarShade.MaskEditor;
 
 public sealed record MaskEditorRequest(byte[] OrientedPhotoPng, byte[] OpeningMaskPng,
     double DiskX, double DiskY, double DiskRadius, string SuggestedName,
-    Func<byte[], string, bool> Save);
+    Func<byte[], string, bool> Save)
+{
+    public Geometry? CalibratedOutline { get; init; }
+    public Geometry? UsableOutline { get; init; }
+    public string FieldOfViewLabel { get; init; } = "FOV unavailable";
+    public string? FieldOfViewHelp { get; init; }
+}
 
 /// <summary>A modal paint window. Its host owns source checks, persistence and result state.</summary>
 public sealed class MaskEditorWindow : Window
@@ -21,6 +27,7 @@ public sealed class MaskEditorWindow : Window
     private readonly Image maskImage;
     private readonly WriteableBitmap maskBitmap;
     private readonly Grid canvas;
+    private readonly FieldOfViewOverlay fieldOfView = new();
     private readonly Ellipse brushCursor;
     private readonly ScrollViewer scroll;
     private readonly Slider zoom, opacity, brush;
@@ -78,6 +85,7 @@ public sealed class MaskEditorWindow : Window
                 double nativeX = (scroll.HorizontalOffset + anchor.X) / oldScale;
                 double nativeY = (scroll.VerticalOffset + anchor.Y) / oldScale;
                 canvas.LayoutTransform = new ScaleTransform(newScale, newScale);
+                fieldOfView.DisplayScale = newScale;
                 scroll.UpdateLayout();
                 scroll.ScrollToHorizontalOffset(nativeX * newScale - anchor.X);
                 scroll.ScrollToVerticalOffset(nativeY * newScale - anchor.Y);
@@ -88,8 +96,11 @@ public sealed class MaskEditorWindow : Window
         top.Children.Add(Button("Undo", () => { document.Undo(); Redraw(); }));
         top.Children.Add(Button("Redo", () => { document.Redo(); Redraw(); }));
         top.Children.Add(Button("Reset", () => { document.Reset(); Redraw(); }));
-        var guide = new TextBlock { Text = "Green circle: detected lens edge. Camera calibration may cover less of the image; paint outside its coverage may not affect the calculation.",
-            Margin = new(16, 0, 16, 7), TextWrapping = TextWrapping.Wrap, Foreground = Brushes.LightGray };
+        bool hasFov = request.CalibratedOutline != null;
+        var guide = new TextBlock { Text = hasFov ? request.FieldOfViewLabel : request.FieldOfViewLabel + " · dashed gray line: detected lens disk",
+            ToolTip = request.FieldOfViewHelp, Margin = new(16, 0, 16, 7), TextWrapping = TextWrapping.Wrap,
+            Foreground = hasFov ? new SolidColorBrush(Color.FromRgb(0x80, 0xee, 0xaa)) : Brushes.LightGray };
+        System.Windows.Automation.AutomationProperties.SetAutomationId(guide, "MaskEditorFieldOfView");
         root.Children.Add(guide);
 
         var bottom = new StackPanel { Margin = new(12, 6, 12, 10) };
@@ -110,14 +121,18 @@ public sealed class MaskEditorWindow : Window
             - guide.Margin.Top - guide.Margin.Bottom - bottom.Margin.Top - bottom.Margin.Bottom);
         viewport.ScrollChanged += (_, e) => { if (ReferenceEquals(e.Source, viewport) && (e.ViewportWidthChange != 0 || e.ViewportHeightChange != 0)) FitViewport(); };
         viewport.Loaded += (_, _) => FitViewport();
-        canvas = new Grid { Width = width, Height = height, Cursor = Cursors.Cross, Background = Brushes.Transparent };
-        canvas.Children.Add(new Image { Source = photoBitmap, Width = width, Height = height, Stretch = Stretch.None, IsHitTestVisible = false });
+        canvas = new Grid { Width = width, Height = height, Cursor = Cursors.Cross, Background = Brushes.Transparent, ClipToBounds = true };
+        canvas.Children.Add(new Image { Source = photoBitmap, Width = width, Height = height, Stretch = Stretch.Fill, IsHitTestVisible = false });
         canvas.Children.Add(maskImage);
-        var outline = new Ellipse { Width = request.DiskRadius * 2, Height = request.DiskRadius * 2,
-            Stroke = Brushes.LimeGreen, StrokeThickness = 2, StrokeDashArray = [7, 5], Fill = Brushes.Transparent,
-            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
-            Margin = new(request.DiskX - request.DiskRadius, request.DiskY - request.DiskRadius, 0, 0), IsHitTestVisible = false };
-        canvas.Children.Add(outline); scroll.Content = canvas;
+        fieldOfView.SetOutlines(request.CalibratedOutline, request.UsableOutline);
+        canvas.Children.Add(fieldOfView);
+        if (!hasFov)
+        {
+            var disk = new EllipseGeometry(new Point(request.DiskX + .5, request.DiskY + .5), request.DiskRadius, request.DiskRadius);
+            canvas.Children.Add(new System.Windows.Shapes.Path { Data = disk, Stroke = Brushes.LightGray, StrokeThickness = 2,
+                StrokeDashArray = [7, 5], IsHitTestVisible = false, Stretch = Stretch.None });
+        }
+        scroll.Content = canvas;
         brushCursor = new Ellipse { Stroke = Brushes.Cyan, StrokeThickness = 1.5, Fill = Brushes.Transparent,
             IsHitTestVisible = false, Visibility = Visibility.Collapsed,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
@@ -132,9 +147,9 @@ public sealed class MaskEditorWindow : Window
         canvas.MouseMove += (_, e) => MoveCursor(e.GetPosition(canvas));
         canvas.MouseLeave += (_, _) => brushCursor.Visibility = Visibility.Collapsed;
         brush.ValueChanged += (_, _) => { if (brushCursor.Visibility == Visibility.Visible) MoveCursor(cursorPoint); };
-        canvas.MouseLeftButtonDown += (_, e) => { painting = true; last = e.GetPosition(canvas); canvas.CaptureMouse();
+        canvas.MouseLeftButtonDown += (_, e) => { painting = true; last = MaskCanvas.PixelCenterCoordinates(e.GetPosition(canvas)); canvas.CaptureMouse();
             document.BeginStroke(); document.PaintLine(last.X, last.Y, last.X, last.Y, brush.Value, white.IsChecked == true ? (byte)255 : (byte)0); Redraw(); e.Handled = true; };
-        canvas.MouseMove += (_, e) => { if (!painting) return; Point next = e.GetPosition(canvas);
+        canvas.MouseMove += (_, e) => { if (!painting) return; Point next = MaskCanvas.PixelCenterCoordinates(e.GetPosition(canvas));
             document.PaintLine(last.X, last.Y, next.X, next.Y, brush.Value, white.IsChecked == true ? (byte)255 : (byte)0);
             last = next; Redraw(); };
         canvas.MouseLeftButtonUp += (_, _) => FinishStroke();

@@ -111,7 +111,7 @@ public static class ManualMaskStore
         Validate(png, baseMask);
         if (Convert.ToHexString(SHA256.HashData(ancestorPng)) != ancestorHash)
             throw new InvalidDataException("Source mask bytes do not match the recorded hash.");
-        Validate(ancestorPng, baseMask, enforceOutside: false);
+        Validate(ancestorPng, baseMask);
         string ancestorPath = AncestorPath(hash, ancestorHash, imported != null);
         if (File.Exists(ancestorPath))
         { if (AppData.FileKey(ancestorPath) != ancestorHash) throw new InvalidDataException("The immutable source mask has changed."); }
@@ -142,12 +142,11 @@ public static class ManualMaskStore
         }
         finally { if (Directory.Exists(temporary)) Directory.Delete(temporary, true); }
     }
-    private static void Validate(byte[] png, SkyMaskResult metadata, bool enforceOutside = true)
+    private static void Validate(byte[] png, SkyMaskResult metadata)
     {
         using var decoded = Cv2.ImDecode(png, ImreadModes.Grayscale);
         if (decoded.Empty() || decoded.Width != metadata.Width || decoded.Height != metadata.Height)
             throw new InvalidDataException("Mask dimensions differ from the source photo.");
-        var disk = metadata.Disk;
         int width = decoded.Width, height = decoded.Height;
         var rowBytes = new byte[width];
         for (int y = 0; y < height; y++)
@@ -156,12 +155,6 @@ public static class ManualMaskStore
             var row = rowBytes.AsSpan();
             if (row.IndexOfAnyExcept((byte)0, (byte)255) >= 0)
                 throw new InvalidDataException("Edited mask pixels must be black or white.");
-            for (int x = 0; x < width; x++)
-            {
-                double dx = x - disk.CenterX, dy = y - disk.CenterY;
-                if (enforceOutside && dx * dx + dy * dy > disk.Radius * disk.Radius && row[x] != 0)
-                    throw new InvalidDataException("Edited mask cannot be white outside the lens disk.");
-            }
         }
     }
 }

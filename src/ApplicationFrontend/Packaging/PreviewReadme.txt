@@ -1,4 +1,4 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.3
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.4
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
@@ -25,7 +25,9 @@ WebView2 or through the tab's option to open it locally in a browser.
    without AI. Choose white or black for open sky, name the mask, then import it.
 2. Click Update results. Editing inputs alone does not calculate.
    Use Edit mask on the mask preview to paint a new black/white variant in a
-   separate window. Adjust mask opacity and zoom while editing, then save.
+   separate window. You can paint across the whole photo and save those strokes.
+   Zoom the original sky photo to inspect the compass. The green FOV guide in
+   the preview and editor shows the angular limit of your selected calibration.
    Select the mask for calculation below the preview and update results.
 3. Once a complete shaded irradiance result is ready, open PV Autonomy.
 4. Enter 24 hourly load values in Wh, panel area and efficiencies, battery

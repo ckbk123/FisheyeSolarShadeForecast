@@ -45,6 +45,66 @@ public sealed class SkyPhotoFieldOfViewTests
     }
 
     [Fact]
+    public void CalibratedRingUsesTheProfilePolynomialAndNativePixelCenters()
+    {
+        var profile = Profile(66.43, [99.25, 153.75], [0, 24, 5]);
+        var view = SkyPhotoFieldOfView.Describe(profile, 201, 303, new(100, 151, 95));
+        double theta = 66.43 * Math.PI / 180;
+        double radius = 24 * theta + 5 * theta * theta;
+        var ring = Assert.IsType<System.Windows.Media.EllipseGeometry>(view.CalibratedOutline);
+        Assert.True(ring.IsFrozen);
+        Assert.Equal(new System.Windows.Point(99.75, 154.25), ring.Center);
+        Assert.Equal(radius, ring.RadiusX, 10);
+        Assert.Equal(radius, ring.RadiusY, 10);
+        Assert.Null(view.UsableOutline);
+        Assert.Equal(132.86, view.CircularFullDegrees!.Value, 10);
+        Assert.Equal(132.86, view.CalibratedFullDegrees!.Value, 10);
+
+        var unconfirmed = SkyPhotoFieldOfView.Describe(profile, 201, 303, null);
+        Assert.Equal(ring.Bounds, unconfirmed.CalibratedOutline!.Bounds);
+        Assert.Null(unconfirmed.UsableOutline);
+        Assert.Null(unconfirmed.CircularFullDegrees);
+        Assert.Contains("unconfirmed", unconfirmed.OutlineLabel);
+        Assert.Null(SkyPhotoFieldOfView.Unavailable("No compatible photo").CalibratedOutline);
+
+        var cropped = SkyPhotoFieldOfView.Describe(Profile(90, polynomial: [0, 200]), 201, 303, null);
+        Assert.Contains("calibrated edge outside photo", cropped.Text);
+        Assert.Null(cropped.UsableOutline);
+    }
+
+    [Fact]
+    public void UsableFootprintMatchesTheShadingProjectionAcrossCroppedAndOffsetEdges()
+    {
+        // The calibrated circle reaches the image edges; the offset disk clips its left side.
+        var profile = Profile(90, [99.5, 151.25], [0, 80]);
+        var disk = new ImageDisk(145, 141, 115);
+        var projection = new CalibratedSkyProjection(profile.Calibration, imageDisk: disk);
+        var view = SkyPhotoFieldOfView.Describe(profile, 201, 303, disk);
+        var usable = view.UsableOutline!;
+        Assert.True(usable.IsFrozen);
+        Assert.Contains("dashed", view.OutlineLabel);
+        int accepted = 0, rejected = 0;
+        foreach (int azimuth in Enumerable.Range(0, 24).Select(n => n * 15))
+            foreach (double incident in new[] { 10, 40, 65, 83, 94 })
+            {
+                double radius = 80 * incident * Math.PI / 180, angle = azimuth * Math.PI / 180;
+                // At default camera pose north is at image top and east is at image left.
+                double x = 99.5 - radius * Math.Sin(angle), y = 151.25 - radius * Math.Cos(angle);
+                bool projects = projection.TryProject(Direction.FromAngles(azimuth, incident), out double px, out double py);
+                Assert.Equal(projects, usable.FillContains(new System.Windows.Point(x + .5, y + .5), .001,
+                    System.Windows.Media.ToleranceType.Absolute));
+                if (projects) { accepted++; Assert.Equal(x, px, 9); Assert.Equal(y, py, 9); }
+                else rejected++;
+            }
+        Assert.True(accepted > 0 && rejected > 0);
+
+        var disjoint = SkyPhotoFieldOfView.Describe(profile, 201, 303, new(450, 151, 20));
+        Assert.True(disjoint.UsableOutline!.IsEmpty());
+        Assert.Contains("no usable area", disjoint.OutlineLabel);
+        Assert.Equal(0, disjoint.CircularFullDegrees!.Value);
+    }
+
+    [Fact]
     public void ReadoutTracksProfileOverrideReplacementAndInvalidationWithoutCalculating() => Sta(async () =>
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
