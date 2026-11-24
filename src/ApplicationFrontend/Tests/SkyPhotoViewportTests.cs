@@ -146,7 +146,8 @@ public sealed class SkyPhotoViewportTests
         }
         double compact = RenderedWidth(160, 220);
         double expanded = RenderedWidth(740, 550);
-        Assert.InRange(expanded, compact * 2, 410);
+        Assert.True(expanded >= compact * 2);
+        Assert.Equal(410, expanded, 7);
         return Task.CompletedTask;
     });
 
