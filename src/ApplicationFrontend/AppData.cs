@@ -47,8 +47,6 @@ public sealed partial record UserSettings
     public int Resolution { get; set; } = 1024;
     public double CoverageAngle { get; set; } // zero: use saved profile value
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
-    public int? MaskEdgeThresholdPercent { get; set; }
-    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public double? ApparentFullFovDegrees { get; set; }
     public bool CenteredDisk { get; set; }
     public int Substeps { get; set; } = 60;
@@ -65,7 +63,14 @@ public static class AppData
         Path.Combine(AppContext.BaseDirectory, "Data");
     public static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     public static string PathFor(string name) { Directory.CreateDirectory(Root); return Path.Combine(Root, name); }
-    public static UserSettings? ReadSettings() => Read<UserSettings>(PathFor("settings.json"));
+    public static UserSettings? ReadSettings()
+    {
+        var settings = Read<UserSettings>(PathFor("settings.json"));
+        // Older releases allowed hand fits through the native field on cameras wider than 270°.
+        if (settings?.ApparentFullFovDegrees is > SolarShade.Core.Models.CalibrationRadialMap.MaximumRefinedFullDegrees and <= 360)
+            settings.ApparentFullFovDegrees = SolarShade.Core.Models.CalibrationRadialMap.MaximumRefinedFullDegrees;
+        return settings;
+    }
     public static void SaveSettings(UserSettings settings) => Write(PathFor("settings.json"), PortablePaths.Map(settings, path => PortablePaths.Store(path)));
     public static T? Read<T>(string path)
     { try { return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) : default; } catch (JsonException) { return default; } catch (IOException) { return default; } }

@@ -16,11 +16,8 @@ internal sealed class SkyPhotoViewport : ImageViewport
     private readonly CalibrationStamp stamp = new();
     internal ImageOverlayPreview Photo => Layers;
     internal bool HasNativePhoto { get; private set; }
-    internal bool HasCalibratedOutline { get; private set; }
-    internal Geometry? BandOutline { get; private set; }
-    internal Geometry? CapOutline { get; private set; }
-    internal Geometry? ManualOutline { get; private set; }
-    private (double X, double Y, double? Band, double? Cap, double? Manual) scanCoordinates;
+    internal Geometry? EdgeOutline { get; private set; }
+    private (double X, double Y, double? Radius)? edgeCoordinates;
     private string? sourcePath;
     private long photoRevision;
     private bool requestedDetail;
@@ -51,11 +48,11 @@ internal sealed class SkyPhotoViewport : ImageViewport
         SetFieldOfView(null);
     }
 
-    internal void SetFieldOfView(SkyPhotoFieldOfView? view, bool showUsableOutline = true)
+    internal void SetFieldOfView(SkyPhotoFieldOfView? view)
     {
-        SetMaskScan(0, 0, null, null);
-        HasCalibratedOutline = view?.CalibratedOutline != null;
-        guide.SetOutlines(view?.CalibratedOutline, showUsableOutline ? view?.UsableOutline : null);
+        edgeCoordinates = null;
+        EdgeOutline = view?.CalibratedOutline;
+        guide.SetEdge(EdgeOutline);
         var warning = HasImage ? view?.StampLabel : null;
         stamp.SetMessage(warning, view?.Explanation);
         if (warning != null)
@@ -66,19 +63,18 @@ internal sealed class SkyPhotoViewport : ImageViewport
         SetPreviewHelp(Gestures);
     }
 
-    internal void SetMaskScan(double cx, double cy, double? transition, double? cap, double? manual = null)
+    internal void SetEdge(double cx, double cy, double? radius)
     {
-        if (scanCoordinates == (cx, cy, transition, cap, manual)) return;
-        scanCoordinates = (cx, cy, transition, cap, manual);
-        EllipseGeometry? Circle(double? radius)
+        if (edgeCoordinates == (cx, cy, radius)) return;
+        edgeCoordinates = (cx, cy, radius);
+        EllipseGeometry? circle = null;
+        if (radius is double r)
         {
-            if (radius is not double r) return null;
-            var circle = new EllipseGeometry(new Point(cx + .5, cy + .5), r, r);
+            circle = new EllipseGeometry(new Point(cx + .5, cy + .5), r, r);
             circle.Freeze();
-            return circle;
         }
-        BandOutline = Circle(transition); CapOutline = Circle(cap); ManualOutline = Circle(manual);
-        guide.SetMaskScan(BandOutline, CapOutline, ManualOutline);
+        EdgeOutline = circle;
+        guide.SetEdge(circle);
     }
 
     private void SetPreviewHelp(string detail)

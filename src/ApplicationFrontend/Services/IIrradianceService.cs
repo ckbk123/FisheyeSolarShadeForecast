@@ -12,6 +12,7 @@ public interface IIrradianceService : IDisposable
         bool refreshSources = false, bool verifyArtifacts = false, bool refreshWeather = false);
     bool IsCurrent(Evaluation evaluation);
     Evaluation? TryRestoreAccepted(UserSettings settings) => null;
+    Task<MaskAsset> PrepareEdgeMask(UserSettings settings, CancellationToken ct);
     DependentResultStore CreateDependentStore(string folder, string software, params string[] requiredFiles);
     Task<Evaluation> Evaluate(UserSettings settings, bool refresh, Action<string> progress, Action<MaskAsset>? onMask,
         CancellationToken ct, Action<SunPathOverlayResult?>? onSunPath = null, Action<CardinalDirectionOverlayResult?>? onCardinals = null);

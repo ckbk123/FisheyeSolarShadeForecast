@@ -45,7 +45,7 @@ public sealed class FailedCalibrationAttemptTests
         {
             await window.Irradiance.Calibrate();
             Assert.Equal(UpdateState.Failed, window.UpdateStateForTest);
-            Assert.StartsWith("Calibrated FOV", window.Irradiance.FieldOfViewTextForTest);
+            Assert.Contains("Measured calibration", window.Irradiance.FieldOfViewHelpForTest);
             Assert.Null(AppData.ReadSettings()!.LastCalibrationFailure);
             AssertOutcome(window, "Calibration Success", Brushes.DarkGreen);
         }
@@ -111,7 +111,7 @@ public sealed class FailedCalibrationAttemptTests
             else window.SetProfileForTest(fixture.Settings.ProfilePath);
             await window.InputsSettled;
             Assert.Null(AppData.ReadSettings()!.LastCalibrationFailure);
-            Assert.StartsWith("Calibrated FOV", window.Irradiance.FieldOfViewTextForTest);
+            Assert.Contains("Measured calibration", window.Irradiance.FieldOfViewHelpForTest);
             AssertOutcome(window, "Calibration Success", Brushes.DarkGreen);
         }
         finally { await window.InputsSettled; window.Close(); }

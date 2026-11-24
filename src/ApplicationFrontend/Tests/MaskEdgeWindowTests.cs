@@ -12,179 +12,77 @@ using static ManualUpdateTests;
 public sealed class MaskEdgeWindowTests
 {
     [Fact]
-    public void StudyAndIndependentMasksUseTheirOwnCoverageWithoutChangingTheStudy() => Sta(async () =>
+    public void TheStudyStartsFromThe95PercentProposalAndUsesOneEditableEdge() => Sta(async () =>
     {
         using var fixture = new Fixture();
         Setup120DegreeProfile(fixture);
-        using var services = new AppServices(fixture.Debug);
-        var owner = new MainWindow(applicationServices: services, loadExampleOnFirstRun: false) { ShowActivated = false };
+        // A narrow white ray persists through the cap. Requiring a fully black ring would choose 180°.
+        using var raster = new Mat(303, 201, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Circle(raster, new OpenCvSharp.Point(100, 151), 76, Scalar.White, -1);
+        Cv2.Line(raster, new OpenCvSharp.Point(100, 151), new OpenCvSharp.Point(199, 151), Scalar.White, 1);
+        string path = Path.Combine(fixture.Root, "rim.png");
+        Cv2.ImWrite(path, raster);
+        var selected = ManualMaskStore.Import(fixture.Settings.SkyImage, path, "Visible rim", centeredDisk: true);
+        AppData.SaveSettings(fixture.Settings with { SelectedMaskId = selected.Id });
+        using var service = new AppServices(fixture.Debug);
+        var owner = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false) { ShowActivated = false };
         try
         {
-            var rendered = new TaskCompletionSource();
-            owner.ContentRendered += (_, _) => rendered.TrySetResult(); owner.Show(); await rendered.Task;
-            await owner.RecheckSourcesAsync(); await owner.InputsSettled;
-            var entry = Assert.Single(Tree(owner.Irradiance).OfType<Button>(), b => Equals("Estimate edge…", b.Content));
-            var dialog = await Open();
-            var status = Assert.Single(Tree(dialog).OfType<TextBlock>(), t => AutomationProperties.GetAutomationId(t) == "MaskEdgeResult");
-            var sky = Assert.Single(Tree(dialog).OfType<TextBlock>(), t => AutomationProperties.GetAutomationId(t) == "MaskEdgeOuterSky");
-            var threshold = Tree(dialog).OfType<ComboBox>().Single();
-            Assert.Equal(new object[] { 80, 90, 95, 100 }, threshold.Items.Cast<object>());
-            Assert.Equal(100, threshold.SelectedItem);
-            Assert.Contains("180° scan cap", status.Text);
-            Assert.Contains("Open sky sampled beyond calibration", sky.Text);
-            Assert.Contains("observed black", AutomationProperties.GetHelpText(status));
-            var showMask = Tree(dialog).OfType<CheckBox>().Single();
-            var view = Tree(dialog).OfType<SkyPhotoViewport>().Single();
-            var apply = Tree(dialog).OfType<Button>().Single(b => Equals(b.Content, "Use for calculation"));
-            Assert.True(apply.IsEnabled);
-            Assert.True(showMask.IsEnabled); Assert.True(view.HasCalibratedOutline);
-            showMask.IsChecked = true; Assert.True(view.Photo.OverlayVisible);
-
-            string maskPath = Path.Combine(fixture.Root, "independent.png");
-            using (var mask = new Mat(303, 201, MatType.CV_8UC1, Scalar.Black))
-            {
-                Cv2.Circle(mask, new OpenCvSharp.Point(100, 151), 79, Scalar.White, -1);
-                Cv2.ImWrite(maskPath, mask);
-            }
-            await dialog.SelectMask(maskPath);
-            Assert.Contains("All-black band", status.Text); Assert.Contains("160° extrapolated span", status.Text);
-            Assert.False(apply.IsEnabled);
-            var manual = Tree(dialog).OfType<RadioButton>().Single(b => AutomationProperties.GetAutomationId(b) == "ManualApparentFovMode");
-            manual.IsChecked = true;
-            Assert.NotNull(view.ManualOutline); Assert.False(apply.IsEnabled);
-            Tree(dialog).OfType<RadioButton>().Single(b => AutomationProperties.GetAutomationId(b) == "AutomaticMaskEdgeMode").IsChecked = true;
-            string skyFinding = sky.Text; Assert.Contains("Open sky sampled beyond calibration", skyFinding);
-            threshold.SelectedItem = 95; Assert.Contains("Approximate 95%", status.Text); Assert.Equal(skyFinding, sky.Text);
-            Assert.True(view.Photo.OverlayVisible);
-            var zoom = Assert.Single(Tree(dialog).OfType<Button>(), b => AutomationProperties.GetAutomationId(b) == "ZoomMaskEdgeIn");
-            zoom.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Assert.True(view.Zoom > 1);
-
-            string copy = Path.Combine(fixture.Root, "copy.png");
-            File.WriteAllBytes(copy, AppServices.LoadCachedAiMask(fixture.Settings)!.Png);
-            await dialog.SelectMask(copy);
-            Assert.Contains(Tree(dialog).OfType<TextBlock>(), t => t.Text.Contains("Matches study mask"));
-            Assert.Contains("180° scan cap", status.Text);
-            string reencoded = Path.Combine(fixture.Root, "three-channel-copy.png");
-            using (var rgb = Cv2.ImRead(copy, ImreadModes.Color)) Cv2.ImWrite(reencoded, rgb);
-            Assert.False(File.ReadAllBytes(copy).SequenceEqual(File.ReadAllBytes(reencoded)));
-            await dialog.SelectMask(reencoded);
-            Assert.Contains(Tree(dialog).OfType<TextBlock>(), t => t.Text.Contains("Matches study mask"));
-            string blackMask = Path.Combine(fixture.Root, "all-black.png");
-            using (var black = new Mat(303, 201, MatType.CV_8UC1, Scalar.Black)) Cv2.ImWrite(blackMask, black);
-            await dialog.SelectMask(blackMask); Assert.Equal("All sampled directions beyond calibration are blocked.", sky.Text);
-            string invalidMask = Path.Combine(fixture.Root, "wrong-size.png");
-            using (var invalid = new Mat(2, 2, MatType.CV_8UC1, Scalar.Black)) Cv2.ImWrite(invalidMask, invalid);
-            Task previous = dialog.SelectMask(maskPath);
-            await dialog.SelectMask(invalidMask); await previous;
-            Assert.Equal("Could not analyze this mask.", status.Text);
-            Assert.Empty(sky.Text);
-            Assert.False(view.Photo.OverlayVisible); Assert.False(showMask.IsEnabled);
-            Assert.Contains(Tree(dialog).OfType<TextBlock>(), t => t.Text.Contains("201 × 303"));
-            var reset = Assert.Single(Tree(dialog).OfType<Button>(), b => Equals("Use study mask", b.Content));
-            reset.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await dialog.Analysis;
-            Assert.Contains("180° scan cap", status.Text); Assert.True(showMask.IsEnabled); Assert.True(apply.IsEnabled);
-
-            string nextPhoto = Path.Combine(fixture.Root, "second-photo.png");
-            using (var image = new Mat(303, 201, MatType.CV_8UC3, Scalar.Gray)) Cv2.ImWrite(nextPhoto, image);
-            owner.Irradiance.SelectSkyPhotoForTest(nextPhoto); await owner.InputsSettled;
-            Assert.False(dialog.IsVisible);
-            var second = await Open();
-            Assert.Contains(Tree(second).OfType<TextBlock>(), t => t.Text == "Choose a full-frame mask to try the ring scan.");
-            await second.SelectMask(maskPath);
-            Assert.Contains(Tree(second).OfType<TextBlock>(), t => t.Text.Contains("All-black band"));
-            var original = CameraProfileFiles.Load(fixture.Settings.ProfilePath);
-            CameraProfileFiles.Export(original with { Calibration = original.Calibration with { MaximumIncidentAngleDegrees = 117.5 } }, fixture.Root);
-            await owner.RecheckSourcesAsync(); await owner.InputsSettled;
-            Assert.False(second.IsVisible);
-            var wide = await Open();
-            Assert.Contains(Tree(wide).OfType<TextBlock>(), t => t.Text.Contains("Calibration already covers the 180° scan cap"));
-            Assert.Contains(Tree(wide).OfType<TextBlock>(), t => t.Text.Contains("235°"));
-            Assert.False(Tree(wide).OfType<Button>().Single(b => Equals(b.Content, "Use for calculation")).IsEnabled);
-            Tree(wide).OfType<RadioButton>().Single(b => AutomationProperties.GetAutomationId(b) == "ManualApparentFovMode").IsChecked = true;
-            var angle = Tree(wide).OfType<TextBox>().Single();
-            Assert.Equal("235", angle.Text);
-            angle.Text = "210";
-            var useApparent = Tree(wide).OfType<Button>().Single(b => Equals(b.Content, "Use for calculation"));
-            Assert.True(useApparent.IsEnabled); // The newly selected photo has no prepared mask yet.
-            useApparent.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            await owner.InputsSettled;
-            Assert.Equal(210, owner.IrradianceController.Settings.ApparentFullFovDegrees);
-            owner.Irradiance.SelectSkyPhotoForTest(fixture.Settings.SkyImage); await owner.InputsSettled;
-            Assert.Null(owner.IrradianceController.Settings.ApparentFullFovDegrees);
-            File.WriteAllText(fixture.Settings.ProfilePath, "broken camera profile");
-            await owner.RecheckSourcesAsync(); await owner.InputsSettled;
-            Assert.False(wide.IsVisible); Assert.False(entry.IsEnabled);
-            Assert.Null(owner.IrradianceController.Settings.SelectedMaskId); Assert.Null(owner.Completed);
-            Assert.Null(owner.IrradianceController.Settings.MaskEdgeThresholdPercent);
-            Assert.Equal(0, services.CardinalGenerationCount); Assert.Equal(0, fixture.Runs);
-
-            async Task<MaskEdgeWindow> Open()
-            {
-                Assert.True(entry.IsEnabled);
-                entry.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                var window = Assert.Single(owner.OwnedWindows.OfType<MaskEdgeWindow>());
-                await Until(() => window.IsLoaded); await window.Analysis;
-                return window;
-            }
-        }
-        finally { owner.Close(); }
-    });
-
-    [Fact]
-    public void ApparentFovIsPreviewedAtNativeScaleAndAppliedOnlyOnRequest() => Sta(async () =>
-    {
-        using var fixture = new Fixture();
-        Setup120DegreeProfile(fixture);
-        using var services = new AppServices(fixture.Debug);
-        var owner = new MainWindow(applicationServices: services, loadExampleOnFirstRun: false) { ShowActivated = false };
-        try
-        {
-            var rendered = new TaskCompletionSource();
-            owner.ContentRendered += (_, _) => rendered.TrySetResult(); owner.Show(); await rendered.Task;
-            await owner.RecheckSourcesAsync(); owner.Calculate(); await Until(() => !owner.UpdatingForTest);
+            owner.Show(); await owner.RecheckSourcesAsync(); await owner.InputsSettled;
+            owner.Calculate(); await Until(() => !owner.UpdatingForTest);
             var baseline = owner.Completed!;
-            var entry = Tree(owner.Irradiance).OfType<Button>().Single(b => Equals(b.Content, "Estimate edge…"));
-            var mainView = Tree(owner.Irradiance).OfType<SkyPhotoViewport>().Single();
+            var suggestion = baseline.MaskEdge!;
+            Assert.Equal(95, suggestion.BlackPercent);
+            Assert.InRange(suggestion.EffectiveFullDegrees, 150, 156);
             var dialog = await Open();
+            Assert.Empty(Tree(dialog).OfType<RadioButton>()); Assert.Empty(Tree(dialog).OfType<ComboBox>());
             var edit = Find<TextBox>(dialog, "ApparentFullFovDegrees");
             var slider = Find<Slider>(dialog, "ApparentFovSlider");
-            var apply = Find<Button>(dialog, "ApplyMaskEdge");
+            Assert.Equal(270, slider.Maximum); Assert.Equal(suggestion.EffectiveFullDegrees, slider.Value);
+            var save = Find<Button>(dialog, "SaveRefinedEdge");
             var preview = Tree(dialog).OfType<SkyPhotoViewport>().Single();
-            Find<RadioButton>(dialog, "ManualApparentFovMode").IsChecked = true;
-            Assert.Equal("180", edit.Text);
-            slider.Value = 156;
-            Assert.Equal("156", edit.Text); Assert.Equal(156, preview.ManualOutline!.Bounds.Width, 9);
-            Tree(dialog).OfType<CheckBox>().Single().IsChecked = true;
-            Assert.True(preview.Photo.OverlayVisible); Assert.Equal(156, preview.ManualOutline.Bounds.Width, 9);
-            foreach (string bad in new[] { "", "0", "181", "NaN", "-3", "5e-324" })
+            var showMask = Tree(dialog).OfType<CheckBox>().Single();
+            showMask.IsChecked = true; Assert.True(preview.Photo.OverlayVisible);
+            foreach (string bad in new[] { "", "0", "270.1", "NaN", "-3", "5e-324" })
             {
                 edit.Text = bad;
-                Assert.False(apply.IsEnabled); Assert.Null(preview.ManualOutline);
+                Assert.False(save.IsEnabled); Assert.Null(preview.EdgeOutline);
             }
-            edit.Text = "105,25";
-            Assert.Equal(105.25, slider.Value); Assert.Equal(105.25, preview.ManualOutline!.Bounds.Width, 9);
-            Assert.True(apply.IsEnabled); Assert.Same(baseline, owner.Completed); Assert.Null(mainView.ManualOutline);
+            slider.Value = 270; Assert.Equal("270", edit.Text);
+            Assert.True(save.IsEnabled); Assert.Equal(270, preview.EdgeOutline!.Bounds.Width, 8);
+            var zoom = Find<Button>(dialog, "ZoomMaskEdgeIn");
+            Click(zoom); Assert.True(preview.Zoom > 1);
+            Click(Tree(dialog).OfType<Button>().Single(b => Equals(b.Content, "Cancel")));
+            Assert.Same(baseline, owner.Completed);
             Assert.Null(owner.IrradianceController.Settings.ApparentFullFovDegrees);
-            apply.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await owner.InputsSettled;
-            Assert.Equal(105.25, AppData.ReadSettings()!.ApparentFullFovDegrees);
-            Assert.Null(AppData.ReadSettings()!.MaskEdgeThresholdPercent);
-            owner.Calculate(); await Until(() => !owner.UpdatingForTest);
-            Assert.Equal(105.25, owner.Completed!.MaskEdge!.ManualFullFovDegrees);
-            Assert.Equal(105.25, mainView.ManualOutline!.Bounds.Width, 9);
-            Assert.Null(mainView.CapOutline);
 
             dialog = await Open();
-            Assert.True(Find<RadioButton>(dialog, "ManualApparentFovMode").IsChecked);
-            Assert.Equal(105.25, Find<Slider>(dialog, "ApparentFovSlider").Value);
-            Find<RadioButton>(dialog, "AutomaticMaskEdgeMode").IsChecked = true;
-            Assert.Null(Tree(dialog).OfType<SkyPhotoViewport>().Single().ManualOutline);
-            Find<Button>(dialog, "ApplyMaskEdge").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await owner.InputsSettled;
+            Find<TextBox>(dialog, "ApparentFullFovDegrees").Text = "215,75";
+            Click(Find<Button>(dialog, "SaveRefinedEdge")); await owner.InputsSettled;
+            Assert.Equal(215.75, AppData.ReadSettings()!.ApparentFullFovDegrees);
+            owner.Calculate(); await Until(() => !owner.UpdatingForTest);
+            Assert.Equal(215.75, owner.Completed!.MaskEdge!.EffectiveFullDegrees);
+            Assert.Equal(215.75, Tree(owner.Irradiance).OfType<SkyPhotoViewport>().Single().EdgeOutline!.Bounds.Width, 8);
+
+            dialog = await Open();
+            Assert.Equal(215.75, Find<Slider>(dialog, "ApparentFovSlider").Value);
+            // Typing exactly the suggested number still pins that angle until the user chooses Use suggestion.
+            var suggested = suggestion.EffectiveFullDegrees.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+            Find<TextBox>(dialog, "ApparentFullFovDegrees").Text = suggested;
+            Click(Find<Button>(dialog, "SaveRefinedEdge")); await owner.InputsSettled;
+            dialog = await Open(); Click(Find<Button>(dialog, "SaveRefinedEdge")); await owner.InputsSettled;
+            Assert.Equal(suggestion.EffectiveFullDegrees, owner.IrradianceController.Settings.ApparentFullFovDegrees);
+            dialog = await Open();
+            Click(Tree(dialog).OfType<Button>().Single(b => Equals(b.Content, "Use suggestion")));
+            Click(Find<Button>(dialog, "SaveRefinedEdge")); await owner.InputsSettled;
             Assert.Null(owner.IrradianceController.Settings.ApparentFullFovDegrees);
-            Assert.Equal(100, owner.IrradianceController.Settings.MaskEdgeThresholdPercent);
+            owner.Calculate(); await Until(() => !owner.UpdatingForTest);
+            Assert.Equal(suggestion, owner.Completed!.MaskEdge);
+            Assert.Equal(baseline.Run.AfterEnergy, owner.Completed.Run.AfterEnergy);
 
             async Task<MaskEdgeWindow> Open()
             {
-                entry.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Click(Find<Button>(owner.Irradiance, "RefineMaskEdge"));
                 var opened = owner.OwnedWindows.OfType<MaskEdgeWindow>().Single();
                 await Until(() => opened.IsLoaded); await opened.Analysis;
                 return opened;
@@ -192,6 +90,89 @@ public sealed class MaskEdgeWindowTests
         }
         finally { owner.Close(); }
     });
+
+    [Fact]
+    public void PreparingAFreshMaskPreservesTypedInputAndCancelDiscardsChanges() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        Setup120DegreeProfile(fixture);
+        var settings = fixture.Settings;
+        var measured = SkyPhotoFieldOfView.Load(settings, 201, 303, null);
+        var asset = AppServices.LoadCachedAiMask(settings)!;
+        var pending = new TaskCompletionSource<MaskAsset>();
+        CancellationToken observed = default;
+        double? saved = null;
+        var owner = new System.Windows.Window { ShowActivated = false };
+        owner.Show();
+        try
+        {
+            var dialog = new MaskEdgeWindow(owner, settings.SkyImage, IrradianceWorkspace.Bitmap(asset.OriginalPreview),
+                null, measured, Task.FromResult<AppliedMaskEdge?>(null), ct => { observed = ct; return pending.Task; },
+                null, value => saved = value);
+            dialog.SetStudyEditable(true); dialog.Show(); await Until(() => dialog.IsLoaded);
+            try
+            {
+                var edit = Find<TextBox>(dialog, "ApparentFullFovDegrees");
+                edit.Text = "207";
+                pending.SetResult(asset);
+                await dialog.Analysis;
+                Assert.True(Tree(dialog).OfType<CheckBox>().Single().IsEnabled);
+                Assert.Equal(207, Find<Slider>(dialog, "ApparentFovSlider").Value);
+                Assert.Contains("180°", Find<TextBlock>(dialog, "EdgeProposal").Text);
+                Assert.Null(saved); Assert.Equal(0, fixture.Runs);
+            }
+            finally { dialog.Close(); }
+            Assert.True(observed.IsCancellationRequested); Assert.Null(saved);
+        }
+        finally { owner.Close(); }
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CancelStopsPreparationAndAnUnavailableMaskStillAllowsHandFitting(bool maskFails) => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        Setup120DegreeProfile(fixture);
+        var settings = fixture.Settings;
+        var asset = AppServices.LoadCachedAiMask(settings)!;
+        var owner = new System.Windows.Window { ShowActivated = false };
+        owner.Show();
+        try
+        {
+            var pending = new TaskCompletionSource<MaskAsset>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var measured = SkyPhotoFieldOfView.Load(settings, 201, 303, null);
+            double? saved = null;
+            var dialog = new MaskEdgeWindow(owner, settings.SkyImage, IrradianceWorkspace.Bitmap(asset.OriginalPreview),
+                null, measured, Task.FromResult<AppliedMaskEdge?>(null), ct => pending.Task.WaitAsync(ct),
+                null, value => saved = value);
+            dialog.SetStudyEditable(true); dialog.Show(); await Until(() => dialog.IsLoaded);
+            var analysis = dialog.Analysis;
+            Assert.False(analysis.IsCompleted);
+            if (maskFails)
+            {
+                pending.SetException(new IOException("Unavailable test model"));
+                await analysis;
+                var status = Find<TextBlock>(dialog, "EdgeProposal");
+                Assert.Contains("Set the edge on the photo", status.Text);
+                Assert.Contains("Unavailable test model", AutomationProperties.GetHelpText(status));
+                Find<TextBox>(dialog, "ApparentFullFovDegrees").Text = "180";
+                Click(Find<Button>(dialog, "SaveRefinedEdge"));
+                Assert.Equal(180d, saved);
+            }
+            else
+            {
+                Click(Tree(dialog).OfType<Button>().Single(b => Equals(b.Content, "Cancel")));
+                await analysis.WaitAsync(TimeSpan.FromSeconds(3));
+                Assert.Null(saved);
+            }
+            Assert.Null(dialog.PreparedMask);
+            Assert.Equal(0, fixture.Runs);
+        }
+        finally { owner.Close(); }
+    });
+
+    private static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
     private static T Find<T>(DependencyObject root, string id) where T : DependencyObject =>
         Tree(root).OfType<T>().Single(e => AutomationProperties.GetAutomationId(e) == id);
@@ -230,49 +211,6 @@ public sealed class MaskEdgeWindowTests
             Assert.False(owner.ExportEnabledForTest);
         }
         finally { owner.Close(); }
-    });
-
-    [Fact]
-    public void ApplyingTheStudyMaskChangesTheNextCalculationAndCanBeReset() => Sta(async () =>
-    {
-        using var fixture = new Fixture();
-        Setup120DegreeProfile(fixture);
-        using var services = new AppServices(fixture.Debug);
-        var owner = new MainWindow(applicationServices: services, loadExampleOnFirstRun: false) { ShowActivated = false };
-        try
-        {
-            var rendered = new TaskCompletionSource();
-            owner.ContentRendered += (_, _) => rendered.TrySetResult(); owner.Show(); await rendered.Task;
-            await owner.RecheckSourcesAsync(); owner.Calculate(); await Until(() => !owner.UpdatingForTest);
-            Assert.True(owner.ExportEnabledForTest); Assert.Null(owner.Completed!.MaskEdge);
-            var baseline = owner.Completed;
-            var view = Tree(owner.Irradiance).OfType<SkyPhotoViewport>().Single();
-            var entry = Tree(owner.Irradiance).OfType<Button>().Single(b => Equals("Estimate edge…", b.Content));
-            var readout = Tree(owner.Irradiance).OfType<TextBlock>().Single(t => AutomationProperties.GetAutomationId(t) == "CalculationFieldOfView");
-            Click(entry);
-            var dialog = owner.OwnedWindows.OfType<MaskEdgeWindow>().Single();
-            await Until(() => dialog.IsLoaded); await dialog.Analysis;
-            var apply = Tree(dialog).OfType<Button>().Single(b => Equals("Use for calculation", b.Content));
-            Assert.True(apply.IsEnabled); Click(apply); await owner.InputsSettled;
-            Assert.False(dialog.IsVisible); Assert.False(owner.ExportEnabledForTest);
-            Assert.Equal(100, AppData.ReadSettings()!.MaskEdgeThresholdPercent); Assert.Same(baseline, owner.Completed);
-            owner.Calculate(); await Until(() => !owner.UpdatingForTest);
-            Assert.True(owner.ExportEnabledForTest);
-            Assert.Equal(120, owner.Completed!.MaskEdge!.MeasuredFullDegrees, 7);
-            Assert.Equal(180, owner.Completed.MaskEdge.EffectiveFullDegrees, 7);
-            Assert.False(owner.Completed.MaskEdge.ObservedTerminalBand); Assert.Contains("180°", readout.Text);
-            Assert.NotNull(view.CapOutline);
-            var reset = Tree(owner.Irradiance).OfType<Button>().Single(b => Equals("Use calibration only", b.Content));
-            Click(reset); await owner.InputsSettled;
-            Assert.Null(AppData.ReadSettings()!.MaskEdgeThresholdPercent);
-            owner.Calculate(); await Until(() => !owner.UpdatingForTest);
-            Assert.True(owner.ExportEnabledForTest); Assert.Null(owner.Completed!.MaskEdge);
-            Assert.Null(view.CapOutline);
-            Assert.Equal(baseline.Run.AfterEnergy, owner.Completed.Run.AfterEnergy);
-        }
-        finally { owner.Close(); }
-
-        void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
     });
 
     private static void Setup120DegreeProfile(Fixture fixture)

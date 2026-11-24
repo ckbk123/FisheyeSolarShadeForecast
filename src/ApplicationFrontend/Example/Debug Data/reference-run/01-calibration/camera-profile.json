@@ -15,14 +15,15 @@
       90.17908124542645,
       -116.02812744232502
     ],
-    "MaximumIncidentAngleDegrees": 66.43,
+    "MaximumIncidentAngleDegrees": 90,
     "ImageCircleRadiusPixels": 1468.4683751810944,
     "RmsError": null,
     "UsedImageCount": 0,
     "RejectedImages": [],
     "CreatedUtc": "2026-09-05T07:11:55+00:00",
-    "Algorithm": "Native OmniCalib YAML; caller-provided angular coverage"
+    "Algorithm": "Native OmniCalib YAML; caller-provided angular coverage",
+    "LinearExtensionStartDegrees": 66.43
   },
   "Source": "Example/Calib Images/calibration.yml",
-  "CoverageNote": "Caller override of maximum incident angle. Caller-provided maximum incident angle; not inferred from lens advertising or polynomial extrapolation."
+  "CoverageNote": "Caller override of maximum incident angle. Caller-provided maximum incident angle; not inferred from lens advertising or polynomial extrapolation. Proposed edge: 180\u00B0 full FOV. Mask coverage at 180\u00B0 is incomplete. The cap is an extrapolation."
 }

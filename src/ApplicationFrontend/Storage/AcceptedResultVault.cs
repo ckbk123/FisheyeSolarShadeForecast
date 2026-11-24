@@ -34,7 +34,7 @@ internal static class AcceptedResultVault
             Provider = services ? s.Provider : (int?)null, s.ImportWindow, s.ImportIntervalMinutes, s.Substeps, s.Isotropic
         });
         if (s.ApparentFullFovDegrees.HasValue) return AppData.Key(new { baseline, s.ApparentFullFovDegrees });
-        return s.MaskEdgeThresholdPercent.HasValue ? AppData.Key(new { baseline, s.MaskEdgeThresholdPercent }) : baseline;
+        return baseline;
     }
     private static string Folder(string key) => Path.Combine(AppData.PathFor("AcceptedResults"), key);
     private static string BlobPath(string hash) => Path.Combine(AppData.PathFor("AcceptedResults"), "Blobs", hash);

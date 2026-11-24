@@ -58,9 +58,9 @@ public sealed class InputDependencies
         keys[ArtifactGroup.Profile] = AppData.Key(new { Profile, Image, s.CoverageAngle });
         if (s.ApparentFullFovDegrees.HasValue)
             keys[ArtifactGroup.Profile] = AppData.Key(new { Measured = keys[ArtifactGroup.Profile], s.ApparentFullFovDegrees });
-        else if (s.MaskEdgeThresholdPercent.HasValue)
+        else
             keys[ArtifactGroup.Profile] = AppData.Key(new { Measured = keys[ArtifactGroup.Profile],
-                Mask = keys[ArtifactGroup.Mask], s.MaskEdgeThresholdPercent });
+                Mask = keys[ArtifactGroup.Mask], Threshold = SolarShade.SkyPhotoMasking.MaskEdgeProbe.ProposalBlackPercent });
         keys[ArtifactGroup.Orientation] = AppData.Key(new { Image, s.CenteredDisk, importedGeometry, Profile = keys[ArtifactGroup.Profile], s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
         // Date/site changes do not change the contents of an imported source workbook.
         bool services = WeatherSourceSelection.UsesServices(s);
@@ -80,7 +80,7 @@ public sealed class InputDependencies
 
     public static ArtifactGroup WithDependents(ArtifactGroup groups, UserSettings? settings = null)
     {
-        if ((groups & ArtifactGroup.Mask) != 0) groups |= settings is { MaskEdgeThresholdPercent: not null, ApparentFullFovDegrees: null }
+        if ((groups & ArtifactGroup.Mask) != 0) groups |= settings?.ApparentFullFovDegrees == null
             ? ArtifactGroup.Profile | PoseChain : ArtifactGroup.Shading;
         if ((groups & ArtifactGroup.Profile) != 0) groups |= PoseChain;
         if ((groups & ArtifactGroup.Orientation) != 0) groups |= PoseChain;
@@ -95,7 +95,7 @@ public sealed class InputDependencies
         "SkyImage" => ArtifactGroup.Profile | ArtifactGroup.Mask | PoseChain,
         "Model" or "Resolution" or "SelectedMaskId" => WithDependents(ArtifactGroup.Mask, settings),
         "CenteredDisk" => WithDependents(ArtifactGroup.Mask, settings) | PoseChain,
-        nameof(UserSettings.MaskEdgeThresholdPercent) or nameof(UserSettings.ApparentFullFovDegrees) => ArtifactGroup.Profile | PoseChain,
+        nameof(UserSettings.ApparentFullFovDegrees) => ArtifactGroup.Profile | PoseChain,
         "ProfilePath" or "CoverageAngle" => ArtifactGroup.Profile | PoseChain,
         "BottomAzimuth" or "CameraTilt" or "CameraRoll" or nameof(UserSettings.PhoneInclination)
             or nameof(UserSettings.PhoneTopHeading) or nameof(UserSettings.PhoneFacingAzimuth) or nameof(UserSettings.FlatImageTopBearing) => PoseChain,

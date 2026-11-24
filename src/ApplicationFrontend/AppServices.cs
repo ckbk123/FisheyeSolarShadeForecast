@@ -16,6 +16,26 @@ public sealed record MaskAsset(byte[] OriginalPreview, byte[] MaskPreview, SkyMa
     public byte[] Png => Result.Png;
     public LensDisk Disk => Result.Disk;
     public string AiAncestorSha256 => Variant?.AiAncestorSha256 ?? Convert.ToHexString(SHA256.HashData(Png));
+
+    public AppliedMaskEdge SuggestEdge(CalibrationResult measured, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        double measuredFull = 2 * measured.MaximumIncidentAngleDegrees;
+        if (measuredFull > CalibrationRadialMap.MaximumRefinedFullDegrees)
+            return new(measuredFull, CalibrationRadialMap.MaximumRefinedFullDegrees, null, false,
+                "The lens calibration extends beyond the 270° study edge.");
+        bool ai = Variant?.IsImported != true;
+        var scan = MaskEdgeProbe.AnalyzeTo180(Png, measured.ImageWidth, measured.ImageHeight,
+            measured.PrincipalPoint[0], measured.PrincipalPoint[1], measured.IncidentAngleToRadiusPolynomial,
+            measured.MaximumIncidentAngleDegrees, Disk, ai ? Result.Crop : null, ct, ai ? Result.InputSize : 0);
+        var proposal = scan.Proposal;
+        var edge = new AppliedMaskEdge(scan.CalibratedFullDegrees, proposal.EstimatedLimitFullDegrees ?? scan.CalibratedFullDegrees,
+            proposal.EstimatedLimitFullDegrees.HasValue ? proposal.BlackPercent : null, proposal.RadiusPixels.HasValue, proposal.Explanation);
+        if (!scan.Reached180) return edge;
+        var cap = scan.Samples[^1];
+        return edge with { ObservedSkyAtCap = MaskEdgeProbe.SamplesPerRing - cap.UnknownSamples - cap.ObservedBlackSamples,
+            UnknownAtCap = cap.UnknownSamples };
+    }
 }
 public sealed record AppliedMaskEdge(double MeasuredFullDegrees, double EffectiveFullDegrees, int? BlackPercent,
     bool ObservedTerminalBand, string Explanation)
@@ -49,7 +69,7 @@ public sealed class AppServices : IIrradianceService
 {
     internal const string MaskCacheSchema = "mask-orchestration-v1";
     // Bump the orchestration schema when scientific sequencing changes. UI/PV builds must not evict upstream caches.
-    internal static string SoftwareFingerprint => AppData.Key(new { Schema = "irradiance-orchestration-v1", Libraries = new[] { typeof(CalibrationWorkflow), typeof(CameraProfileFiles),
+    internal static string SoftwareFingerprint => AppData.Key(new { Schema = "irradiance-orchestration-v2", Libraries = new[] { typeof(CalibrationWorkflow), typeof(CameraProfileFiles),
         typeof(IrradianceClient), typeof(TranspositionModule), typeof(SolarPositionModule), typeof(ShadingCorrectionModule), typeof(SkyPhotoMasker) }.Select(AppData.LibraryVersion).ToArray() });
     public static readonly SemaphoreSlim NativeGate = new(1, 1);
     private readonly SemaphoreSlim evaluationGate = new(1, 1);
@@ -454,62 +474,14 @@ public sealed class AppServices : IIrradianceService
             MaskAsset? activeMask = null;
             if (!string.IsNullOrEmpty(s.SkyImage))
             {
-                string imageHash = AppData.FileKey(s.SkyImage);
-                string aiMaskKey = AppData.Key(new { Image = imageHash, s.Model, s.Resolution, s.CenteredDisk,
-                    Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = AppServices.MaskCacheSchema });
-                string nextMask = s.SelectedMaskId == null ? aiMaskKey
+                string nextMask = s.SelectedMaskId == null ? AiMaskKey(s, s.SkyImage)
                     : selectedMaskFingerprint ?? InputDependencies.Capture(s).Keys[ArtifactGroup.Mask];
                 debug.RecordInput("sky-mask", new { Fingerprint = nextMask });
-                bool reusedMask = mask != null && maskKey == nextMask;
-                string maskOrigin = reusedMask ? "Reused in-memory mask" : "Computed or loaded validated mask cache";
-                string directory = debug.BeginStage("02-sky-mask", maskOrigin, typeof(SkyPhotoMasker));
-                if (!reusedMask)
-                {
-                    progress("Preparing sky mask");
-                    await NativeGate.WaitAsync(ct);
-                    try
-                    {
-                        var next = await Task.Run(() =>
-                        {
-                            string cache = AppData.PathFor(Path.Combine("mask-stages", nextMask));
-                            SkyMaskResult result;
-                            MaskVariant? variant = null;
-                            if (s.SelectedMaskId != null)
-                            {
-                                (variant, byte[] edited) = ManualMaskStore.Load(s.SkyImage, s.SelectedMaskId);
-                                if (!ManualMaskStore.IsCompatible(variant, s))
-                                    throw new InvalidDataException("This edited mask was made with different AI model, resolution or disk settings. Select its original settings or choose another mask.");
-                                result = variant.BaseMask with { Png = edited };
-                                maskOrigin = variant.Description;
-                            }
-                            else if (File.Exists(Path.Combine(cache, "sky-mask.png")) && File.Exists(Path.Combine(cache, "mask-details.json")))
-                            { result = SkyMaskExporter.Load(cache); maskOrigin = "Reused validated disk mask cache"; }
-                            else
-                            {
-                                string modelDirectory = AppData.EnsureModel(s.Model);
-                                string key = AppData.Key(new { modelDirectory, s.Resolution, s.CenteredDisk });
-                                if (key != maskerKey)
-                                {
-                                    masker?.Dispose();
-                                    masker = new(new() { ModelsDirectory = modelDirectory, InputSize = s.Resolution,
-                                        DiskDetection = s.CenteredDisk ? DiskDetection.Centered : DiskDetection.Auto,
-                                        Acceleration = Environment.GetEnvironmentVariable("SOLARSHADE_FORCE_CPU") == "1" ? MaskAcceleration.Cpu : MaskAcceleration.Auto });
-                                    maskerKey = key;
-                                }
-                                result = masker!.CreateMaskDetailed(s.SkyImage, s.Model); maskOrigin = "Computed by SkyPhotoMasker";
-                                SkyMaskExporter.Export(result, cache, "Computed");
-                            }
-                            using var image = Cv2.ImRead(s.SkyImage, ImreadModes.Color);
-                            using var binary = Cv2.ImDecode(result.Png, ImreadModes.Grayscale);
-                            return new MaskAsset(Preview(image), Preview(binary), result,
-                                variant == null ? $"{result.Width} × {result.Height} · {result.Model} · {result.ExecutionProvider} · AI mask"
-                                    : $"{result.Width} × {result.Height} · {variant.Description}", variant);
-                        }, CancellationToken.None);
-                        ct.ThrowIfCancellationRequested(); mask = next; maskKey = nextMask;
-                    }
-                    finally { NativeGate.Release(); }
-                }
-                activeMask = mask!; debug.Origin("02-sky-mask", maskOrigin);
+                string directory = debug.BeginStage("02-sky-mask", "Preparing selected sky mask", typeof(SkyPhotoMasker));
+                if (mask == null || maskKey != nextMask) progress("Preparing sky mask");
+                string maskOrigin;
+                (activeMask, maskOrigin) = await LoadStudyMask(s, nextMask, ct);
+                debug.Origin("02-sky-mask", maskOrigin);
                 debug.CompleteStage("02-sky-mask", debug.NeedsWrite(ArtifactGroup.Mask) ? await Task.Run(() =>
                 {
                     var files = SkyMaskExporter.Export(activeMask.Result, directory, maskOrigin, ct).ToList();
@@ -546,8 +518,8 @@ public sealed class AppServices : IIrradianceService
                     activeMask.Result.Width, activeMask.Result.Height, Library = AppData.LibraryVersion(typeof(CameraProfileFiles)) });
                 if (s.ApparentFullFovDegrees is double apparent)
                     nextProfile = AppData.Key(new { Source = nextProfile, ApparentFullFovDegrees = apparent });
-                else if (s.MaskEdgeThresholdPercent is int threshold)
-                    nextProfile = AppData.Key(new { Source = nextProfile, SelectedMask = maskKey, Threshold = threshold,
+                else
+                    nextProfile = AppData.Key(new { Source = nextProfile, SelectedMask = maskKey, Threshold = MaskEdgeProbe.ProposalBlackPercent,
                         Probe = AppData.LibraryVersion(typeof(MaskEdgeProbe)) });
                 debug.RecordInput("camera-profile", new { Fingerprint = nextProfile });
                 string directory = debug.BeginStage("01-calibration", "Loaded effective camera profile", typeof(CameraProfileFiles));
@@ -613,23 +585,11 @@ public sealed class AppServices : IIrradianceService
             return (source with { Calibration = selected, CoverageNote = source.CoverageNote + " " + explanation },
                 new AppliedMaskEdge(2 * measured.MaximumIncidentAngleDegrees, apparent, null, false, explanation) { ManualFullFovDegrees = apparent });
         }
-        if (s.MaskEdgeThresholdPercent is not int percent) return (source, null);
-        if (percent is not (80 or 90 or 95 or 100)) throw new InvalidDataException("Unsupported mask-edge threshold.");
-        bool ai = mask.Variant?.IsImported != true;
-        var scan = MaskEdgeProbe.AnalyzeTo180(mask.Png, measured.ImageWidth, measured.ImageHeight,
-            measured.PrincipalPoint[0], measured.PrincipalPoint[1], measured.IncidentAngleToRadiusPolynomial,
-            measured.MaximumIncidentAngleDegrees, mask.Disk, ai ? mask.Result.Crop : null, ct, ai ? mask.Result.InputSize : 0);
-        var finding = scan.Findings.Single(f => f.BlackPercent == percent);
-        double effectiveFull = finding.EstimatedLimitFullDegrees ?? scan.CalibratedFullDegrees;
-        var edge = new AppliedMaskEdge(scan.CalibratedFullDegrees, effectiveFull, percent, finding.RadiusPixels.HasValue, finding.Explanation);
-        if (scan.Reached180)
-        {
-            var cap = scan.Samples[^1];
-            edge = edge with { ObservedSkyAtCap = MaskEdgeProbe.SamplesPerRing - cap.UnknownSamples - cap.ObservedBlackSamples,
-                UnknownAtCap = cap.UnknownSamples };
-        }
-        var calibration = CalibrationRadialMap.ExtendTo(measured, effectiveFull / 2);
-        string note = FormattableString.Invariant($" Mask scan at {percent}% black: {edge.MeasuredFullDegrees:0.##}° measured full FOV, {effectiveFull:0.##}° effective full FOV. ") + finding.Explanation;
+        var edge = mask.SuggestEdge(measured, ct);
+        var calibration = edge.EffectiveFullDegrees < edge.MeasuredFullDegrees
+            ? CalibrationRadialMap.WithApparentFullFov(measured, edge.EffectiveFullDegrees)
+            : CalibrationRadialMap.ExtendTo(measured, edge.EffectiveFullDegrees / 2);
+        string note = FormattableString.Invariant($" Proposed edge: {edge.EffectiveFullDegrees:0.##}° full FOV. ") + edge.Explanation;
         return (source with { Calibration = calibration, CoverageNote = source.CoverageNote + note }, edge);
     }
 
@@ -648,13 +608,97 @@ public sealed class AppServices : IIrradianceService
         ct.ThrowIfCancellationRequested(); IrradianceDatasetFiles.Export(data, path, ct); return (data, "Fetched from irradiance service");
     }
 
+    /// <summary>Prepare just the selected photo's mask for edge refinement without publishing an update.</summary>
+    public async Task<MaskAsset> PrepareEdgeMask(UserSettings settings, CancellationToken ct)
+    {
+        var study = settings with { SkyImage = PortablePaths.Resolve(settings.SkyImage) };
+        await evaluationGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            lock (inputGate) ObjectDisposedException.ThrowIf(disposeRequested, this);
+            string? key = study.SelectedMaskId == null
+                ? await Task.Run(() => AiMaskKey(study, study.SkyImage), ct).ConfigureAwait(false) : null;
+            return (await LoadStudyMask(study, key, ct).ConfigureAwait(false)).Asset;
+        }
+        finally { ReleaseOperation(); }
+    }
+
+    private static string AiMaskKey(UserSettings s, string photo) => AppData.Key(new { Image = AppData.FileKey(photo),
+        s.Model, s.Resolution, s.CenteredDisk, Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = MaskCacheSchema });
+
+    private async Task<(MaskAsset Asset, string Origin)> LoadStudyMask(UserSettings s, string? key, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (key != null && mask != null && maskKey == key) return (mask, "Reused in-memory mask");
+        await NativeGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var loaded = await Task.Run(() =>
+            {
+                ct.ThrowIfCancellationRequested();
+                SkyMaskResult result;
+                MaskVariant? variant = null;
+                string origin;
+                if (s.SelectedMaskId != null)
+                {
+                    (variant, byte[] edited) = ManualMaskStore.Load(s.SkyImage, s.SelectedMaskId);
+                    if (!ManualMaskStore.IsCompatible(variant, s))
+                        throw new InvalidDataException("This edited mask was made with different AI model, resolution or disk settings. Select its original settings or choose another mask.");
+                    result = variant.BaseMask with { Png = edited };
+                    origin = variant.Description;
+                }
+                else
+                {
+                    string cache = AppData.PathFor(Path.Combine("mask-stages", key!));
+                    if (File.Exists(Path.Combine(cache, "sky-mask.png")) && File.Exists(Path.Combine(cache, "mask-details.json")))
+                    { result = SkyMaskExporter.Load(cache); origin = "Reused validated disk mask cache"; }
+                    else
+                    {
+                        string modelDirectory = AppData.EnsureModel(s.Model);
+                        string modelKey = AppData.Key(new { modelDirectory, s.Resolution, s.CenteredDisk });
+                        if (modelKey != maskerKey)
+                        {
+                            var nextMasker = new SkyPhotoMasker(new() { ModelsDirectory = modelDirectory, InputSize = s.Resolution,
+                                DiskDetection = s.CenteredDisk ? DiskDetection.Centered : DiskDetection.Auto,
+                                Acceleration = Environment.GetEnvironmentVariable("SOLARSHADE_FORCE_CPU") == "1" ? MaskAcceleration.Cpu : MaskAcceleration.Auto });
+                            masker?.Dispose();
+                            masker = nextMasker;
+                            maskerKey = modelKey;
+                        }
+                        result = masker!.CreateMaskDetailed(s.SkyImage, s.Model);
+                        if (AiMaskKey(s, s.SkyImage) != key)
+                            throw new IOException("The sky photo changed during mask preparation. Reopen Refine edge or update the study.");
+                        origin = "Computed by SkyPhotoMasker";
+                        // The metadata is the completion marker. A failed write can leave a PNG
+                        // for the next attempt, but never a partially published pair.
+                        string metadata = Path.Combine(cache, "mask-details.json");
+                        if (File.Exists(metadata) && !File.Exists(Path.Combine(cache, "sky-mask.png"))) File.Delete(metadata);
+                        SkyMaskExporter.Export(result, cache, "Computed");
+                    }
+                }
+                ct.ThrowIfCancellationRequested();
+                using var image = Cv2.ImRead(s.SkyImage, ImreadModes.Color);
+                using var binary = Cv2.ImDecode(result.Png, ImreadModes.Grayscale);
+                if (image.Empty() || image.Width != result.Width || image.Height != result.Height)
+                    throw new InvalidDataException("The mask dimensions must match the selected oriented photo.");
+                var asset = new MaskAsset(Preview(image), Preview(binary), result,
+                    variant == null ? $"{result.Width} × {result.Height} · {result.Model} · {result.ExecutionProvider} · AI mask"
+                        : $"{result.Width} × {result.Height} · {variant.Description}", variant);
+                return (Asset: asset, Origin: origin);
+            }, ct).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+            if (key != null) { mask = loaded.Asset; maskKey = key; }
+            return loaded;
+        }
+        finally { NativeGate.Release(); }
+    }
+
     public static MaskAsset? LoadCachedAiMask(UserSettings settings)
     {
         if (string.IsNullOrEmpty(settings.SkyImage)) return null;
         string photo = PortablePaths.Resolve(settings.SkyImage);
         if (!File.Exists(photo)) return null;
-        string key = AppData.Key(new { Image = AppData.FileKey(photo), settings.Model, settings.Resolution, settings.CenteredDisk,
-            Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = MaskCacheSchema });
+        string key = AiMaskKey(settings, photo);
         string cache = AppData.PathFor(Path.Combine("mask-stages", key));
         if (!File.Exists(Path.Combine(cache, "sky-mask.png")) || !File.Exists(Path.Combine(cache, "mask-details.json"))) return null;
         var result = SkyMaskExporter.Load(cache);

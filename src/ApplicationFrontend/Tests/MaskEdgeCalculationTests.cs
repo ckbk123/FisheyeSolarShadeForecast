@@ -9,25 +9,41 @@ using Xunit.Abstractions;
 public sealed class MaskEdgeCalculationTests(ITestOutputHelper output)
 {
     [Fact]
+    public async Task PreparingAPreviewReadsOnlyThePhotoAndReusesItsMaskOnUpdate()
+    {
+        using var fixture = new ManualUpdateTests.Fixture();
+        using var service = new AppServices(fixture.Debug);
+        var preview = await service.PrepareEdgeMask(fixture.Settings with { ImportPath = "missing-weather.xlsx", Zone = "invalid-zone" }, CancellationToken.None);
+        Assert.False(File.Exists(Path.Combine(fixture.Debug, "run.json")));
+        Assert.Equal(0, service.PreparationCount);
+        Assert.Equal(0, service.CardinalGenerationCount);
+        var result = await Evaluate(service, fixture.Settings);
+        Assert.Same(preview, result.Mask);
+        Assert.Equal(preview.SuggestEdge(CameraProfileFiles.Load(fixture.Settings.ProfilePath).Calibration, CancellationToken.None), result.MaskEdge);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.PrepareEdgeMask(fixture.Settings, new CancellationToken(true)));
+    }
+
+    [Fact]
     public async Task SelectedMaskControlsTheEffectiveFieldEnergyAndRestoredResult()
     {
         using var fixture = new ManualUpdateTests.Fixture();
         var settings = PrepareStudy(fixture);
         string openId = ImportMask(fixture, "Open annulus", 79);
         string blockedId = ImportMask(fixture, "All blocked", null);
-        var baseline = settings with { SelectedMaskId = openId };
-        var extended = baseline with { MaskEdgeThresholdPercent = 100 };
+        var extended = settings with { SelectedMaskId = openId };
+        var baseline = extended with { ApparentFullFovDegrees = 120 };
         var blocked = extended with { SelectedMaskId = blockedId };
         using var service = new AppServices(fixture.Debug);
 
         var before = await Evaluate(service, baseline);
-        Assert.Null(before.MaskEdge);
+        Assert.Equal(120, before.MaskEdge!.ManualFullFovDegrees);
         Assert.Equal(0d, before.Run.AfterEnergy);
         Assert.True(before.Run.BeforeEnergy > 0);
         AssertProfile(fixture.Debug, 60, null);
 
         var open = await Evaluate(service, extended);
         var band = Assert.IsType<AppliedMaskEdge>(open.MaskEdge);
+        Assert.Equal(95, band.BlackPercent);
         Assert.True(band.ObservedTerminalBand);
         Assert.Equal(120, band.MeasuredFullDegrees);
         Assert.InRange(band.EffectiveFullDegrees, 158, 162);
@@ -62,19 +78,41 @@ public sealed class MaskEdgeCalculationTests(ITestOutputHelper output)
         AssertProfile(fixture.Debug, band.EffectiveFullDegrees / 2, 60);
 
         var reset = await Evaluate(service, baseline);
-        Assert.Null(reset.MaskEdge);
-        Assert.Null(Manifest(fixture.Debug).MaskEdge);
+        Assert.Equal(before.MaskEdge, reset.MaskEdge);
+        Assert.Equal(before.MaskEdge, Manifest(fixture.Debug).MaskEdge);
         Assert.Equal(before.Run.Rows.ToArray(), reset.Run.Rows.ToArray());
         AssertProfile(fixture.Debug, 60, null);
     }
 
     [Fact]
-    public async Task AnExportedEffectiveProfileReopensWithMeasuredCoverageUntilOptedIn()
+    public async Task UneditedStudyUsesThe95PercentBandEvenWithAnOpenSliverAt180()
+    {
+        using var fixture = new ManualUpdateTests.Fixture();
+        var settings = PrepareStudy(fixture);
+        using var binary = new Mat(303, 201, MatType.CV_8UC1, Scalar.Black);
+        Cv2.Circle(binary, new Point(100, 151), 70, Scalar.White, -1);
+        Cv2.Line(binary, new Point(165, 151), new Point(195, 151), Scalar.White, 1);
+        string png = Path.Combine(fixture.Root, "thin-horizon-opening.png");
+        Cv2.ImWrite(png, binary);
+        var variant = ManualMaskStore.Import(settings.SkyImage, png, "Small opening at cap", centeredDisk: true);
+        using var service = new AppServices(fixture.Debug);
+        var study = await Evaluate(service, settings with { SelectedMaskId = variant.Id });
+        var proposal = Assert.IsType<AppliedMaskEdge>(study.MaskEdge);
+        Assert.Equal(95, proposal.BlackPercent);
+        Assert.True(proposal.ObservedTerminalBand);
+        Assert.InRange(proposal.EffectiveFullDegrees, 139, 144);
+        Assert.True(proposal.ObservedSkyAtCap > 0);
+        Assert.Equal(0, proposal.UnknownAtCap);
+        Assert.Equal(proposal.EffectiveFullDegrees, 2 * study.Cardinals!.Projection.MaximumIncidentAngleDegrees);
+    }
+
+    [Fact]
+    public async Task AnExportedEffectiveProfileReopensWithTheProposalFromTheSelectedMask()
     {
         using var fixture = new ManualUpdateTests.Fixture();
         var settings = PrepareStudy(fixture) with { SelectedMaskId = ImportMask(fixture, "Open through 180", 96) };
         using var service = new AppServices(fixture.Debug);
-        var extended = await Evaluate(service, settings with { MaskEdgeThresholdPercent = 100 });
+        var extended = await Evaluate(service, settings);
         var cap = Assert.IsType<AppliedMaskEdge>(extended.MaskEdge);
         Assert.False(cap.ObservedTerminalBand);
         Assert.Equal(180, cap.EffectiveFullDegrees);
@@ -87,17 +125,15 @@ public sealed class MaskEdgeCalculationTests(ITestOutputHelper output)
         Assert.Equal(cap, Manifest(exported).MaskEdge);
         var reimported = settings with { ProfilePath = ProfilePath(exported) };
         using var reopened = new AppServices(Path.Combine(fixture.Root, "reopened study"));
-        var measured = await Evaluate(reopened, reimported);
-        Assert.Null(measured.MaskEdge);
-        Assert.Equal(0d, measured.Run.AfterEnergy);
-        Assert.Equal(extended.Run.BeforeEnergy, measured.Run.BeforeEnergy);
-        AssertProfile(measured.DebugDirectory!, 60, null);
+        var proposed = await Evaluate(reopened, reimported);
+        Assert.Equal(cap, proposed.MaskEdge);
+        Assert.Equal(extended.Run.Rows.ToArray(), proposed.Run.Rows.ToArray());
+        AssertProfile(proposed.DebugDirectory!, 90, 60);
         AssertProfile(exported, 90, 60);
-
-        var optedIn = await Evaluate(reopened, reimported with { MaskEdgeThresholdPercent = 100 });
-        Assert.Equal(cap, optedIn.MaskEdge);
-        Assert.Equal(extended.Run.Rows.ToArray(), optedIn.Run.Rows.ToArray());
-        AssertProfile(optedIn.DebugDirectory!, 90, 60);
+        var newlyBlocked = await Evaluate(reopened, reimported with { SelectedMaskId = ImportMask(fixture, "Blocked after reimport", null) });
+        Assert.Equal(120, newlyBlocked.MaskEdge!.EffectiveFullDegrees);
+        Assert.Equal(0d, newlyBlocked.Run.AfterEnergy);
+        AssertProfile(newlyBlocked.DebugDirectory!, 60, null);
     }
 
     private static UserSettings PrepareStudy(ManualUpdateTests.Fixture fixture)

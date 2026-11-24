@@ -48,6 +48,28 @@ public sealed class PanelVisibilityTests
     }
 
     [Fact]
+    public void BehindAxisSunCanBeVisibleAboveTheHorizonButRaysBeyondThePhotoRemainUnknown()
+    {
+        // With the axis tilted 60° north, a sun 60° from zenith in the south is 120° from the lens axis.
+        var sun = Direction.FromAngles(180, 60);
+        var normal = new Direction(0, 0, 1);
+        var pose = new CameraPose(0, 60);
+        FluxVisibility Visibility(double fullFov, int height, byte value)
+        {
+            var calibration = new CalibrationResult(2, CameraModelKind.OmniCalibIncidentAnglePolynomial,
+                301, height, [150, 150], [0, 180 / Math.PI], 60, 145, null, 0, [], DateTimeOffset.UnixEpoch, "equidistant");
+            var effective = CalibrationRadialMap.WithApparentFullFov(calibration, fullFov);
+            var mask = new SkyMask(301, height, Enumerable.Repeat(value, 301 * height).ToArray());
+            var scene = new PanelSkyScene(mask, effective, pose, new(150, 150, 145), domeSamples: 64);
+            return scene.Disk(sun, normal);
+        }
+        Assert.Equal(new FluxVisibility(1, 1), Visibility(270, 301, 255));
+        Assert.Equal(new FluxVisibility(0, 1), Visibility(270, 301, 0));
+        Assert.Equal(new FluxVisibility(0, 0), Visibility(180, 301, 255));
+        Assert.Equal(new FluxVisibility(0, 0), Visibility(270, 250, 255));
+    }
+
+    [Fact]
     public void ClassifierPaddingIsUnknownOnlyOnTheExtensionIncludingDisksThatStraddleTheJoin()
     {
         var measured = new CalibrationResult(2, CameraModelKind.OmniCalibIncidentAnglePolynomial,

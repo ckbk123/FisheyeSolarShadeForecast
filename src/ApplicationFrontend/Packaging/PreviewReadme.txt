@@ -1,4 +1,4 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.12
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.13
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
@@ -28,10 +28,9 @@ WebView2 or through the tab's option to open it locally in a browser.
    The editor lets you paint across the whole photo and save those strokes.
    Show sky grid marks the lens center, 30-degree rings and dotted compass lines.
    Zoom either preview to inspect the sky grid or the mask and its sun path.
-   Estimate edge checks for a dark band through 180 degrees full FOV.
-   To match a visible rim, adjust the apparent full FOV on the photo or mask.
-   Choose Use for calculation on the study mask, then Update results to apply it.
-   The green guide on the sky photo and in the editor shows the calibrated FOV.
+   The green circle shows the study edge. To adjust it, choose Refine edge,
+   move the slider or enter the full FOV (up to 270 degrees), then Save edge.
+   Update results uses that edge for shading and the sun path.
    A CALIBRATION FAILED stamp on the sky photo means the checkerboard run
    failed. Open Review checkerboard photos for the cause. PROFILE UNUSABLE
    means the selected profile could not be applied to this sky photo.

@@ -33,7 +33,28 @@ public sealed class CalibratedSkyProjectionTests
         Assert.Equal(horizonRadius, Assert.Single(overlay.Rings, r => r.IncidentAngleDegrees == 90).RadiusPixels, 10);
         Assert.Null(measured.LinearExtensionStartDegrees);
         Assert.Throws<ArgumentException>(() => new CalibratedSkyProjection(measured with { MaximumIncidentAngleDegrees = 90 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => CalibrationRadialMap.ExtendTo(measured, 90.1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CalibrationRadialMap.ExtendTo(measured, 135.1));
+    }
+
+    [Fact]
+    public void A270DegreeFieldUsesTheTangentBehindTheLensAndBreaksPathsAcrossTheRearCap()
+    {
+        var measured = Profile(60) with { IncidentAngleToRadiusPolynomial = [0, 160, -58] };
+        var projection = new CalibratedSkyProjection(CalibrationRadialMap.WithApparentFullFov(measured, 270));
+        const double join = Math.PI / 3;
+        double joinRadius = 160 * join - 58 * join * join;
+        double slope = 160 - 116 * join;
+        foreach (double incident in new[] { 90d, 120, 135 })
+        {
+            Assert.True(projection.TryProject(Direction.FromAngles(270, incident), out var x, out var y));
+            Assert.Equal(250 + joinRadius + (incident * Math.PI / 180 - join) * slope, x, 10);
+            Assert.Equal(250, y, 10);
+        }
+        Assert.False(projection.TryProject(Direction.FromAngles(270, 135.001), out _, out _));
+        Assert.False(projection.CanConnectProjectedRays(Direction.FromAngles(90, 120), Direction.FromAngles(270, 120)));
+        Assert.True(projection.CanConnectProjectedRays(Direction.FromAngles(90, 120), Direction.FromAngles(95, 120)));
+        var grid = CardinalDirectionOverlayGenerator.Generate(projection);
+        Assert.Equal(joinRadius + join * slope, Assert.Single(grid.Rings, ring => ring.IncidentAngleDegrees == 120).RadiusPixels, 10);
     }
 
     [Theory]
