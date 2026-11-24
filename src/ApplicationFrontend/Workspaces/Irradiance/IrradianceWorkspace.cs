@@ -124,15 +124,30 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             finally { exporting = false; if (!closing) { RecheckSources(); RefreshButtons(); } }
         };
         actions.Children.Add(export);
-        var footer = new StackPanel { Margin = new(22, 8, 22, 10) }; footer.Children.Add(status); footer.Children.Add(detail); detail.TextWrapping = TextWrapping.Wrap;
+        var footer = new StackPanel { Margin = new(14, 8, 0, 8) }; footer.Children.Add(status); footer.Children.Add(detail); detail.TextWrapping = TextWrapping.Wrap;
         var footerViewport = new ScrollViewer { Content = footer, MaxHeight = 80,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-        DockPanel.SetDock(footerViewport, Dock.Bottom); root.Children.Add(footerViewport);
+        var fixedFooter = new Grid { Margin = new(16, 2, 16, 2) };
+        fixedFooter.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        fixedFooter.ColumnDefinitions.Add(new());
+        var updateControls = new StackPanel();
+        var updateBlock = new Border { Child = updateControls, MaxWidth = 348, Padding = new(10, 5, 10, 3),
+            Background = new SolidColorBrush(Color.FromRgb(231, 243, 240)),
+            BorderBrush = accent, BorderThickness = new(4, 0, 0, 0) };
+        System.Windows.Automation.AutomationProperties.SetAutomationId(updateBlock, "IrradianceUpdateControls");
+        var updateHeading = Label("UPDATE RESULTS", 13, ink); updateHeading.FontWeight = FontWeights.Bold;
+        var updateHeader = new WrapPanel(); updateHeader.Children.Add(updateHeading);
+        updateIndicator.FontWeight = FontWeights.Bold; updateIndicator.Margin = new(10, 0, 0, 0);
+        System.Windows.Automation.AutomationProperties.SetAutomationId(updateIndicator, "IrradianceUpdateState");
+        updateHeader.Children.Add(updateIndicator); updateControls.Children.Add(updateHeader);
+        fixedFooter.Children.Add(updateBlock); Grid.SetColumn(footerViewport, 1); fixedFooter.Children.Add(footerViewport);
+        DockPanel.SetDock(fixedFooter, Dock.Bottom); root.Children.Add(fixedFooter);
         var body = new Grid { Margin = new(16, 12, 16, 0) };
         var inputs = new StackPanel { Margin = new(14) };
         var inputHost = new Border { Background = Brushes.White }; body.Children.Add(inputHost);
         var tuning = new StackPanel { Margin = new(0, 0, 0, 8) };
         var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs, Background = Brushes.White }; inputHost.Child = scroll;
+        System.Windows.Automation.AutomationProperties.SetAutomationId(scroll, "IrradianceInputs");
         Section(inputs, "01  IMAGES & CALIBRATION");
         PathField(inputs, "Calibration folder", "CalibrationFolder", () => PickCalibrationFolder());
         var board = new Grid(); for (int i = 0; i < 3; i++) board.ColumnDefinitions.Add(new());
@@ -204,10 +219,19 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         update.Background = accent; update.Foreground = Brushes.White;
         System.Windows.Automation.AutomationProperties.SetAutomationId(update, "UpdateResults");
         System.Windows.Automation.AutomationProperties.SetAutomationId(refreshData, "RefreshData");
+        System.Windows.Automation.AutomationProperties.SetAutomationId(stop, "StopUpdate");
+        update.FontWeight = stop.FontWeight = refreshData.FontWeight = FontWeights.Bold;
+        foreach (var button in new[] { update, stop, refreshData })
+        {
+            button.Padding = new(10, 4, 10, 4);
+            button.Margin = new(0, 2, 6, 2);
+        }
+        update.FontSize = 14;
+        refreshData.FontSize = 12;
+        refreshData.Content = new TextBlock { Text = "Download weather again & update", TextWrapping = TextWrapping.Wrap };
         update.Click += (_, _) => Calculate(); refreshData.Click += (_, _) => Begin(true); stop.Click += (_, _) => StopUpdate();
-        tuning.Children.Add(updateIndicator);
-        var runButtons = new WrapPanel(); runButtons.Children.Add(update); runButtons.Children.Add(stop); tuning.Children.Add(runButtons);
-        tuning.Children.Add(refreshData);
+        var runButtons = new WrapPanel(); runButtons.Children.Add(update); runButtons.Children.Add(stop); updateControls.Children.Add(runButtons);
+        updateControls.Children.Add(refreshData);
         tuning.Children.Add(Label("Update results reuses matching weather data. Download weather again bypasses the weather cache; camera calibration and masks are reused when unchanged.", 11));
 
         var right = new Grid(); body.Children.Add(right);
