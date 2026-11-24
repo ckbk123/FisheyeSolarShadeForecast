@@ -37,6 +37,16 @@ The photograph’s visible transition to the housing lies around **880–886 px*
 
 On this photograph, that visible rim corresponds to about **151–153° full** under the extrapolated lens model. Try **152°** in the preview. The automatic scan reached 180° because all 1,440 samples at its outer circle fell outside classified coverage. A different image can reach the same cap because white mask pixels are still visible there.
 
+![SolarShade at 152° full FOV, with the dashed pink circle aligned to the visible lens rim and the measured field shown in green](images/apparent-fov-152.png)
+
+| Bundled 744-hour study | Shaded panel energy |
+| --- | ---: |
+| Measured 132.86° | 107.3974 kWh/m² |
+| Apparent 152° | 109.2394 kWh/m² |
+| Automatic 180° cap | 109.2410 kWh/m² |
+
+All three calculations used the same **131.3587 kWh/m²** of unshaded panel energy. The extra field from 152° to 180° contributed about **0.0016 kWh/m²** on this mask and panel orientation.
+
 ## Field trial with nominal 235° lenses
 
 We used ten October-audit sky photographs whose oriented dimensions matched their respective calibrations. They cover six site–phone setups, including five views from one setup. Each photo was tested with both automatic disk detection and centered disk preprocessing using the production EfficientNet-B5 model at 1024 input size. Four profiles already measured **183.45° to 186.66° full**, so those four photos required no extension. [Calibration audit](CALIBRATION_AUDIT_2026-11-24.md)
