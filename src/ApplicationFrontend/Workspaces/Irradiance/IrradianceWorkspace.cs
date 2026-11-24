@@ -53,7 +53,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private Evaluation? completed { get => controller.Completed; set => controller.Completed = value; }
     private readonly Dictionary<string, TextBox> fields = new();
     private readonly HashSet<string> invalidFields = new();
-    private readonly TextBlock status = Label("", 13), detail = Label("", 12), maskInfo = Label("Choose a sky photo", 12), calibrationInfo = Label("No camera profile selected", 12);
+    private readonly TextBlock status = Label("", 13), detail = Label("", 12), maskInfo = Label("Choose a sky photo", 12), calibrationInfo = Label("", 12);
     private readonly Button reviewCalibration = new() { Content = "Review checkerboard photos", IsEnabled = false };
     private readonly Button loadProfile = new() { Content = "Load camera profile…" };
     private CalibrationReview? calibrationReview;
@@ -169,6 +169,9 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         StudioTheme.Help(calibrate, "Fit the checkerboard photos and save the reusable camera profile under Data/Profiles. Diagnostic files are saved under Debug Data/01-calibration.");
         calButtons.Children.Add(calibrate); calButtons.Children.Add(loadProfile);
         reviewCalibration.Click += (_, _) => { RefreshCalibrationReview(); ShowCalibrationReview(); }; calButtons.Children.Add(reviewCalibration);
+        calibrationInfo.Name = "CalibrationOutcome";
+        calibrationInfo.FontWeight = FontWeights.SemiBold;
+        AutomationProperties.SetLiveSetting(calibrationInfo, AutomationLiveSetting.Polite);
         inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
         var imageButtons = new WrapPanel(); imageButtons.Children.Add(choosePhoto); imageButtons.Children.Add(importMask); inputs.Children.Add(imageButtons);
@@ -863,6 +866,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             ? SkyPhotoFieldOfView.CalibrationFailed(failure.Reason)
             : SkyPhotoFieldOfView.Load(settings, orientedPhotoWidth, orientedPhotoHeight,
                 disk == null ? null : new ImageDisk(disk.CenterX, disk.CenterY, disk.Radius));
+        RefreshCalibrationOutcome();
         if (currentFieldOfView.StampLabel != null)
         {
             if (currentCardinals != null) InvalidateOrientation(currentFieldOfView.Explanation);
@@ -1036,15 +1040,32 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         reviewedProfile = settings.ProfilePath;
         reviewedProfileFingerprint = fingerprint;
         reviewCalibration.IsEnabled = calibrationReview != null;
-        calibrationInfo.Text = string.IsNullOrWhiteSpace(settings.ProfilePath) ? "No camera profile selected" :
-            "Profile · " + Path.GetFileName(settings.ProfilePath);
-        if (calibrationReview != null) calibrationInfo.Text += "\n" + calibrationReview.Summary;
-        if (calibrationReview?.FitSummary != null) calibrationInfo.Text += "\n" + calibrationReview.FitSummary;
-        if (settings.LastCalibrationFailure is { } last && last.Matches(settings))
-            calibrationInfo.Text += "\nCalibration failed. " + (calibrationReview != null ? "Review the checkerboard photos." : last.Reason);
-        calibrationInfo.ToolTip = string.IsNullOrWhiteSpace(settings.ProfilePath) ? null : PortablePaths.Resolve(settings.ProfilePath);
+        RefreshCalibrationOutcome();
         const string profileHelp = "Choose camera-profile.json for this lens and oriented image size. The profile includes the calibrated field of view.";
-        StudioTheme.Help(loadProfile, calibrationInfo.ToolTip is string path ? profileHelp + "\n" + path : profileHelp);
+        StudioTheme.Help(loadProfile, string.IsNullOrWhiteSpace(settings.ProfilePath) ? profileHelp :
+            profileHelp + "\n" + PortablePaths.Resolve(settings.ProfilePath));
+    }
+    private void RefreshCalibrationOutcome()
+    {
+        (string text, Brush color, string help) outcome;
+        if (calibrating)
+            outcome = ("Calibrating…", StudioTheme.Muted, "Checking the board photos and fitting the lens.");
+        else if (settings.LastCalibrationFailure is { } failure && failure.Matches(settings))
+            outcome = ("Calibration Failed", Brushes.Firebrick, failure.Reason);
+        else if (string.IsNullOrWhiteSpace(settings.ProfilePath))
+            outcome = ("No calibration", StudioTheme.Muted, "Calibrate with checkerboard photos or load a saved camera profile.");
+        else if (reviewedProfileFingerprint == null)
+            outcome = ("Profile unavailable", Brushes.Firebrick, "The selected camera profile could not be read.");
+        else if (currentFieldOfView.StampLabel == CalibrationStamp.UnusableLabel)
+            outcome = ("Profile unusable", Brushes.Firebrick, currentFieldOfView.Explanation);
+        else if (currentFieldOfView.CalibratedFullDegrees.HasValue || calibrationReview is { Report.Failure: null })
+            outcome = ("Calibration Success", Brushes.DarkGreen, calibrationReview != null ?
+                "Review checkerboard photos for detections and fit details." : "The saved camera profile applies to this photo.");
+        else
+            outcome = ("Profile selected", StudioTheme.Muted, "Choose a sky photo to check the saved profile.");
+        calibrationInfo.Text = outcome.text;
+        calibrationInfo.Foreground = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : outcome.color;
+        StudioTheme.Help(calibrationInfo, outcome.help);
     }
     private string? ProfileFingerprint()
     {
@@ -1081,6 +1102,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if (calibrating || updating || controller.DependentBusy) return;
         if (invalidFields.Count > 0) { status.Text = "Correct the highlighted fields first"; return; }
         calibrating = true;
+        RefreshCalibrationOutcome();
         pending?.Cancel(); revision++; export.IsEnabled = false;
         MarkPreviousResults(); SetUpdateState(UpdateState.Updating, "Calibrating checkerboard photographs…");
         ClearSunPath("Sun path waiting for the new calibration");
@@ -1115,7 +1137,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             status.Text = "Calibration saved"; detail.Text = result.Path; ShowCalibrationReview();
         }
         catch (Exception ex) { if (!closing) ShowError(ex); }
-        finally { calibrating = false; if (!closing) { if (updateState == UpdateState.Updating) RefreshInputState(); else RefreshButtons(); } }
+        finally { calibrating = false; if (!closing) { RefreshCalibrationOutcome(); if (updateState == UpdateState.Updating) RefreshInputState(); else RefreshButtons(); } }
     }
     private void RecordCalibrationFailure(CalibrationReviewException error)
     {
