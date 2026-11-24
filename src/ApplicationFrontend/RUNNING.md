@@ -68,7 +68,7 @@ For the LAAS Site 2 example, a panel tilted 6.8° with a front azimuth of −26�
 
 ## Cardinal-direction preview
 
-**Show cardinal directions** places magenta N/E/S/W labels over the original colour photograph. The outer endpoint of each short tick marks the compass bearing through the same calibration and camera pose used for sun paths and shading. It marks the horizon where visible or the edge of coverage otherwise. The tick points toward the calibrated optical center. A dot marks a bearing with less than one pixel of room for a tick. Labels remain upright.
+**Show cardinal directions** places magenta N/E/S/W labels over the original colour photograph. The outer endpoint of each tick marks the compass bearing through the same calibration and camera pose used for sun paths and shading. It marks the horizon where visible or the edge of coverage otherwise. The strokes show the compass axes in the oriented photo. Opposite bearings have parallel strokes. A dot marks an end-on bearing or a location with less than one pixel of room for a stroke. Labels remain upright.
 
 Expand the sky photo to inspect the compass. Scroll over a feature to zoom around it, drag the magnified image to pan, and choose **Fit** to see the whole photograph. The green outline and the compass move with the image.
 

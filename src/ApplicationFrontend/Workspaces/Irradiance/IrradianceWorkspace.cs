@@ -936,7 +936,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         }
         if (!ReferenceEquals(displayedCardinals, result.Png)) { photo.SetOverlay(Bitmap(result.Png)); displayedCardinals = result.Png; }
         photo.ShowOverlay = settings.ShowCardinalDirections;
-        SetOverlayStatus(cardinalInfo, showCardinals, result.HasMarkers ? "Each marker anchors a projected compass bearing. Short ticks point toward the calibrated optical center." : "No cardinal bearings inside this view.", !result.HasMarkers);
+        SetOverlayStatus(cardinalInfo, showCardinals, result.HasMarkers ? "Each tick marks a projected compass bearing and follows its compass axis in the photo." : "No cardinal bearings inside this view.", !result.HasMarkers);
     }
     private void SetCardinalVisibility()
     {
