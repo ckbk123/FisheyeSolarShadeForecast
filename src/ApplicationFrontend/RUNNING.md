@@ -1,6 +1,6 @@
 # Running SolarShade
 
-Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.3.6 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
+Launch `Deliverable/APPLICATION.exe` or extract the complete `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. SolarShade includes all four segmentation models.
 
 Hover over a study control or focus it and press **F1** to read its explanation. Press **Escape** to dismiss keyboard help. For the full reference, open **Help**. You can keep the guide beside the study while you edit inputs or change workspaces.
 

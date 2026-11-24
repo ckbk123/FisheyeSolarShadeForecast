@@ -18,6 +18,8 @@ Starting at the cap and working inward, SolarShade finds the first radius of the
 
 Angles outside calibration are estimates. SolarShade continues the slope of the lens’s angle-to-radius curve at the last calibrated angle. For the bundled photograph the polynomial turns inward after 78.79° incident angle, so simply extending that polynomial could assign two angles to one radius. The endpoint slope gives a consistent outward projection. An independently measured direction near the edge would be needed to test its angular accuracy.
 
+In a controlled irradiance test, the Sun passed through a known opening between a 120° calibrated field and a 160° terminal dark band. Applying the extension recovered the expected **0.400 kWh/m²** in that hour. Selecting a fully blocked mask produced **0.000 kWh/m²** with the same weather and panel orientation.
+
 ## Bundled photograph
 
 The calibrated field is **132.86° full** at **823.94 px**. The estimated 180° ring lies at **970.36 px**. The automatic mask classifies cloud and sky beyond calibration. At **867.94 px** (147.03° estimated full), it still labels **70 of 1,440** samples as open. A 95%-black crossing at that radius cannot establish a terminal band. Starting at **893.94 px** (155.40° estimated full), all samples on every remaining ring fall outside the mask’s coverage.
