@@ -44,8 +44,9 @@ no ground reflection or electrical PV model is added.
 
 Every explicit Update results operation saves its actual stage outputs
 in a new top-level Debug Data run. The fixed reference run remains unchanged.
-Export data opens a selection and destination dialog. Irradiance (.xlsx) saves
-all completed result intervals in a six-column workbook in a new scenario folder.
+Export data opens a selection and destination dialog. Choose panel results, shading factors or
+horizontal weather columns. Each row retains the source timestamp. Original GHI
+is available only for inputs that supply it.
 Full scientific diagnostics remain in the current top-level Debug Data folder.
 
 settings.json here contains default paths relative to APPLICATION.exe. Current

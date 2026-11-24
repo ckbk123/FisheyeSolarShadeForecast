@@ -7,11 +7,14 @@ namespace SolarShade.Desktop;
 internal static class IrradianceDataExport
 {
     private const string PanelResults = "06-shading/panel-results.json";
+    private const string HorizontalResults = "03-irradiance/horizontal-irradiance.xlsx";
     private const string FactorSemantics = "Shading factor=shaded/unshaded irradiance (1=open, 0=blocked); blank when the unshaded component is zero.";
 
     // The callback permits testing failures and changes after generation but before atomic publication.
-    internal static void Publish(DebugDataRun run, string destination, Action<string>? afterWorkbook = null)
+    internal static void Publish(DebugDataRun run, string destination, Action<string>? afterWorkbook = null, DataExportOptions? options = null)
     {
+        options ??= new();
+        options.Validate();
         destination = Path.GetFullPath(destination);
         if (DebugDataStore.Within(run.DirectoryPath, destination) || DebugDataStore.Within(destination, run.DirectoryPath))
             throw new ArgumentException("Choose an export destination outside Debug Data.");
@@ -24,18 +27,28 @@ internal static class IrradianceDataExport
         {
             DebugDataRun.Manifest snapshot;
             string savedResults = Path.Combine(staging, "panel-results.json");
+            string savedHorizontal = Path.Combine(staging, "horizontal-irradiance.xlsx");
             lock (run.SyncRoot)
             {
                 snapshot = run.ExportState();
                 using var inputs = SnapshotExport.LockInputs(snapshot.Settings);
                 snapshot = run.ExportState();
                 SnapshotExport.CopyVerified(Path.Combine(run.DirectoryPath, PanelResults), savedResults, snapshot.ArtifactHashes[PanelResults]);
+                if (options.IncludesWeather)
+                {
+                    if (!snapshot.ArtifactHashes.TryGetValue(HorizontalResults, out var hash))
+                        throw new InvalidOperationException("This study has no saved horizontal weather data. Update results before exporting weather columns.");
+                    SnapshotExport.CopyVerified(Path.Combine(run.DirectoryPath, HorizontalResults), savedHorizontal, hash);
+                }
             }
             using var document = JsonDocument.Parse(File.ReadAllText(savedResults));
             var root = document.RootElement;
             string workbook = Path.Combine(staging, "irradiance.xlsx");
-            WriteWorkbook(workbook, root, snapshot);
+            var weather = options.IncludesWeather
+                ? IrradianceDatasetFiles.Import(savedHorizontal, TimeZoneInfo.Utc, TimeSpan.Zero, TimestampLabel.Explicit) : null;
+            WriteWorkbook(workbook, root, snapshot, options, weather);
             File.Delete(savedResults);
+            if (weather != null) File.Delete(savedHorizontal);
             afterWorkbook?.Invoke(workbook);
             lock (run.SyncRoot)
             {
@@ -48,6 +61,8 @@ internal static class IrradianceDataExport
                     Status = "Complete", ResultId = snapshot.Id, ExportedUtc = exported,
                     Products = new[] { "Irradiance" }, Workbook = "irradiance.xlsx", WorkbookSha256 = AppData.FileKey(workbook),
                     SourceArtifactSha256 = snapshot.ArtifactHashes[PanelResults],
+                    SelectedFields = options.Fields.ToString(), WeatherSource = weather?.Source,
+                    WeatherArtifactSha256 = weather == null ? null : snapshot.ArtifactHashes[HorizontalResults],
                     Model = root.GetProperty("Model").GetString(), TimeZoneId = root.GetProperty("TimeZoneId").GetString(),
                     TimestampConvention = root.GetProperty("TimestampConvention").GetString(), FactorSemantics, snapshot.EquipmentAngles,
                     RowCount = root.GetProperty("Rows").GetArrayLength()
@@ -62,8 +77,11 @@ internal static class IrradianceDataExport
         }
     }
 
-    internal static void WriteWorkbook(string path, JsonElement root, DebugDataRun.Manifest snapshot)
+    internal static void WriteWorkbook(string path, JsonElement root, DebugDataRun.Manifest snapshot,
+        DataExportOptions? options = null, IrradianceDataset? weather = null)
     {
+        options ??= new();
+        options.Validate();
         string model = Text(root, "Model") switch {
             "Isotropic" => "Isotropic", "HayDavies" => "Hay–Davies",
             _ => throw Incomplete()
@@ -72,12 +90,30 @@ internal static class IrradianceDataExport
         if (!root.TryGetProperty("Rows", out var rows) || rows.ValueKind != JsonValueKind.Array || rows.GetArrayLength() == 0)
             throw Incomplete();
         Number(root, "BeforeEnergy"); Number(root, "AfterEnergy");
+        if (options.IncludesWeather)
+        {
+            if (weather == null) throw Incomplete();
+            // Weather files may extend beyond the study and the local study day may clip a source interval.
+            weather = IrradianceDatasets.Select(weather, Instant(rows[0], "Start"), Instant(rows[rows.GetArrayLength() - 1], "End"));
+            if (weather.Intervals.Count != rows.GetArrayLength()) throw IntervalMismatch();
+            if (options.Fields.HasFlag(IrradianceFields.GlobalHorizontal) && !weather.Intervals.Any(r => r.GlobalHorizontal.HasValue))
+                throw new InvalidOperationException("This study has no original GHI. Export its horizontal components or download weather again and update.");
+        }
         // Validate every saved interval before writing any workbook data.
+        int index = 0;
         foreach (var row in rows.EnumerateArray())
         {
-            Instant(row, "Timestamp");
+            var timestamp = Instant(row, "Timestamp");
             var start = Instant(row, "Start"); var end = Instant(row, "End");
             if (end <= start) throw Incomplete();
+            if (weather != null)
+            {
+                var interval = weather.Intervals[index++];
+                if (interval.Id != Text(row, "IntervalId") || interval.Timestamp != timestamp ||
+                    interval.Start != start || interval.End != end ||
+                    interval.SourceStart != Instant(row, "SourceStart") || interval.SourceEnd != Instant(row, "SourceEnd"))
+                    throw IntervalMismatch();
+            }
             double direct = Number(row, "BeforeDirect"), diffuse = Number(row, "BeforeDiffuse");
             double afterDirect = Number(row, "AfterDirect"), afterDiffuse = Number(row, "AfterDiffuse");
             Number(row, "AfterTotal");
@@ -96,19 +132,49 @@ internal static class IrradianceDataExport
                 snapshot.EquipmentAngles,
                 DatasetFingerprint = root.TryGetProperty("DatasetFingerprint", out var fingerprint) && fingerprint.ValueKind == JsonValueKind.String ? fingerprint.GetString() : null,
                 SourceArtifactSha256 = snapshot.ArtifactHashes.GetValueOrDefault(PanelResults),
+                WeatherArtifactSha256 = weather == null ? null : snapshot.ArtifactHashes.GetValueOrDefault(HorizontalResults),
                 NativeCadence = root.TryGetProperty("NativeCadence", out var cadence) && cadence.ValueKind == JsonValueKind.String ? cadence.GetString() : null,
                 Source = root.TryGetProperty("Source", out var source) && source.ValueKind == JsonValueKind.String ? source.GetString() : null
             });
-        ScientificSheet sheet = new("Irradiance",
-            ["Timeseries", "Direct (W/m²)", $"Diffuse {model} (W/m²)",
-                "Shading factor direct", "Shading factor diffuse", "Final total (W/m²)"],
-            rows.EnumerateArray().Select(row => new object?[] {
-                Instant(row, "Timestamp"), Number(row, "BeforeDirect"), Number(row, "BeforeDiffuse"),
-                Factor(Number(row, "BeforeDirect"), Number(row, "AfterDirect")),
-                Factor(Number(row, "BeforeDiffuse"), Number(row, "AfterDiffuse")), Number(row, "AfterTotal")
-            })) { ColumnWidths = [36, 24, 30, 24, 24, 24] };
-        ScientificWorkbook.Write(path, [sheet], metadata);
+        var columns = IrradianceExportColumn.ForModel(model).Where(c => options.Fields.HasFlag(c.Field)).ToArray();
+        List<ScientificSheet> sheets = [new("Irradiance", ["Timeseries", .. columns.Select(c => c.Header)],
+            rows.EnumerateArray().Select((row, i) => Values(row, weather?.Intervals[i], columns)))
+            { ColumnWidths = [36, .. columns.Select(c => c.Width)] }];
+        if (weather != null)
+        {
+            sheets.Add(new("Weather source", ["Property", "Value"], [
+                ["Source", weather.Source], ["Units", weather.Units], ["Time zone", weather.TimeZoneId],
+                ["Timestamp label", weather.Label.ToString()], ["Interval convention", weather.TimestampConvention],
+                ["Native cadence (minutes)", weather.NativeCadence?.TotalMinutes], ["Fetched at (UTC)", weather.FetchedUtc.ToUniversalTime()],
+                ["Values", "Original source interval means on a horizontal surface, before panel transposition or shading."],
+                ["Study boundaries", "An interval clipped at a study boundary keeps the value and timestamp of its source interval."]
+            ]) { ColumnWidths = [30, 115] });
+        }
+        ScientificWorkbook.Write(path, sheets, metadata);
     }
+
+    private static object?[] Values(JsonElement row, IrradianceInterval? weather, IrradianceExportColumn[] columns)
+    {
+        var values = new object?[columns.Length + 1];
+        values[0] = Instant(row, "Timestamp");
+        for (int i = 0; i < columns.Length; i++)
+            values[i + 1] = columns[i].Field switch
+            {
+                IrradianceFields.PanelDirect => Number(row, "BeforeDirect"),
+                IrradianceFields.PanelDiffuse => Number(row, "BeforeDiffuse"),
+                IrradianceFields.DirectFactor => Factor(Number(row, "BeforeDirect"), Number(row, "AfterDirect")),
+                IrradianceFields.DiffuseFactor => Factor(Number(row, "BeforeDiffuse"), Number(row, "AfterDiffuse")),
+                IrradianceFields.ShadedTotal => Number(row, "AfterTotal"),
+                IrradianceFields.GlobalHorizontal => weather!.GlobalHorizontal,
+                IrradianceFields.DirectHorizontal => weather!.DirectHorizontal,
+                IrradianceFields.DiffuseHorizontal => weather!.DiffuseHorizontal,
+                _ => throw new ArgumentOutOfRangeException()
+            };
+        return values;
+    }
+
+    private static InvalidOperationException IntervalMismatch() =>
+        new("Saved weather intervals do not match the panel results. Update results before exporting.");
 
     private static string Text(JsonElement parent, string property)
     {
