@@ -41,8 +41,8 @@ function create(container, onViewChange) {
   container.appendChild(canvas);
   const ctx = canvas.getContext("2d");
   let state = {
-    panel: {azimuth: 0, tilt: 28},
-    phone: {azimuth: 0, tilt: 28, imageTopBearing: 0},
+    panel: {topHeading: 0, tilt: 28},
+    phone: {topHeading: 0, tilt: 28},
     sun: {azimuth: 135, elevation: 42}
   };
   let options = {active: "panel", labels: true, angles: true, placed: true};
@@ -226,24 +226,21 @@ function create(container, onViewChange) {
 
   function groundArc(values) {
     const active = options.active;
-    const flatHeading = active === "phone" && state.phone.tilt === 0;
-    const fromNorth = active === "sun" || flatHeading;
-    const bearing = flatHeading ? values.actualImageTopBearing :
-        active === "phone" ? values.phoneBearing : active === "panel" ? values.panelBearing : values.sunBearing;
+    const solar = active === "sun";
+    const bearing = solar ? values.sunBearing : state[active].topHeading;
     if (bearing == null) return;
-    const start = fromNorth ? 0 : 180;
-    const delta = fromNorth ? bearing : state[active].azimuth;
     const color = colors[active], radius = 2.95;
-    const arc = samples(start, start + delta, a => onRing(radius, a, .028), 2.5);
-    if (Math.abs(delta) > .02) {
+    const arc = samples(0, bearing, a => onRing(radius, a, .028), 2.5);
+    if (bearing > .02) {
       polygon([[0, 0, .028], ...arc], color + "0b");
       arrow(arc, color + "bc", 1.7, 6.5);
     } else
       dotAt(arc[0], 3, color);
-    line([[0, 0, .028], onRing(radius + .12, start, .028)], color + "78", 1, [3, 4]);
+    line([[0, 0, .028], onRing(radius + .12, 0, .028)], color + "78", 1, [3, 4]);
     line([[0, 0, .03], onRing(radius + .12, bearing, .03)], color + "9c", 1.4);
-    const mid = onRing(radius, start + delta / 2, .03);
-    tag((flatHeading ? "Image top " : "Az ") + angleText(delta), mid, color, 8, 9, true);
+    const mid = onRing(radius, bearing / 2, .03);
+    const label = solar ? "Solar az " : state[active].tilt === 90 ? "Heading when flat " : "Top heading ";
+    tag(label + angleText(bearing), mid, color, 8, 9, true);
   }
 
   function contactShadow(center, frame, w, h) {
@@ -465,14 +462,11 @@ function create(container, onViewChange) {
       });
     } else {
       const isPanel = active === "panel";
-      const trueBearing = (isPanel ? values.panelBearing : values.phoneBearing) ??
-          ((isPanel ? state.panel.azimuth : values.actualImageTopBearing) + 180);
-      const planeTilt = isPanel ? state.panel.tilt : values.phoneTilt;
+      const planeTilt = state[active].tilt;
       // The selected plane meets its horizontal reference along the level (cross-slope) direction.
-      const uphill = heading(trueBearing + 180);
-      const slope = plus(times(uphill, Math.cos(planeTilt * rad)), times(up, Math.sin(planeTilt * rad)));
+      const uphill = heading(state[active].topHeading);
       const f = isPanel ? panels : phones, c = isPanel ? pc : fc;
-      const base = move(move(c, f.right, isPanel ? -1.67 : -.37), slope, isPanel ? -.78 : -.33);
+      const base = onFace(c, f, isPanel ? -1.67 : -.37, isPanel ? -.78 : -.33);
       tiltArc({
         base,
         zero: uphill,
@@ -533,7 +527,7 @@ function create(container, onViewChange) {
     ctx.lineCap = "round";
     labels = [];
     occupied = [];
-    const values = G.sceneValues(state), panels = G.framePanel(state.panel), phones = G.framePhone(state.phone);
+    const values = G.sceneValues(state), panels = G.equipmentFrame(state.panel), phones = G.equipmentFrame(state.phone);
     const sun = times(values.sunVector, sunDistance);
     setProjection(sun);
     const pc = options.placed ? [0, 0, .91] : [-.56, .17, .91];
@@ -560,19 +554,21 @@ function create(container, onViewChange) {
     reserveModel(fc, phones, .50, .89, .85);
     const panelBase = onFace(pc, panels, -.60, .00, .018), phoneBase = onFace(fc, phones, 0, .22, .022);
     const panelTip = move(panelBase, panels.normal, 1.67), phoneTip = move(phoneBase, phones.normal, 1.30);
-    arrow([panelBase, panelTip], colors.panel, 2.8, 10);
-    arrow([phoneBase, phoneTip], colors.phone, 2.8, 10);
+    arrow([panelBase, panelTip], colors.panel, 2.1, 8);
+    arrow([phoneBase, phoneTip], colors.phone, 2.1, 8);
     dotAt(panelBase, 2.3, colors.panel);
     dotAt(phoneBase, 2.3, colors.phone);
+    function topArrow(center, frame, x, from, to, label, color, offset) {
+      const shaft = [onFace(center, frame, x, from, .036), onFace(center, frame, x, to, .036)];
+      arrow(shaft, "#f8fcff", 5.4, 13);
+      arrow(shaft, color, 3, 10);
+      if (options.labels) tag(label, shaft[1], color, offset, 10);
+    }
+    topArrow(pc, panels, -.94, -.47, .98, "Panel top", colors.panel, 14);
+    topArrow(fc, phones, .14, -.29, .55, "Phone top", colors.phone, -14);
     if (options.labels) {
       tag("Panel normal", panelTip, colors.panel, 9, -14);
       tag("Lens axis", phoneTip, colors.phone, -9, -14);
-    }
-    if (options.active === "phone") {
-      const begin = onFace(fc, phones, 0, -.22, .035), end = onFace(fc, phones, 0, .74, .035);
-      arrow([begin, end], "#087e77", 1.8, 7);
-      if (options.labels)
-        tag("Image top", end, colors.phone, -8, 12);
     }
     if (options.angles)
       angleGuide(values, panels, phones, pc, fc);

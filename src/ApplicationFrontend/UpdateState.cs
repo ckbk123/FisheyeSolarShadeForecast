@@ -12,7 +12,7 @@ public static class UpdateInputs
         if (!double.IsFinite(s.Longitude) || Math.Abs(s.Longitude) > 180) return "Longitude must be between -180 and 180 degrees.";
         if (!double.IsFinite(s.Elevation)) return "Enter a finite elevation.";
         if (!double.IsFinite(s.PanelTilt) || s.PanelTilt < 0 || s.PanelTilt > 90) return "Panel tilt must be between 0 and 90 degrees.";
-        if (!double.IsFinite(s.PanelAzimuth) || s.PanelAzimuth < 0 || s.PanelAzimuth > 360) return "The stored panel bearing is invalid. Set the panel front azimuth again.";
+        if (!double.IsFinite(s.PanelAzimuth) || s.PanelAzimuth < 0 || s.PanelAzimuth > 360) return "The stored panel bearing is invalid. Enter the panel top heading again.";
         if (!double.IsFinite(s.BottomAzimuth) || !double.IsFinite(s.CameraTilt) || !double.IsFinite(s.CameraRoll) || Math.Abs(s.CameraTilt) > 180)
             return "The stored camera pose is invalid. Select Use lens-end-uphill placement or copy the panel pose.";
         if (!double.IsFinite(s.CoverageAngle) || s.CoverageAngle < 0 || s.CoverageAngle > 180) return "Coverage must be 0 (use profile) or at most 180 degrees.";

@@ -112,7 +112,7 @@
       mounts.set(container, view);
     }
     const geometry = globalThis.AngleGeometry;
-    const frame = geometry.framePhone(state.phone);
+    const frame = geometry.equipmentFrame(state.phone);
     view.horizon.setAttribute("d", horizonPath(frame));
     const visibleCardinals = [];
     cardinals.forEach(({ label, vector }, index) => {

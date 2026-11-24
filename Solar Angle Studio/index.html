@@ -64,26 +64,26 @@
           </div>
           <div id="fields"></div>
           <p id="control-note" class="control-note"></p>
-          <button id="copy-panel" class="copy-button" title="Copy this example panel’s current tilt and front direction to the illustrated phone."><svg class="icon"><use href="#i-link"/></svg>Copy panel pose to phone</button>
+          <button id="copy-panel" class="copy-button" title="Copy this example panel’s tilt and top heading to the illustrated phone."><svg class="icon"><use href="#i-link"/></svg>Copy panel pose to phone</button>
           <div id="photo-inspection" hidden></div>
         </div>
       </aside>
     </div>
     <section class="card readout" aria-labelledby="readout-heading">
       <div class="card-head"><h2 id="readout-heading"><svg class="icon"><use href="#i-grid"/></svg>Angle readout</h2></div>
-      <div class="table-wrap"><table><thead><tr><th scope="col">Object</th><th scope="col">Azimuth</th><th scope="col">Tilt or elevation</th><th scope="col">Additional angle</th></tr></thead><tbody id="readout"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th scope="col">Object</th><th scope="col">Top heading</th><th scope="col">Tilt or solar angles</th><th scope="col">Azimuth</th></tr></thead><tbody id="readout"></tbody></table></div>
       <div class="measurements"><span>Sun to panel normal <strong id="incidence"></strong></span><span>Lens to panel normal <strong id="separation"></strong></span></div>
     </section>
   </main>
   <dialog id="guide" aria-labelledby="guide-heading"><div class="dialog-head"><h2 id="guide-heading">Angle guide</h2><button class="icon-button" id="close-guide" aria-label="Close guide"><svg class="icon"><use href="#i-close"/></svg></button></div>
     <div class="guide-body">
-      <h3>Panel and phone</h3><p>Measure tilt between the equipment plane and horizontal. A flat panel or phone has 0° tilt. At 90° it is vertical. The blue arrow points out of the solar-cell face. The teal arrow points out of the fisheye lens.</p>
-      <p>Project each arrow onto the horizontal plane to find its azimuth. Start at geographic south and turn clockwise. South is 0°, west +90°, north ±180°, and east −90° or 270°. A flat panel or phone has an upward normal and an undefined azimuth.</p>
-      <h3>Phone image</h3><p>This illustration places the lens end straight uphill and aligns it with image top (zero additional roll). When the phone lies flat, the separate image-top bearing is clockwise from true north. Turn it to rotate the photograph while the lens points straight up. With image top north, east appears on the left.</p>
+      <h3>Panel top and phone top</h3><p>Follow the arrow along each face, from the centre toward the marked top edge. The phone top is its lens end. With the device flat, measure this heading clockwise from true north. Keep the heading as you raise that edge from 0° flat to 90° vertical. At 90° the top points straight up, and the ground compass shows its heading when laid flat.</p>
+      <h3>Panel front and lens azimuth</h3><p>The arrows pointing out of the faces show the panel front normal and lens axis. Their horizontal projections give azimuths measured clockwise from geographic south. South is 0°, west +90°, north ±180° and east −90° or 270°. When the marked tops point east and you lift them, both faces point west (+90°). At 0° tilt the normals point straight up and their azimuths are undefined.</p>
+      <h3>Phone image</h3><p>The lens end points straight uphill and aligns with image top (zero additional roll). Turn the phone’s top heading to rotate the photograph. With the phone flat and its top pointing north, east appears on the left.</p>
       <p>The phone image shows an ideal 180° fisheye. A calibrated study uses the lens and field of view of the photograph.</p>
       <h3>Sun</h3><p>Solar azimuth is clockwise from true north. Elevation starts at the horizon, and zenith angle starts at straight up. Their sum is 90°. Azimuth is undefined when the sun is directly overhead or directly below. The gold line points toward the sun. Incoming sunlight travels in the opposite direction.</p>
       <p>The example sun position is set manually. The irradiance calculation determines solar position from site, date and time.</p>
-      <h3>Explore the scene</h3><p>Choose Panel, Phone or Sun to see its angles. Use the arrows on a focused scene to orbit, + or − to zoom and Home to reset. Top view places north up and east right. Copy panel pose to phone aligns the two illustrated objects once. The flat panel leaves the phone’s image heading free.</p>
+      <h3>Explore the scene</h3><p>Choose Panel, Phone or Sun to see its angles. Use the arrows on a focused scene to orbit, + or − to zoom and Home to reset. Top view places north up and east right. Copy panel pose to phone aligns both illustrated top edges and both tilts once, including when flat.</p>
     </div></dialog>
   <noscript>Enable JavaScript to use the 3D angle controls.</noscript>
 </body>

@@ -14,7 +14,9 @@ public sealed record EquipmentAngleReport(
     double? PanelFrontAzimuthClockwiseFromSouthDegrees,
     double PanelTiltFromHorizontalDegrees)
 {
-    public string Convention => "Vincent Boitier: equipment azimuth clockwise from geographic south (west +90°, east -90°); flat planes have undefined azimuth.";
+    public double PhoneTopHeadingClockwiseFromTrueNorthDegrees { get; init; }
+    public double PanelTopHeadingClockwiseFromTrueNorthDegrees { get; init; }
+    public string Convention => "Equipment azimuth follows the outward lens or front normal clockwise from geographic south (west +90°, east −90°). Flat planes have undefined azimuth. Top headings are clockwise from true north with the equipment laid flat.";
 
     internal static EquipmentAngleReport? From(UserSettings settings)
     {
@@ -28,7 +30,11 @@ public sealed record EquipmentAngleReport(
         var angles = EquipmentOrientation.Describe(settings);
         return new(angles.PhoneAzimuth, angles.PhoneTilt <= 90 ? angles.PhoneTilt : null,
             angles.PhoneTilt, angles.ImageTopBearing, angles.Roll, angles.PhonePlacement,
-            angles.IsVincentPhonePose, angles.PanelAzimuth, angles.PanelTilt);
+            angles.IsVincentPhonePose, angles.PanelAzimuth, angles.PanelTilt)
+        {
+            PhoneTopHeadingClockwiseFromTrueNorthDegrees = settings.PhoneTopHeading,
+            PanelTopHeadingClockwiseFromTrueNorthDegrees = settings.PanelTopHeading
+        };
     }
 
     private static string Degrees(double? value) =>
@@ -39,12 +45,12 @@ public sealed record EquipmentAngleReport(
         string tilt = PhoneTiltFromHorizontalDegrees is { } t
             ? "tilt " + Degrees(t) + " from horizontal"
             : "lens zenith " + Degrees(LensZenithFromUpDegrees) + " (outside 0–90°)";
-        return $"Lens azimuth {Degrees(PhoneLensAzimuthClockwiseFromSouthDegrees)} (S = 0°) | {tilt}";
+        return $"Phone top {Degrees(PhoneTopHeadingClockwiseFromTrueNorthDegrees)} (flat, true N) | lens azimuth {Degrees(PhoneLensAzimuthClockwiseFromSouthDegrees)} (S = 0°) | {tilt}";
     }
 
     internal string DescribeImage() =>
-        $"Image top {Degrees(ImageTopBearingClockwiseFromTrueNorthDegrees)} (true N = 0°) | source camera roll {Degrees(SourceProjectionRollDegrees)} | {PhonePlacement}";
+        $"Projected image top {Degrees(ImageTopBearingClockwiseFromTrueNorthDegrees)} (true N) | source camera roll {Degrees(SourceProjectionRollDegrees)} | {PhonePlacement}";
 
     internal string DescribePanel() =>
-        $"Front azimuth {Degrees(PanelFrontAzimuthClockwiseFromSouthDegrees)} (S = 0°) | tilt {Degrees(PanelTiltFromHorizontalDegrees)} from horizontal";
+        $"Panel top {Degrees(PanelTopHeadingClockwiseFromTrueNorthDegrees)} (flat, true N) | front azimuth {Degrees(PanelFrontAzimuthClockwiseFromSouthDegrees)} (S = 0°) | tilt {Degrees(PanelTiltFromHorizontalDegrees)} from horizontal";
 }

@@ -78,6 +78,8 @@ public sealed class EquipmentOrientationTests
         string key = AppData.Key(loaded);
         var expected = CameraPose.FromImageBottom(252, tilt, roll);
         var angles = EquipmentOrientation.Describe(loaded);
+        loaded.PhoneTopHeading = loaded.PhoneTopHeading;
+        loaded.PanelTopHeading = loaded.PanelTopHeading;
         Assert.Equal(supported, angles.IsVincentPhonePose);
         Assert.Equal(Math.Abs(tilt), angles.PhoneTilt);
         Assert.Equal(180, angles.PanelAzimuth);
@@ -90,6 +92,7 @@ public sealed class EquipmentOrientationTests
         Assert.DoesNotContain("PhoneInclination", saved);
         Assert.DoesNotContain("FlatImageTopBearing", saved);
         Assert.DoesNotContain("PanelFacingAzimuth", saved);
+        Assert.DoesNotContain("TopHeading", saved);
         var reloaded = JsonSerializer.Deserialize<UserSettings>(saved)!;
         Assert.Equal(expected.Axes(), EquipmentOrientation.ToCameraPose(reloaded).Axes());
         Assert.Equal(key, AppData.Key(reloaded));
@@ -112,14 +115,14 @@ public sealed class EquipmentOrientationTests
     }
 
     [Fact]
-    public void MountingOnHorizontalPanelPreservesHeadingEvenForAnOriginallyVerticalImageEdge()
+    public void MountingOnHorizontalPanelCopiesItsHeadingEvenForAnOriginallyVerticalImageEdge()
     {
         var settings = new UserSettings { PanelAzimuth = 47, PanelTilt = 0, BottomAzimuth = 270, CameraTilt = -90 };
         Assert.Null(EquipmentOrientation.Describe(settings).ImageTopBearing);
         EquipmentOrientation.PlacePhoneOnPanel(settings);
         Assert.Equal(0, settings.CameraTilt);
         Assert.Equal(0, settings.CameraRoll);
-        Assert.Equal(90, settings.FlatImageTopBearing, 10);
+        Assert.Equal(227, settings.FlatImageTopBearing, 10);
         Assert.Null(EquipmentOrientation.Describe(settings).PhoneAzimuth);
         settings.PanelTilt = 6.8;
         settings.PanelFacingAzimuth = -26;
@@ -127,6 +130,66 @@ public sealed class EquipmentOrientationTests
         Assert.Equal(-6.8, settings.CameraTilt);
         Assert.Equal(154, settings.BottomAzimuth);
         Assert.Equal(-26, settings.PhoneFacingAzimuth);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(90, 90)]
+    [InlineData(180, 180)]
+    [InlineData(270, -90)]
+    [InlineData(326.7, -33.3)]
+    public void TopHeadingsRemainEditableFromFlatThroughUpright(double heading, double azimuth)
+    {
+        var settings = new UserSettings();
+        foreach (double tilt in new[] { 0, 28, 90, 0 })
+        {
+            settings.PanelTilt = tilt;
+            settings.PhoneInclination = tilt;
+            settings.PanelTopHeading = heading;
+            settings.PhoneTopHeading = heading;
+            Assert.Equal(heading, settings.PanelTopHeading, 10);
+            Assert.Equal(heading, settings.PhoneTopHeading, 10);
+            var angles = EquipmentOrientation.Describe(settings);
+            if (tilt == 0)
+            {
+                Assert.Null(angles.PhoneAzimuth);
+                Assert.Null(angles.PanelAzimuth);
+            }
+            else
+            {
+                Assert.Equal(azimuth, angles.PhoneAzimuth!.Value, 10);
+                Assert.Equal(azimuth, angles.PanelAzimuth!.Value, 10);
+            }
+            if (tilt == 90) Assert.Null(angles.ImageTopBearing);
+            else Assert.Equal(heading, angles.ImageTopBearing!.Value, 10);
+            // Make the next iteration an actual heading edit, including at 90°.
+            settings.PhoneTopHeading = heading + 45;
+            settings.PanelTopHeading = heading + 45;
+        }
+    }
+
+    [Theory]
+    [InlineData(-72, 30)]
+    [InlineData(72, 145)]
+    public void RolledLegacyTopHeadingUsesTheFlattenedPhotoFrameAtEveryTilt(double signedTilt, double roll)
+    {
+        var settings = new UserSettings { BottomAzimuth = 156, CameraTilt = signedTilt, CameraRoll = roll };
+        var reference = EquipmentOrientation.Describe(settings with { CameraTilt = 0 }).ImageTopBearing!.Value;
+        var initial = EquipmentOrientation.Describe(settings);
+        Assert.True(initial.IsVincentPhonePose);
+        Assert.NotEqual(reference, initial.ImageTopBearing!.Value, 6);
+        Assert.Equal(reference, settings.PhoneTopHeading, 10);
+        settings.PhoneTopHeading = 48.5;
+        Assert.Equal(48.5, settings.PhoneTopHeading, 10);
+        Assert.Equal(48.5, EquipmentOrientation.Describe(settings with { CameraTilt = 0 }).ImageTopBearing!.Value, 10);
+        Assert.Equal(signedTilt, settings.CameraTilt);
+        Assert.Equal(roll, settings.CameraRoll);
+        foreach (double tilt in new[] { 90, 0, 28 })
+        {
+            settings.PhoneInclination = tilt;
+            Assert.Equal(48.5, settings.PhoneTopHeading, 10);
+            Assert.True(EquipmentOrientation.Describe(settings).IsVincentPhonePose);
+        }
     }
 
     [Fact]
@@ -140,6 +203,9 @@ public sealed class EquipmentOrientationTests
         settings.PanelAzimuth = -90;
         settings.PanelFacingAzimuth = 90;
         Assert.Equal(270, settings.PanelAzimuth);
+        settings.PanelAzimuth = -90;
+        settings.PanelTopHeading = 90;
+        Assert.Equal(270, settings.PanelAzimuth);
     }
 
     [Fact]
@@ -151,6 +217,8 @@ public sealed class EquipmentOrientationTests
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.PhoneInclination = 91);
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.PhoneFacingAzimuth = double.NaN);
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.PanelFacingAzimuth = double.PositiveInfinity);
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.PhoneTopHeading = double.NaN);
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.PanelTopHeading = double.PositiveInfinity);
         Assert.Throws<InvalidOperationException>(() => settings.FlatImageTopBearing = 45);
         Assert.Equal(before, settings);
         settings.CameraTilt = 181;

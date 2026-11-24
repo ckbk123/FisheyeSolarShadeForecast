@@ -44,7 +44,7 @@ public sealed class FixedUpdateControlsTests
             Assert.True(Bounds(block, surface).Top >= Bounds(viewport, surface).Bottom - 1,
                 "Update commands must remain below the scrollable study panes.");
 
-            foreach (string property in new[] { "PanelTilt", "PanelFacingAzimuth" })
+            foreach (string property in new[] { "PanelTilt", "PanelTopHeading" })
             {
                 var field = Assert.Single(Descendants<TextBox>(inputs), box => Equals(box.Tag, property));
                 Assert.Contains(inputs, Ancestors<ScrollViewer>(field));
@@ -71,7 +71,7 @@ public sealed class FixedUpdateControlsTests
             Assert.InRange(viewport.VerticalOffset, 0, 1); AssertFixed("study top");
 
             chart.BringIntoView(); await Layout(surface, width, height); AssertFixed("chart BringIntoView");
-            foreach (string property in new[] { "Latitude", "PanelFacingAzimuth" })
+            foreach (string property in new[] { "Latitude", "PanelTopHeading" })
             {
                 Assert.Single(Descendants<TextBox>(inputs), box => Equals(box.Tag, property)).BringIntoView();
                 await Layout(surface, width, height); AssertFixed(property + " BringIntoView");

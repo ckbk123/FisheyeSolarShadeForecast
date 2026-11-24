@@ -8,7 +8,7 @@ using static ManualUpdateTests;
 public sealed class EquipmentAngleControlTests
 {
     [Fact]
-    public void EditingUsesSouthZeroAndFlatHeadingAndCopiesPanelOnlyOnRequest() => Sta(async () =>
+    public void FlatTiltedAndVerticalPosesKeepTheSameTopHeadingControls() => Sta(async () =>
     {
         using var fixture = new Fixture();
         using var service = new AppServices(fixture.Debug);
@@ -20,41 +20,85 @@ public sealed class EquipmentAngleControlTests
             TextBox Box(string field) => controls.OfType<TextBox>().Single(box => Equals(box.Tag, field));
             void Edit(string field, string value) => window.CommitFieldForTest(field, value);
             var copy = controls.OfType<Button>().Single(b => Equals(b.Content, "Copy panel pose to phone"));
+            var panelSlider = controls.OfType<Slider>().Single(s => Equals(s.Tag, "PanelTopHeading"));
+            var phoneTop = Box("PhoneTopHeading");
+            var panelTop = Box("PanelTopHeading");
 
-            Assert.False(Box("PhoneFacingAzimuth").IsEnabled);
-            Assert.Equal("—", Box("PhoneFacingAzimuth").Text);
-            Assert.True(Box("FlatImageTopBearing").IsEnabled);
-            Edit("FlatImageTopBearing", "90");
+            Assert.True(phoneTop.IsEnabled);
+            Assert.Contains(controls.OfType<TextBlock>(), b => b.Text == "Lens azimuth undefined · flat");
+            Edit("PhoneTopHeading", "90");
             Assert.Equal(270, settings.BottomAzimuth, 9);
             Edit("PanelTilt", "28");
-            var panelSlider = controls.OfType<Slider>().Single(s => Equals(s.Tag, "PanelFacingAzimuth"));
-            panelSlider.Value = -180;
-            Assert.Equal(-180, panelSlider.Value);
-            Assert.Equal(0, settings.PanelAzimuth);
-            Edit("PanelFacingAzimuth", "270");
-            Assert.Equal("-90", Box("PanelFacingAzimuth").Text);
+            panelSlider.Value = 360;
+            Assert.Equal(360, panelSlider.Value);
+            Assert.Equal(180, settings.PanelAzimuth);
+            Edit("PanelTopHeading", "-90");
+            Assert.Equal("270", panelTop.Text);
             Assert.Equal(90, settings.PanelAzimuth);
+            Assert.Contains(controls.OfType<TextBlock>(), b => b.Text.StartsWith("Panel front azimuth -90°"));
             Assert.Equal(0, settings.CameraTilt);
+
             copy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal("28", Box("PhoneInclination").Text);
-            Assert.Equal("-90", Box("PhoneFacingAzimuth").Text);
-            Assert.False(Box("FlatImageTopBearing").IsEnabled);
-            Assert.Equal(90, settings.BottomAzimuth); Assert.Equal(-28, settings.CameraTilt);
-            Edit("PhoneFacingAzimuth", "90");
+            Assert.Equal("270", phoneTop.Text);
+            Assert.Equal(90, settings.BottomAzimuth);
+            Assert.Equal(-28, settings.CameraTilt);
+            Assert.Contains(controls.OfType<TextBlock>(), b => b.Text.StartsWith("Lens azimuth -90°"));
+            Edit("PhoneTopHeading", "90");
             Assert.Equal(270, settings.BottomAzimuth);
             Assert.Equal(90, settings.PanelAzimuth);
             Edit("PhoneInclination", "-28");
             Assert.Equal(UpdateState.NeedsAttention, window.UpdateStateForTest);
             Assert.Equal(-28, settings.CameraTilt);
             Edit("PhoneInclination", "0");
-            Assert.Equal("—", Box("PhoneFacingAzimuth").Text);
-            Assert.Equal(90, settings.FlatImageTopBearing, 9);
+            Assert.True(phoneTop.IsEnabled);
+            Assert.Equal("90", phoneTop.Text);
+
             Edit("PanelTilt", "0");
-            Assert.Equal("—", Box("PanelFacingAzimuth").Text);
-            Assert.False(Box("PanelFacingAzimuth").IsEnabled);
-            Assert.False(panelSlider.IsEnabled);
+            Assert.True(panelTop.IsEnabled);
+            Assert.True(panelSlider.IsEnabled);
+            Assert.Contains(controls.OfType<TextBlock>(), b => b.Text == "Panel front azimuth undefined · flat");
+            Edit("PanelTopHeading", "invalid");
+            Assert.False(copy.IsEnabled);
+            Edit("PanelTopHeading", "180");
+            Assert.True(copy.IsEnabled);
+            Assert.Equal("90", phoneTop.Text);
+            copy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("180", phoneTop.Text);
+            Assert.Equal(0, settings.PhoneInclination);
             Assert.NotEqual(UpdateState.NeedsAttention, window.UpdateStateForTest);
+
+            Edit("PanelTilt", "90");
+            Assert.Equal("180", panelTop.Text);
+            Edit("PanelTopHeading", "45");
+            Assert.Equal("180", phoneTop.Text);
+            copy.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("45", phoneTop.Text);
+            Assert.Equal(90, settings.PhoneInclination);
+            Assert.Contains(controls.OfType<TextBlock>(), b => b.Text.StartsWith("Lens azimuth 45°"));
+            Edit("PhoneInclination", "0");
+            Assert.Equal("45", phoneTop.Text);
             Assert.Equal(0, fixture.Runs);
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
+    [Fact]
+    public void InvalidStoredPanelBearingCanBeRepairedWhileFlat() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        AppData.SaveSettings(fixture.Settings with { PanelTilt = 0, PanelAzimuth = -1 });
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(loadExampleOnFirstRun: false, applicationServices: service);
+        try
+        {
+            var top = Descendants(window.Irradiance).OfType<TextBox>().Single(b => Equals(b.Tag, "PanelTopHeading"));
+            Assert.True(top.IsEnabled);
+            Assert.Equal("—", top.Text);
+            window.CommitFieldForTest("PanelTopHeading", "179");
+            Assert.Equal(359, window.IrradianceController.Settings.PanelAzimuth);
+            Assert.Equal("179", top.Text);
+            Assert.NotEqual(UpdateState.NeedsAttention, window.UpdateStateForTest);
         }
         finally { window.Close(); await window.InputsSettled; }
     });

@@ -28,6 +28,8 @@ public sealed class EquipmentAngleExportTests
         Assert.Equal(90, angles.GetProperty("PanelFrontAzimuthClockwiseFromSouthDegrees").GetDouble());
         Assert.Equal(28, angles.GetProperty("PhoneTiltFromHorizontalDegrees").GetDouble());
         Assert.Equal(90, angles.GetProperty("ImageTopBearingClockwiseFromTrueNorthDegrees").GetDouble(), 8);
+        Assert.Equal(90, angles.GetProperty("PhoneTopHeadingClockwiseFromTrueNorthDegrees").GetDouble());
+        Assert.Equal(90, angles.GetProperty("PanelTopHeadingClockwiseFromTrueNorthDegrees").GetDouble());
         Assert.True(angles.GetProperty("IsVincentPhonePose").GetBoolean());
 
         using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "export.json")));
@@ -45,15 +47,18 @@ public sealed class EquipmentAngleExportTests
     [Fact]
     public void FlatVerticalAndHistoricalDownwardPosesHaveUnambiguousReports()
     {
-        var settings = new UserSettings { PanelTilt = 0, BottomAzimuth = 270, CameraTilt = 0 };
+        var settings = new UserSettings { PanelTilt = 0, PanelTopHeading = 240, BottomAzimuth = 270, CameraTilt = 0 };
         var flat = EquipmentAngleReport.From(settings)!;
         Assert.Null(flat.PanelFrontAzimuthClockwiseFromSouthDegrees);
         Assert.Null(flat.PhoneLensAzimuthClockwiseFromSouthDegrees);
         Assert.Equal(90, flat.ImageTopBearingClockwiseFromTrueNorthDegrees!.Value, 8);
+        Assert.Equal(240, flat.PanelTopHeadingClockwiseFromTrueNorthDegrees);
+        Assert.Equal(90, flat.PhoneTopHeadingClockwiseFromTrueNorthDegrees);
         Assert.Contains("undefined", flat.DescribePhone());
 
         var vertical = EquipmentAngleReport.From(settings with { CameraTilt = -90 })!;
         Assert.Null(vertical.ImageTopBearingClockwiseFromTrueNorthDegrees);
+        Assert.Equal(90, vertical.PhoneTopHeadingClockwiseFromTrueNorthDegrees);
         Assert.Contains("undefined", vertical.DescribeImage());
 
         var downward = EquipmentAngleReport.From(settings with { CameraTilt = -120 })!;

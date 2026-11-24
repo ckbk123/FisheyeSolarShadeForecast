@@ -123,7 +123,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
             var study = snapshot.Settings;
             var angles = EquipmentOrientation.Describe(study);
             string facing = angles.PanelAzimuth is double azimuth ? $"{azimuth:0.##}° from south" : "undefined (flat)";
-            sourceText.Text = $"{study.Start:yyyy-MM-dd} – {study.End:yyyy-MM-dd} · {snapshot.TimeZoneId} · panel tilt {angles.PanelTilt:0.##}° · front azimuth {facing}";
+            sourceText.Text = $"{study.Start:yyyy-MM-dd} – {study.End:yyyy-MM-dd} · {snapshot.TimeZoneId} · panel tilt {angles.PanelTilt:0.##}° · top heading {study.PanelTopHeading:0.##}° clockwise from true north · front azimuth {facing}";
         }
         evaluate.IsEnabled = Controller.CanEvaluate; stop.IsEnabled = Controller.IsBusy; export.IsEnabled = Controller.CanExport;
         status.Text = snapshot == null ? source.Source.Reason : Controller.Problem ?? Controller.Status;

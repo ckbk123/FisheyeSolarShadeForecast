@@ -321,14 +321,20 @@ public sealed class AppServices : IIrradianceService
 
             string transpositionDirectory = debug.BeginStage("05-transposition", "Computed", typeof(TranspositionModule));
             progress("Calculating irradiance on the panel");
-            string nextTransposed = AppData.Key(new { Solar = nextGeometry, s.PanelTilt, s.PanelAzimuth, s.Isotropic });
+            var panel = new PanelOrientation(s.PanelTilt, s.PanelAzimuth);
+            // Rotating a horizontal panel changes its marked edge and saved study, but not its receiver normal.
+            // Share the numerical rows while keeping the requested orientation in every exported stage.
+            double numericalAzimuth = s.PanelTilt == 0 && s.PanelAzimuth is >= 0 and <= 360 ? 180 : s.PanelAzimuth;
+            string nextTransposed = AppData.Key(new { Solar = nextGeometry, s.PanelTilt, PanelAzimuth = numericalAzimuth, s.Isotropic });
             // Transposition is cheaper to compute than to deserialize its duplicated solar timeline.
             if (transposedCache == null || transposedKey != nextTransposed || refresh)
             {
-                var next = await Task.Run(() => TranspositionModule.ComputePrepared(geometry!, new(s.PanelTilt, s.PanelAzimuth),
+                var next = await Task.Run(() => TranspositionModule.ComputePrepared(geometry!, panel,
                     s.Isotropic ? DiffuseModel.Isotropic : DiffuseModel.HayDavies, ct: ct), ct);
                 ct.ThrowIfCancellationRequested(); transposedCache = next; transposedKey = nextTransposed;
             }
+            else if (transposedCache.Panel != panel)
+                transposedCache = transposedCache with { Panel = panel };
             var panelArtifacts = debug.NeedsWrite(ArtifactGroup.Transposition)
                 ? new[] { (await Task.Run(() => TranspositionModule.ExportPrepared(transposedCache, Path.Combine(transpositionDirectory, "panel-unshaded.xlsx"), ct), ct)).OutputPath! } : [];
             debug.CompleteStage("05-transposition", panelArtifacts);
@@ -344,7 +350,8 @@ public sealed class AppServices : IIrradianceService
                 ct.ThrowIfCancellationRequested(); resultCache = next; resultKey = nextResult;
                 await Task.Run(() => Values.Write("shading", nextResult, next), ct);
             }
-            var result = resultCache;
+            var result = resultCache.Panel.HasValue && resultCache.Panel != panel
+                ? resultCache with { Panel = panel } : resultCache;
             debug.CompleteStage("06-shading", debug.NeedsWrite(ArtifactGroup.Shading)
                 ? await Task.Run(() => ShadingCorrectionModule.ExportPanel(result, correctionDirectory, ct), ct) : [], skipped: scene == null);
             lock (inputGate)

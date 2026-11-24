@@ -17,35 +17,38 @@ function Camera($settings) {
         right = Vector $axes.Item1
         top = Vector ([SolarShade.Shading.Direction]::op_Multiply(-1, $axes.Item2))
         normal = Vector $axes.Item3
+        topHeading = $settings.PhoneTopHeading
         imageTopBearing = $angles.ImageTopBearing
         lensBearing = if ($null -ne $angles.PhoneAzimuth) { $settings.BottomAzimuth }
+        lensAzimuthFromSouth = $angles.PhoneAzimuth
     }
 }
 
 # Independent panel and camera inputs exercise both objects even away from a mounted pose.
-$cases = foreach ($facing in 0, 90, -90, 270, 180, -180, -26, 36.75) {
+$cases = foreach ($heading in 0, 90, -90, 270, 180, -180, -26, 36.75) {
     foreach ($tilt in 0, 6.8, 28, 90) {
         foreach ($sunElevation in -90, -17, 0, 42, 90) {
             $settings = [SolarShade.Desktop.UserSettings]::new()
             $settings.PanelTilt = $tilt
-            $settings.PanelFacingAzimuth = $facing
-            $phone = @{ azimuth = -$facing; tilt = 90 - $tilt; imageTopBearing = (360 + $facing) % 360 }
+            $settings.PanelTopHeading = $heading
+            $phone = @{ topHeading = (45 - $heading + 360) % 360; tilt = 90 - $tilt }
             $settings.PhoneInclination = $phone.tilt
-            if ($phone.tilt -eq 0) { $settings.FlatImageTopBearing = $phone.imageTopBearing }
-            else { $settings.PhoneFacingAzimuth = $phone.azimuth }
+            $settings.PhoneTopHeading = $phone.topHeading
 
-            $sunAzimuth = (317.25 + $facing) % 360
+            $sunAzimuth = (317.25 + $heading) % 360
             $sunDirection = [SolarShade.Shading.Direction]::FromAngles($sunAzimuth, 90 - $sunElevation)
             $panelDirection = [SolarShade.Shading.Direction]::FromAngles($settings.PanelAzimuth, $tilt)
             $lensDirection = [SolarShade.Desktop.EquipmentOrientation]::ToCameraPose($settings).Axes().Item3
             $case = @{
                 state = @{
-                    panel = @{ azimuth = $facing; tilt = $tilt }
+                    panel = @{ topHeading = (360 + $heading) % 360; tilt = $tilt }
                     phone = $phone
                     sun = @{ azimuth = $sunAzimuth; elevation = $sunElevation }
                 }
                 camera = Camera $settings
                 panel = Vector $panelDirection
+                panelTopHeading = $settings.PanelTopHeading
+                panelAzimuthFromSouth = [SolarShade.Desktop.EquipmentOrientation]::Describe($settings).PanelAzimuth
                 panelBearing = if ($tilt -ne 0) { $settings.PanelAzimuth }
                 sun = Vector $sunDirection
                 incidenceCosine = $panelDirection.Dot($sunDirection)
@@ -83,12 +86,19 @@ function bearing(a, b, key) {
 function camera(actual, expected) {
   for (const axis of ["right", "top", "normal"]) vector(actual[axis], expected[axis], "camera " + axis);
 }
+function southAzimuth(bearing) {
+  return bearing === null ? null : G.signedAzimuth(bearing - 180);
+}
 for (const c of cases) {
   try {
     const {panel, phone, sun} = c.state;
     const values = G.sceneValues(c.state);
-    camera(G.framePhone(phone), c.camera);
-    vector(G.framePanel(panel).normal, c.panel, "panel front");
+    camera(G.equipmentFrame(phone), c.camera);
+    vector(G.equipmentFrame(panel).normal, c.panel, "panel front");
+    bearing(panel.topHeading, c.panelTopHeading, "panel top heading");
+    bearing(phone.topHeading, c.camera.topHeading, "phone top heading");
+    bearing(southAzimuth(values.phoneBearing), c.camera.lensAzimuthFromSouth, "lens azimuth from south");
+    bearing(southAzimuth(values.panelBearing), c.panelAzimuthFromSouth, "front azimuth from south");
     vector(values.sunVector, c.sun, "solar direction");
     bearing(values.phoneBearing, c.camera.lensBearing, "lens azimuth");
     bearing(values.actualImageTopBearing, c.camera.imageTopBearing, "image-top bearing");
@@ -98,9 +108,11 @@ for (const c of cases) {
     close(values.phoneTilt, phone.tilt, "phone tilt");
     close(Math.cos(values.incidence * Math.PI / 180), c.incidenceCosine, "incidence cosine");
     close(Math.cos(values.separation * Math.PI / 180), c.separationCosine, "lens–panel cosine");
-    const mounted = G.copyPanelPose(panel, phone);
-    camera(G.framePhone(mounted), c.mounted);
-    camera(G.framePhone(G.setPhoneTilt(mounted, phone.tilt)), c.retilted);
+    const mounted = G.copyPanelPose(panel);
+    camera(G.equipmentFrame(mounted), c.mounted);
+    bearing(mounted.topHeading, c.mounted.topHeading, "aligned top heading");
+    camera(G.equipmentFrame({...mounted, tilt: phone.tilt}), c.retilted);
+    bearing(mounted.topHeading, c.retilted.topHeading, "top heading after changing tilt");
   } catch (error) {
     throw new Error("Parity failure for " + JSON.stringify(c.state), {cause: error});
   }

@@ -11,7 +11,6 @@
 
   function signedAzimuth(angle) {
     const wrapped = wrap360(angle);
-    if (wrapped === 180 && angle < 0) return -180;
     return wrapped > 180 ? wrapped - 360 : wrapped;
   }
 
@@ -30,10 +29,9 @@
     return Math.atan2(Math.hypot(...cross), dot) / rad;
   }
 
-  // The lens end is straight uphill. In a tilted plane this edge projects
-  // opposite the outward normal, so its north bearing equals the numeric
-  // south-zero equipment azimuth. Image right is west when image top is north.
-  function equipmentFrame(topHeading, tilt) {
+  // Start flat with the marked top at topHeading, then lift that edge about the
+  // cross-slope axis. For the sky-facing image, right is west when top is north.
+  function equipmentFrame({topHeading, tilt}) {
     const angle = wrap360(topHeading) * rad;
     const s = Math.sin(angle), c = Math.cos(angle);
     const rise = Math.sin(tilt * rad), run = tilt === 90 ? 0 : Math.cos(tilt * rad);
@@ -44,35 +42,18 @@
     };
   }
 
-  function framePhone(phone) {
-    return equipmentFrame(phone.tilt === 0 ? phone.imageTopBearing ?? 0 : phone.azimuth, phone.tilt);
-  }
-
-  function framePanel(panel) {
-    return equipmentFrame(panel.azimuth, panel.tilt);
-  }
-
   function sunDirection({azimuth, elevation}) {
     const horizontal = Math.abs(elevation) === 90 ? 0 : Math.cos(elevation * rad);
     return [horizontal * Math.sin(azimuth * rad), horizontal * Math.cos(azimuth * rad), Math.sin(elevation * rad)];
   }
 
-  function setPhoneTilt(phone, tilt) {
-    if (!Number.isFinite(tilt) || tilt < 0 || tilt > 90) throw new RangeError("Phone tilt must be between 0° and 90°.");
-    if (tilt === phone.tilt) return {...phone};
-    if (tilt === 0) return {...phone, tilt, imageTopBearing: wrap360(phone.azimuth)};
-    if (phone.tilt === 0) return {...phone, tilt, azimuth: signedAzimuth(phone.imageTopBearing ?? 0)};
-    return {...phone, tilt};
-  }
-
-  function copyPanelPose(panel, phone) {
-    if (panel.tilt === 0) return setPhoneTilt(phone, 0);
-    return {...phone, tilt: panel.tilt, azimuth: panel.azimuth};
+  function copyPanelPose(panel) {
+    return {tilt: panel.tilt, topHeading: panel.topHeading};
   }
 
   function sceneValues({panel, phone, sun}) {
-    const panelFrame = framePanel(panel);
-    const phoneFrame = framePhone(phone);
+    const panelFrame = equipmentFrame(panel);
+    const phoneFrame = equipmentFrame(phone);
     const sunVector = sunDirection(sun);
     return {
       panelNormal: panelFrame.normal,
@@ -83,16 +64,14 @@
       separation: angleBetween(panelFrame.normal, phoneFrame.normal),
       zenith: 90 - sun.elevation,
       phoneTilt: phone.tilt,
-      actualImageTopBearing: phone.tilt === 90 ? null :
-        wrap360(phone.tilt === 0 ? phone.imageTopBearing ?? 0 : phone.azimuth),
-      phoneBearing: phone.tilt === 0 ? null : wrap360(phone.azimuth + 180),
-      panelBearing: panel.tilt === 0 ? null : wrap360(panel.azimuth + 180),
+      actualImageTopBearing: phone.tilt === 90 ? null : wrap360(phone.topHeading),
+      phoneBearing: phone.tilt === 0 ? null : wrap360(phone.topHeading + 180),
+      panelBearing: panel.tilt === 0 ? null : wrap360(panel.topHeading + 180),
       sunBearing: Math.abs(sun.elevation) === 90 ? null : wrap360(sun.azimuth)
     };
   }
 
-  const api = {wrap360, signedAzimuth, bearing, angleBetween, framePhone, framePanel, sunDirection,
-    setPhoneTilt, copyPanelPose, sceneValues};
+  const api = {wrap360, signedAzimuth, bearing, angleBetween, equipmentFrame, sunDirection, copyPanelPose, sceneValues};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   globalThis.AngleGeometry = api;
 })();

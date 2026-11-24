@@ -1,4 +1,4 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.2
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.3
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
@@ -13,13 +13,13 @@ apply only to the illustration. The map works offline with Microsoft Edge
 WebView2 or through the tab's option to open it locally in a browser.
 
 1. Open Solar Irradiance. Load the example or select your study inputs.
-   Both the phone and panel use tilt from horizontal and clockwise azimuth
-   from geographic south: S 0, W +90, N +/-180, E -90 (also 270 degrees).
-   Enter the direction the lens points or the panel front faces. With the
-   phone on the panel, keep its lens end uphill and enter identical angles.
-   For a flat phone, enter the image-top bearing clockwise from true north.
-   Existing studies keep their saved pose. The camera controls identify
-   older placements that fall outside the new capture convention.
+   Set each top heading clockwise from true north as if the device lay flat.
+   The phone top is its lens end. Raise the marked top edge to set the tilt.
+   You can also turn either top while flat. Copy panel pose to phone aligns
+   both top headings and tilts once. The lens and panel-front azimuths are
+   measured clockwise from south and are undefined at zero tilt.
+   Existing studies keep their saved pose.
+
    Choose sky photo selects a photograph directly. Import existing mask accepts
    an opaque, exact black/white grayscale PNG at the oriented photo dimensions
    without AI. Choose white or black for open sky, name the mask, then import it.

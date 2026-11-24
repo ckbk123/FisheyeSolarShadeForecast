@@ -1,12 +1,12 @@
 # Running SolarShade
 
-Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.3.2 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
+Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.3.3 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
 
 Hover over a study control or focus it and press **F1** to read its explanation. Press **Escape** to dismiss keyboard help. For the full reference, open **Help**. You can keep the guide beside the study while you edit inputs or change workspaces.
 
 ## Orientation map
 
-The leftmost tab is a 3D reference for the sun, panel and phone. Orbit the scene or choose a top or side view. Start with the south-facing 28° example, then try a flat phone and rotate its image-top bearing. The values you explore belong only to this map. Solar Irradiance opens by default and has its own study inputs. The map runs offline in Microsoft Edge WebView2. If that runtime is unavailable, use the browser option in the tab to open the bundled map locally.
+The leftmost tab is a 3D reference for the sun, panel and phone. Orbit the scene or choose a top or side view. Start with the south-facing 28° example, then select the flat example and rotate the panel or phone top. The arrows drawn on the devices identify their marked tops. The values you explore belong only to this map. Solar Irradiance opens by default and has its own study inputs. The map runs offline in Microsoft Edge WebView2. If that runtime is unavailable, use the browser option in the tab to open the bundled map locally.
 
 ## Workflow
 
@@ -47,19 +47,22 @@ Click **Evaluate system**. The shared chart shows load demand and available PV e
 
 ## Phone and panel angles
 
-Use geographic directions. Panel azimuth follows the outward normal of its front face. Phone azimuth follows the optical axis coming out of the fisheye lens. In both cases S = 0°, W = +90°, N = ±180°, and E = −90° or 270°. Tilt is the angle of the device plane above horizontal, from 0° to 90°. For an uphill phone capture the top of the oriented photo corresponds to the raised lens end. With the phone lens-outward on the panel, enter the same tilt and azimuth for both.
+Choose a physical top edge on the panel. On the phone, use the lens end that corresponds to the top of the oriented photograph. Imagine the device lying flat, lens or panel front pointing up. **Top heading** is the compass bearing from the center toward that edge, clockwise from true north. North is 0°, east 90°, south 180° and west 270°. Set the **tilt from horizontal** by raising that edge. At 90° the marked edge is directly above the center in the illustrated placement. The heading still records which way the top points when you lower the device flat.
 
-| Physical setup | Phone entry | Panel entry |
-| --- | --- | --- |
-| Both face south at 28°, lens end uphill | 28° tilt, 0° azimuth | 28° tilt, 0° azimuth |
-| Both face east at 28°, lens end uphill | 28° tilt, −90° azimuth | 28° tilt, −90° azimuth |
-| LAAS Site 2 historical run | 0° tilt, image top 0° true (assumed north) | 6.8° tilt, −26° azimuth |
+Boitier’s convention defines **panel front azimuth** and **lens azimuth** using the horizontal projection of the outward panel normal and lens axis. Their zero is geographic south, increasing clockwise to west +90°, north ±180° and east −90°. Solar Irradiance displays these derived angles beside the inputs. A flat device has a top heading and an undefined facing azimuth.
 
-When a device is flat, its upward normal has no compass direction. For a flat phone, enter the **image-top bearing clockwise from true north** to register the photograph against the sun path. Changing this heading rotates the overlay while the lens still points straight up. For an upward-looking image with north at the top, east appears on the left. Solar azimuth in the ephemeris and the cardinal overlay remain geographic bearings clockwise from north.
+| Physical placement with phone and panel tops aligned | Top heading on both devices | Tilt | Panel front and lens azimuth |
+| --- | --- | --- | --- |
+| Both lie flat with tops east | 90° (E) | 0° | Undefined |
+| Raise those east edges | 90° (E) | 28° | +90° (W) |
+| Both face south with tops uphill | 0° (N) | 28° | 0° (S) |
+| Both face east with tops uphill | 270° (W) | 28° | −90° (E) |
 
-Saved settings retain their original physical fields for older readers. In the stored geometry the 28° south-facing phone uses image bottom 180°, signed camera tilt −28°, and roll 0°. The corresponding stored panel uses tilt 28° and front bearing 180°. Opening and updating an older study preserves its pose. The UI identifies older phone placements outside the uphill convention, including an optical axis pointing below the horizon. Changing one of those placements is an explicit action.
+**Copy panel pose to phone** aligns the two top headings and tilts once, including when the panel is flat. Subsequent edits are independent. Turning a flat panel rotates its physical edges. Turning a flat phone also rotates the photograph relative to the compass and sun path. With north at image top in an upward-looking photograph, east appears on the left. Solar azimuth uses true north as zero.
 
-**Copy panel pose to phone** applies the panel angles once. The two inputs can then be edited independently. At zero tilt the copy keeps the photo heading. After upgrading, use **Update results** to generate outputs with the new build. An older north-zero panel entry of 0° still models north and appears as 180° here. If field notes establish that the operator meant south, set the front azimuth to 0° in the new interface and update that study.
+Existing studies retain their stored camera and panel geometry. An older flat panel's initial top heading comes from its saved panel bearing. If that edge was never recorded in the field, choose the heading that matches the installation. Saved camera roll and nonstandard phone placements remain identifiable in the study.
+
+For the LAAS Site 2 example, a panel tilted 6.8° with a front azimuth of −26° has a top heading of 334°. The flat phone’s assumed north image top corresponds to a separate phone top heading of 0°.
 
 ## Cardinal-direction preview
 
