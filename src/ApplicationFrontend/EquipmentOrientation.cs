@@ -6,7 +6,10 @@ namespace SolarShade.Desktop;
 /// <summary>Equipment azimuths are clockwise from geographic south. Image-top bearing is clockwise from geographic north.</summary>
 public sealed record EquipmentAngles(
     double? PhoneAzimuth, double PhoneTilt, double? PanelAzimuth, double PanelTilt,
-    double? ImageTopBearing, double Roll, bool IsVincentPhonePose, string PhonePlacement);
+    double? ImageTopBearing, double Roll, bool IsVincentPhonePose, string PhonePlacement)
+{
+    public bool MatchesTwoAnglePhonePose => EquipmentOrientation.MatchesTwoAnglePhonePose(IsVincentPhonePose, PhoneTilt, Roll);
+}
 
 /// <summary>
 /// Interprets the persisted north-bearing camera/receiver parameters without modifying a saved pose.
@@ -34,6 +37,11 @@ public static class EquipmentOrientation
         double difference = Wrap360(Wrap360(a) - Wrap360(b));
         return difference < 1e-11 || 360 - difference < 1e-11;
     }
+
+    // When flat, roll is fully included in top heading. When tilted, the top must point
+    // directly uphill: 0° roll for negative stored tilt, or 180° for positive stored tilt.
+    internal static bool MatchesTwoAnglePhonePose(bool uphillOrFlat, double tilt, double roll) =>
+        uphillOrFlat && (tilt == 0 || SameBearing(roll, 0) || SameBearing(roll, 180));
 
     internal static void RequireFinite(double value)
     {

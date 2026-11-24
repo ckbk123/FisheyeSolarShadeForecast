@@ -10,6 +10,7 @@ public sealed partial class IrradianceWorkspace
     private const string PhoneHeadingHelp = "With the phone flat, measure clockwise from true north toward the lens end (0–360°). See Orientation map.";
     private const string PanelHeadingHelp = "With the panel flat and face up, measure clockwise from true north toward its top edge (0–360°). See Orientation map.";
     private readonly Dictionary<string, Slider> angleSliders = new();
+    private TextBlock savedRoll = null!;
     private Button useUphillPlacement = null!;
     private Button placePhoneOnPanel = null!;
     private UserSettings? phoneTiltEditOrigin;
@@ -20,6 +21,9 @@ public sealed partial class IrradianceWorkspace
         AddAngleField(parent, "Phone tilt", nameof(UserSettings.PhoneInclination),
             "Raise the lens end from 0° (flat) to 90° (vertical). See Orientation map.");
         AddAngleField(parent, "Phone top heading", nameof(UserSettings.PhoneTopHeading), PhoneHeadingHelp);
+        savedRoll = Label("", 12);
+        StudioTheme.Help(savedRoll, "This photo also uses a sideways roll. Orientation map shows the phone with its top pointing directly uphill.");
+        parent.Children.Add(savedRoll);
         useUphillPlacement = Button("Use lens-end-uphill placement", () =>
         {
             EquipmentOrientation.UseUphillPlacement(settings);
@@ -101,11 +105,17 @@ public sealed partial class IrradianceWorkspace
             Show(nameof(UserSettings.PhoneTopHeading), pose.IsVincentPhonePose ? settings.PhoneTopHeading : null, pose.IsVincentPhonePose);
             Show(nameof(UserSettings.PanelTilt), pose.PanelTilt, true);
             Show(nameof(UserSettings.PanelTopHeading), validPanelBearing ? settings.PanelTopHeading : null, true);
-            useUphillPlacement.Visibility = pose.IsVincentPhonePose ? Visibility.Collapsed : Visibility.Visible;
+            bool sidewaysRoll = pose.IsVincentPhonePose && !pose.MatchesTwoAnglePhonePose;
+            savedRoll.Visibility = sidewaysRoll ? Visibility.Visible : Visibility.Collapsed;
+            if (sidewaysRoll) savedRoll.Text = $"Saved camera roll {pose.Roll:G}°";
+            useUphillPlacement.Visibility = pose.MatchesTwoAnglePhonePose ? Visibility.Collapsed : Visibility.Visible;
+            useUphillPlacement.Content = sidewaysRoll ? "Use two-angle pose" : "Use lens-end-uphill placement";
             placePhoneOnPanel.IsEnabled = settings.PanelTilt is >= 0 and <= 90 && validPanelBearing &&
                 !invalidFields.Contains(nameof(UserSettings.PanelTilt)) && !invalidFields.Contains(nameof(UserSettings.PanelTopHeading));
             string lens = AzimuthReadout("Lens azimuth", pose.PhoneAzimuth, pose.PhoneTilt == 0);
-            if (!pose.IsVincentPhonePose)
+            if (sidewaysRoll)
+                StudioTheme.Help(useUphillPlacement, "Keep the lens direction and tilt. Rotate the image top directly uphill to match Orientation map.");
+            else if (!pose.IsVincentPhonePose)
             {
                 string reset = pose.PhoneTilt is > 90 and <= 180
                     ? $"Lens zenith {pose.PhoneTilt:G}° from vertical up. Use lens-end-uphill placement to bring the lens to 90° at the horizon."
