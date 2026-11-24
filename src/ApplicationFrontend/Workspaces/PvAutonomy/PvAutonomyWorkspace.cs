@@ -46,7 +46,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
             sidebarMinimumHeight: 600, contentMinimumHeight: 600));
         var top = new StackPanel { Margin = new(16, 12, 16, 0) }; right.Children.Add(top);
         top.Children.Add(Heading("System settings", 19));
-        sourceText.Margin = new(0, 2, 0, 4); top.Children.Add(sourceText);
+        sourceText.Focusable = true; sourceText.Margin = new(0, 2, 0, 4); top.Children.Add(sourceText);
         var settings = new WrapPanel(); top.Children.Add(settings);
         AddField(settings, "Panel area · m²", "Active panel area receiving the study’s shaded irradiance.", d => d.Area, (d, v) => d with { Area = v });
         AddField(settings, "Panel efficiency · %", "Percentage of incident solar energy converted to electricity by the panel.", d => d.PanelEfficiency, (d, v) => d with { PanelEfficiency = v });
@@ -81,7 +81,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
         navigation.Children.Add(Button("First shortfall", () => { if (Controller.Result?.Summary.FirstShortfallIntervalStart is { } start) { day.SelectedDate = start.Date; chart.Day(start.Date); } },
             "Show the first interval with unmet consumption. Red marks along the chart identify these intervals."));
         navigation.Children.Add(Button("Hourly values", ShowTable, "Inspect the actual interval bounds, energy values, battery charge and unmet consumption."));
-        hover.MinHeight = 34; bottom.Children.Add(hover); chart.Hover += value => hover.Text = value;
+        hover.MinHeight = 20; bottom.Children.Add(hover); chart.Hover += value => hover.Text = value;
         status.Margin = new(0, 7, 0, 0); bottom.Children.Add(status);
         chart.Margin = new(10, 0, 10, 0); Grid.SetRow(chart, 1); right.Children.Add(chart);
         load.Edited += values => Controller.SetDraft(Controller.Draft with { Load = values });
@@ -123,7 +123,8 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
             var study = snapshot.Settings;
             var angles = EquipmentOrientation.Describe(study);
             string facing = angles.PanelAzimuth is double azimuth ? $"{azimuth:0.##}° from south" : "undefined (flat)";
-            sourceText.Text = $"{study.Start:yyyy-MM-dd} – {study.End:yyyy-MM-dd} · {snapshot.TimeZoneId} · panel tilt {angles.PanelTilt:0.##}° · top heading {study.PanelTopHeading:0.##}° clockwise from true north · front azimuth {facing}";
+            sourceText.Text = study.Start.Date == study.End.Date ? $"Study · {study.Start:dd.MM.yyyy}" : $"Study · {study.Start:dd.MM.yyyy} – {study.End:dd.MM.yyyy}";
+            StudioTheme.Help(sourceText, $"{snapshot.TimeZoneId} · panel tilt {angles.PanelTilt:0.##}° · top heading {study.PanelTopHeading:0.##}° clockwise from true north · front azimuth {facing}");
         }
         evaluate.IsEnabled = Controller.CanEvaluate; stop.IsEnabled = Controller.IsBusy; export.IsEnabled = Controller.CanExport;
         status.Text = snapshot == null ? source.Source.Reason : Controller.Problem ?? Controller.Status;
@@ -168,7 +169,7 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
     private void ShowHelp() => HelpWindow.OpenGuide(ref helpWindow, owner, "PV Autonomy · Help",
         [
             ("Set up a study", "1. Complete and update Solar Irradiance.\n2. Enter 24 hourly consumption values in Wh. They repeat by study-local hour (DST days can have 23 or 25 hours).\n3. Enter panel area, efficiencies, battery capacity in Wh and charge at the study start. Click Evaluate system."),
-            ("Read the energy chart", "The graph overlays load demand and PV energy available on the Wh axis, with battery charge on the fixed 0–100% axis. Red marks mean unmet load, even if charge recovered before the hour ended. Hover for actual interval bounds and duration. Zooming never resets the battery."),
+            ("Read the energy chart", "The Wh axis shows demand and available PV energy. The % axis shows battery charge. Red marks flag unmet load, even if charge recovered before the hour ended. Hover for interval readings and the duration of partial hours. Open Hourly values to compare rows."),
             ("Battery assumptions", "Conversion losses apply to PV only. Battery charge/discharge is ideal, all capacity is accessible, and power limits, ageing and temperature effects are omitted. Results describe the supplied study period only."),
             ("Export and restore", "Export PV results saves CSV, JSON and XLSX, including inputs, assumptions and the full irradiance source in JSON. Settings are restored on restart; results require an explicit evaluation."),
         ]);

@@ -46,6 +46,8 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private readonly Button refreshData = new() { Content = "Download weather again & update" };
     private readonly TextBlock weatherSource = Label("", 11);
     private readonly TextBlock lastWeatherResult = Label("", 11);
+    private readonly TextBlock runDetails = Label("", 12), modelDetails = Label("", 12);
+    private readonly Expander studyDetails = new() { Header = "Study details", Visibility = Visibility.Collapsed };
     private readonly Button chooseWeatherFile = new() { Content = "Choose XLSX / CSV file" };
     private readonly WeatherSourceSwitch weatherMode = new();
     private readonly StackPanel serviceWeatherControls = new(), importWeatherControls = new();
@@ -180,15 +182,16 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         resolution = Combo(inputs, "Mask resolution", ["1024 · original quality", "512 · faster"]); resolution.SelectionChanged += (_, _) => { if (!loading) { settings.Resolution = resolution.SelectedIndex == 1 ? 512 : 1024; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
         AddPhoneControls(inputs);
         Section(inputs, "Site location");
-        Field(inputs, "Latitude, ° N (+) / S (−)", "Latitude"); Field(inputs, "Longitude, ° E (+) / W (−)", "Longitude"); Field(inputs, "Elevation above sea level, m", "Elevation");
+        Field(inputs, "Latitude (°)", "Latitude"); Field(inputs, "Longitude (°)", "Longitude"); Field(inputs, "Elevation (m)", "Elevation");
         StudioTheme.Help(fields["Latitude"], "Enter geographic latitude in decimal degrees. North is positive, south is negative.");
         StudioTheme.Help(fields["Longitude"], "Enter geographic longitude in decimal degrees. East is positive, west is negative.");
-        useSystemZone = new() { Content = "Use Windows time zone (automatic)", Margin = new(0, 8, 0, 4) };
+        StudioTheme.Help(fields["Elevation"], "Height above sea level in metres.");
+        useSystemZone = new() { Content = "Use Windows time zone", Margin = new(0, 8, 0, 4) };
         useSystemZone.Checked += (_, _) => ChangeTimeZoneMode(true);
         useSystemZone.Unchecked += (_, _) => ChangeTimeZoneMode(false);
         inputs.Children.Add(useSystemZone);
         StudioTheme.Help(useSystemZone, "Use the Windows time zone for study dates and the graph. Clear this option to choose a different region or a fixed UTC offset.");
-        zone = Combo(inputs, "Time zone for dates and graph", []);
+        zone = Combo(inputs, "Study time zone", []);
         zone.DisplayMemberPath = nameof(TimeZoneInfo.DisplayName); zone.SelectedValuePath = nameof(TimeZoneInfo.Id);
         zone.ItemsSource = TimeZoneSelection.Choices();
         zone.DropDownOpened += (_, _) =>
@@ -218,12 +221,12 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         chooseWeatherFile.Click += (_, _) => PickImport(); importWeatherControls.Children.Add(chooseWeatherFile);
         StudioTheme.Help(chooseWeatherFile, "Include Timestamp, BHI (direct horizontal) and DHI (diffuse horizontal), in W/m². A sample CSV row is 2025-05-15T12:00:00+07:00,500,100. Example/Irradiance contains a sample workbook.");
         window = Combo(importWeatherControls, "Imported rows represent", ["Preceding interval · end labels", "Following interval · start labels", "Centered interval"]); window.SelectionChanged += (_, _) => { if (!loading) { settings.ImportWindow = window.SelectedIndex; Changed(); } };
-        Field(importWeatherControls, "Import interval, minutes (without metadata)", "ImportIntervalMinutes");
+        Field(importWeatherControls, "Interval length (min)", "ImportIntervalMinutes");
         StudioTheme.Help(window, "Use the source file’s timestamp convention. Native workbook metadata takes precedence over these interval settings.");
         StudioTheme.Help(fields["ImportIntervalMinutes"], "For a file without interval metadata, enter the duration represented by one source row in minutes.");
-        inputs.Children.Add(weatherSource); inputs.Children.Add(lastWeatherResult);
-        isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; inputs.Children.Add(isotropic);
-        StudioTheme.Help(isotropic, "Hay–Davies includes a circumsolar component. An isotropic sky distributes diffuse light uniformly. Their estimates depend on the weather, panel direction and mask.");
+        inputs.Children.Add(weatherSource);
+        isotropic = new() { Content = "Use isotropic diffuse light", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; inputs.Children.Add(isotropic);
+        StudioTheme.Help(isotropic, "Treat diffuse light as uniform across the sky. The default Hay–Davies model includes brighter sky around the sun.");
         inputs.Children.Add(tuning);
         AddPanelControls(tuning);
         update.Background = StudioTheme.Blue; update.Foreground = Brushes.White;
@@ -260,6 +263,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         preview.Children.Add(pair);
         editMask.Click += (_, _) => OpenMaskEditor();
         var previewInfo = new StackPanel { Margin = new(16, 6, 16, 10) };
+        maskInfo.Focusable = true;
         previewInfo.Children.Add(fieldOfViewInfo); previewInfo.Children.Add(maskInfo);
         sunPathInfo.Visibility = cardinalInfo.Visibility = Visibility.Collapsed;
         previewInfo.Children.Add(sunPathInfo); previewInfo.Children.Add(cardinalInfo);
@@ -284,7 +288,13 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         AutomationProperties.SetName(graphDay, "Day to display");
         toolbar.Children.Add(Label("  ● Before", 12, IrradianceChart.BeforeBrush)); toolbar.Children.Add(Label("  ● After", 12, IrradianceChart.AfterBrush));
         chart.HoverText = text => hover.Text = text; Grid.SetRow(chart, 2); graph.Children.Add(chart); hover.Margin = new(18, 4, 10, 0); Grid.SetRow(hover, 3); graph.Children.Add(hover);
-        provenance.Margin = new(18, 0, 14, 0); provenance.TextWrapping = TextWrapping.Wrap; Grid.SetRow(provenance, 4); graph.Children.Add(provenance);
+        var graphNotes = new StackPanel { Margin = new(18, 0, 14, 6) };
+        Grid.SetRow(graphNotes, 4); graph.Children.Add(graphNotes);
+        provenance.Visibility = Visibility.Collapsed; graphNotes.Children.Add(provenance);
+        var studyNotes = new StackPanel { Margin = new(18, 2, 0, 0) };
+        foreach (var note in new[] { runDetails, modelDetails, lastWeatherResult })
+        { note.TextWrapping = TextWrapping.Wrap; studyNotes.Children.Add(note); }
+        studyDetails.Content = studyNotes; graphNotes.Children.Add(studyDetails);
         
         settings = services.PrepareInputs(settings);
         LoadFields();
@@ -541,7 +551,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     skyViewport.SetPhoto(Bitmap(displayedPhoto), unmaskedPhoto.Width, unmaskedPhoto.Height, PortablePaths.Resolve(settings.SkyImage));
                     orientedPhotoWidth = unmaskedPhoto.Width; orientedPhotoHeight = unmaskedPhoto.Height;
                     RefreshFieldOfView();
-                    maskInfo.Text = "Mask pending";
+                    ShowMaskPending();
                 }
                 else { orientedPhotoWidth = orientedPhotoHeight = 0; RefreshFieldOfView(); }
                 return;
@@ -694,7 +704,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             if (geometryChanged) { skyViewport.ClearPhoto(); displayedPhoto = null; orientedPhotoWidth = orientedPhotoHeight = 0; }
             maskViewport.ClearImage(); displayedMaskPng = null;
             displayedAsset = null; editMask.IsEnabled = false;
-            maskInfo.Text = "Mask pending";
+            ShowMaskPending();
         }
         if ((groups & (ArtifactGroup.Profile | ArtifactGroup.Mask)) != 0) RefreshFieldOfView();
         if ((groups & ArtifactGroup.Orientation) != 0) InvalidateOrientation("Cardinal directions waiting for Update results");
@@ -708,6 +718,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if (completed == null) return;
         chart.Opacity = .5; beforeEnergy.Opacity = afterEnergy.Opacity = reduction.Opacity = .5;
         provenance.Text = "Previous results — update required";
+        provenance.Visibility = Visibility.Visible;
     }
     private string? InputProblem() => invalidFields.Any(f => InputDependencies.ForField(f, settings) != ArtifactGroup.None)
         ? "Correct the highlighted calculation fields: " + string.Join(", ", invalidFields.Where(f => InputDependencies.ForField(f, settings) != ArtifactGroup.None).Order()) : UpdateInputs.Problem(settings);
@@ -829,12 +840,19 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         chart.SetData(result.Run.Rows, TimeZoneSelection.Resolve(result.Settings.Zone));
         beforeEnergy.Text = result.Run.BeforeEnergy.ToString("F2"); afterEnergy.Text = result.Run.AfterEnergy?.ToString("F2") ?? "—";
         reduction.Text = result.Run.LossPercent is { } loss ? loss.ToString("F1") + "%" : "—";
-        provenance.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1}" : "Baseline only · add a camera profile and sky photo for shading.";
+        modelDetails.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1}" : "Baseline only";
+        runDetails.Text = restored ? $"{result.Run.Rows.Count:N0} intervals · saved result restored · {result.Settings.Zone}"
+            : $"{result.Run.Rows.Count:N0} intervals · {result.TotalMilliseconds / 1000:F2} s · Debug Data saved · {result.Settings.Zone}";
+        studyDetails.Visibility = Visibility.Visible;
+        provenance.Visibility = Visibility.Collapsed;
         bool complete = IrradianceReadiness.Inspect(services, result).IsReady;
         SetUpdateState(complete ? UpdateState.UpToDate : UpdateState.NeedsAttention,
-            complete ? restored ? $"{result.Run.Rows.Count:N0} intervals · saved result restored · {result.Raw.Source} · {result.Settings.Zone}"
-                : $"{result.Run.Rows.Count:N0} intervals · {result.TotalMilliseconds / 1000:F2} s · Debug Data saved · {result.Raw.Source} · {result.Settings.Zone}"
-                : "The shaded dataset is incomplete. Check the camera profile and sky photograph.");
+            complete ? "" : "Shading is incomplete. Check the camera profile and sky photo.");
+    }
+    private void ShowMaskPending()
+    {
+        maskInfo.Text = "Mask pending";
+        StudioTheme.Help(maskInfo, "Update results to prepare the selected mask.");
     }
     public void ShowMask(MaskAsset asset)
     {
@@ -852,7 +870,8 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             displayedMaskPng = asset.Png;
             if (sunPathIsCurrent && completed?.SunPath != null) ShowSunPath(completed.SunPath);
         }
-        maskInfo.Text = asset.Description;
+        maskInfo.Text = "Mask ready";
+        StudioTheme.Help(maskInfo, asset.Description);
         displayedAsset = asset; orientedPhotoWidth = asset.Result.Width; orientedPhotoHeight = asset.Result.Height;
         RefreshFieldOfView(); RefreshButtons();
     }

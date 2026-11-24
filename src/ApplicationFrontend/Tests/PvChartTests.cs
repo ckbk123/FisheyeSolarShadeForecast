@@ -47,6 +47,6 @@ public sealed class PvChartTests
         var end = start.ToOffset(TimeSpan.FromHours(-5)).AddMinutes(30);
         var row = new BatteryHour(start, end, true, 0, 0, 0, 0, 20, 0, 20, 0);
         string text = PvSystemChart.Describe(row);
-        Assert.Contains("-04:00", text); Assert.Contains("-05:00", text); Assert.Contains("30 min (partial hour)", text); Assert.Contains("unmet 20", text);
+        Assert.Contains("-04:00", text); Assert.Contains("-05:00", text); Assert.Contains("30 min (partial hour)", text); Assert.Contains("Unmet 20", text);
     }
 }

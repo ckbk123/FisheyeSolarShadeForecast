@@ -2,6 +2,13 @@ namespace SolarShade.Desktop;
 
 public static class TimeZoneSelection
 {
+    public static string IntervalLabel(DateTimeOffset start, DateTimeOffset end)
+    {
+        string until = end.ToString(start.Date == end.Date ? "HH:mm" : "dd.MM.yyyy HH:mm");
+        return start.Offset == end.Offset ? $"{start:dd.MM.yyyy HH:mm}–{until} ({start:zzz})"
+            : $"{start:dd.MM.yyyy HH:mm zzz}–{until} {end:zzz}";
+    }
+
     private const string FixedPrefix = "Fixed/UTC";
 
     public static TimeZoneInfo FixedOffset(TimeSpan offset)

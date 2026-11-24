@@ -25,7 +25,11 @@ public sealed class WeatherControlsTests
         {
             owner.Irradiance.SelectWeatherFile(workbook); owner.Calculate(); await Until(() => !owner.UpdatingForTest);
             Assert.NotNull(owner.Completed);
-            Assert.Contains(Descendants(owner.Irradiance).OfType<TextBlock>(),
+            var details = Descendants(owner.Irradiance).OfType<Expander>().Single(e => Equals(e.Header, "Study details"));
+            Assert.False(details.IsExpanded);
+            Assert.Equal(Visibility.Visible, details.Visibility);
+            details.IsExpanded = true;
+            Assert.Contains(Descendants(details).OfType<TextBlock>(),
                 text => text.Text.Contains("Dataset timestamp: 2025-05-15 05:00 UTC."));
         }
         finally { owner.Close(); }

@@ -79,6 +79,13 @@ public class TimeZoneTests
     }
 
     [Fact]
+    public void IntervalLabelsIncludeBothDatesAcrossMidnightAndShowASharedOffsetOnce()
+    {
+        var start = new DateTimeOffset(2025, 5, 15, 23, 0, 0, TimeSpan.FromHours(7));
+        Assert.Equal("15.05.2025 23:00–16.05.2025 00:00 (+07:00)", TimeZoneSelection.IntervalLabel(start, start.AddHours(1)));
+    }
+
+    [Fact]
     public void CaptionShowsBothOffsetsAcrossParisClockChange()
     {
         var start = SolarShade.Irradiance.IrradianceDatasets.Boundary(new(2023, 3, 26), Paris); var end = SolarShade.Irradiance.IrradianceDatasets.Boundary(new(2023, 3, 27), Paris);

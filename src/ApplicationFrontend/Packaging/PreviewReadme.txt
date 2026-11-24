@@ -1,4 +1,4 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.6
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.7
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
@@ -16,14 +16,14 @@ WebView2 or through the tab's option to open it locally in a browser.
    Set each top heading clockwise from true north as if the device lay flat.
    The phone top is its lens end. Raise the marked top edge to set the tilt.
    You can also turn either top while flat. Copy panel pose to phone aligns
-   both top headings and tilts once. The lens and panel-front azimuths are
+   both top headings and tilts once. The map shows the two devices side by side. The lens and panel-front azimuths are
    measured clockwise from south and are undefined at zero tilt.
    Existing studies keep their saved pose.
 
    Choose sky photo selects a photograph directly. Import existing mask accepts
    an opaque, exact black/white grayscale PNG at the oriented photo dimensions
    without AI. Choose white or black for open sky, name the mask, then import it.
-2. Click Update results. Editing inputs alone does not calculate.
+2. Click Update results. Open Study details beneath the graph for weather and run information.
    Use Edit mask at the top right of the mask preview to paint a new variant.
    The editor lets you paint across the whole photo and save those strokes.
    Zoom either preview to inspect the compass or the mask and its sun path.
