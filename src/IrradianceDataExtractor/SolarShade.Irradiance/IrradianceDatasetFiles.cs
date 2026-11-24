@@ -22,11 +22,14 @@ public static partial class IrradianceDatasetFiles
         TimestampLabel fallbackLabel, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var rows = Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase) ? Csv(path) : Xlsx(path);
+        bool isStudyExport = false;
+        var rows = Path.GetExtension(path).Equals(".csv", StringComparison.OrdinalIgnoreCase) ? Csv(path) : Xlsx(path, out isStudyExport);
         if (rows.Count < 2) throw new InvalidDataException("Expected timestamp, BHI and DHI header and data rows.");
+        if (isStudyExport && !rows[0].Skip(1).Take(2).SequenceEqual(Headers.Skip(1).Take(2)))
+            throw new InvalidDataException("To import an Excel study export, select just Direct horizontal and Diffuse horizontal, or use the horizontal-irradiance.xlsx file from Debug Data.");
         string header = string.Join(" ", rows[0].Take(3)).ToLowerInvariant();
-        if (new[] { "dni", "direct normal", "on panel", "tilted", "shaded", "factor" }.Any(header.Contains))
-            throw new InvalidDataException("Import requires raw horizontal BHI and DHI, not DNI or corrected panel data.");
+        if (new[] { "ghi", "global horizontal", "dni", "direct normal", "on panel", "tilted", "shaded", "factor" }.Any(header.Contains))
+            throw new InvalidDataException("Weather inputs require timestamp, direct horizontal (BHI) and diffuse horizontal (DHI) as the first three columns.");
         if (new[] { "wh/", "wh /", "j/", "j /", "accumulated", "instantaneous" }.Any(header.Contains))
             throw new InvalidDataException("Import requires interval means in W/m²; accumulated energy and instantaneous observations need an explicit conversion.");
         bool native = rows[0].Length >= 16 && rows[0].Take(16).SequenceEqual(Headers.Take(16));

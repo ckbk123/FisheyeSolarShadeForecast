@@ -152,6 +152,10 @@ public sealed class IrradianceDataExportTests
         Assert.Equal(weather.Source, receipt.RootElement.GetProperty("WeatherSource").GetString());
         Assert.Equal(AppData.FileKey(Path.Combine(fixture.Debug, "03-irradiance/horizontal-irradiance.xlsx")),
             receipt.RootElement.GetProperty("WeatherArtifactSha256").GetString());
+        // A results workbook with GHI in column B cannot supply the BHI required by weather import.
+        string mixed = AppServices.Export(modified, fixture.Root, new(Fields: IrradianceFields.GlobalHorizontal | IrradianceFields.DirectHorizontal));
+        Assert.Throws<InvalidDataException>(() => IrradianceDatasetFiles.Import(Path.Combine(mixed, "irradiance.xlsx"),
+            TimeZoneInfo.Utc, TimeSpan.FromHours(1), label));
 
         // Equal lengths and timestamps alone would accept a different interval identity.
         var mismatched = weather with { Intervals = intervals.Select(r => r with { Id = r.Id + "-other" }).ToArray() };
@@ -179,6 +183,9 @@ public sealed class IrradianceDataExportTests
         Assert.Equal(new[] { "Timeseries", "Direct horizontal (W/m²)", "Diffuse horizontal (W/m²)" },
             table[0].Descendants(Spreadsheet + "t").Select(t => t.Value));
         Assert.All(table.Skip(1), row => { Assert.Equal(0, Number(row, 'B')); Assert.Equal(100, Number(row, 'C')); });
+        var imported = IrradianceDatasetFiles.Import(Path.Combine(output, "irradiance.xlsx"), TimeZoneInfo.Utc,
+            TimeSpan.FromHours(1), TimestampLabel.Start);
+        Assert.All(imported.Intervals, row => { Assert.Equal(0, row.DirectHorizontal); Assert.Equal(100, row.DiffuseHorizontal); });
     }
 
     [Theory]

@@ -26,7 +26,7 @@ public static partial class IrradianceDatasetFiles
         reader.SetDelimiters(first.Contains(';') ? ";" : ","); reader.HasFieldsEnclosedInQuotes = true;
         var rows = new List<string[]>(); while (!reader.EndOfData) rows.Add(reader.ReadFields()!); return rows;
     }
-    private static List<string[]> Xlsx(string path)
+    private static List<string[]> Xlsx(string path, out bool isStudyExport)
     {
         using var zip = ZipFile.OpenRead(path);
         XDocument Part(string part)
@@ -37,6 +37,10 @@ public static partial class IrradianceDatasetFiles
             return XDocument.Load(reader);
         }
         XNamespace n = "http://schemas.openxmlformats.org/spreadsheetml/2006/main", rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        XNamespace dc = "http://purl.org/dc/elements/1.1/";
+        isStudyExport = zip.GetEntry("docProps/core.xml") != null &&
+            Part("docProps/core.xml").Root?.Element(dc + "description")?.Value
+                .StartsWith("Panel irradiance interval means in W/m².", StringComparison.Ordinal) == true;
         if (Part("xl/workbook.xml").Descendants(n + "workbookPr").Any(p => (string?)p.Attribute("date1904") is "1" or "true")) throw new InvalidDataException("Convert this 1904-date workbook to ISO timestamp text before importing.");
         var sheet = Part("xl/workbook.xml").Descendants(n + "sheet").First();
         var link = Part("xl/_rels/workbook.xml.rels").Root!.Elements().Single(e => (string?)e.Attribute("Id") == (string?)sheet.Attribute(rel + "id"));
