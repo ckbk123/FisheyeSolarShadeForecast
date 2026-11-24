@@ -12,6 +12,47 @@ using static ManualUpdateTests;
 public sealed class WeatherControlsTests
 {
     [Fact]
+    public void TemplateImportsItsPartialDayAndRestoresWithHiddenServiceDates() => Sta(async () =>
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var template = Path.Combine(fixture.Root, "weather-template.xlsx");
+        WeatherSourceSelection.WriteImportTemplate(template);
+        var serviceStart = new DateTime(2020, 1, 1);
+        AppData.SaveSettings(fixture.Settings with { Start = serviceStart, End = serviceStart, ImportWindow = 0 });
+        var owner = new MainWindow(loadExampleOnFirstRun: false, applicationServices: service);
+        try
+        {
+            owner.Irradiance.SelectWeatherFile(template);
+            await owner.InputsSettled;
+            owner.Calculate(); await Until(() => !owner.UpdatingForTest);
+            Assert.True(owner.ExportEnabledForTest, AppData.Read<DebugDataRun.Manifest>(Path.Combine(fixture.Debug, "run.json"))?.Error ?? owner.IrradianceController.Source.Reason);
+            var source = Assert.IsType<IrradianceSnapshot>(owner.IrradianceController.Source.Snapshot);
+            var start = new DateTimeOffset(2025, 5, 15, 8, 0, 0, TimeSpan.FromHours(7));
+            Assert.Equal(start, source.Start); Assert.Equal(start.AddHours(3), source.End);
+            Assert.Equal(3, source.Run.Rows.Count);
+            Assert.Equal(serviceStart, owner.IrradianceController.Settings.Start);
+            var graphDay = Descendants(owner.Irradiance).OfType<DatePicker>().Single();
+            Assert.Equal(start.Date, graphDay.DisplayDateStart); Assert.Equal(start.Date, graphDay.DisplayDateEnd);
+            var manifest = AppData.Read<DebugDataRun.Manifest>(Path.Combine(fixture.Debug, "run.json"))!;
+            Assert.Equal(new StudyPeriod(start, start.AddHours(3)), manifest.StudyPeriod);
+            Assert.True(owner.Workspaces.Select("pv"));
+            var pv = owner.PvAutonomy.Controller;
+            pv.SetDraft(PvSettingsDraft.Example());
+            await pv.EvaluateAsync(); Assert.True(pv.IsCurrent, pv.Status);
+            var hours = pv.Result!.Hours;
+            Assert.Equal(start, hours[0].Start); Assert.Equal(source.End, hours[^1].End);
+            owner.Irradiance.SelectWeatherMode(true); await owner.InputsSettled;
+            var provider = Descendants(owner.Irradiance).OfType<ComboBox>().Single(c => AutomationProperties.GetName(c) == "Weather data source");
+            provider.SelectedIndex = 1 - provider.SelectedIndex;
+            owner.EditFieldForTest("Start", "bad date"); await owner.InputsSettled;
+            owner.Irradiance.SelectWeatherMode(false); await owner.InputsSettled;
+            Assert.True(owner.ExportEnabledForTest);
+            Assert.Equal(start, owner.IrradianceController.Source.Snapshot!.Start);
+        }
+        finally { owner.Close(); await owner.InputsSettled; }
+    });
+
+    [Fact]
     public void NativeDatasetTimestampIsConvertedBeforeLabellingItUtc() => Sta(async () =>
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);

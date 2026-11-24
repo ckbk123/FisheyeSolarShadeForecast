@@ -121,8 +121,9 @@ public sealed class IrradianceDataExportTests
         var weather = new IrradianceDataset(intervals, source, "UTC", $"Synthetic {label}-labeled hourly mean",
             label, TimeSpan.FromHours(1));
         string input = Path.Combine(fixture.Root, "source.xlsx");
-        IrradianceDatasetFiles.Export(weather, input);
         var settings = fixture.Settings with { ImportPath = input, Zone = "India Standard Time" };
+        var selected = IrradianceDatasets.SelectCalendarRange(weather, settings.Start, settings.End, TimeZoneSelection.Resolve(settings.Zone));
+        IrradianceDatasetFiles.Export(selected, input);
         var result = await Calculate(service, settings);
         // The selected local day clips both boundary hours; the last source label falls on the following local day.
         Assert.Equal(25, result.Run.Rows.Count);

@@ -62,7 +62,9 @@ public sealed class InputDependencies
         keys[ArtifactGroup.Irradiance] = !services
             ? AppData.Key(new { UseDataServices = false, Weather, s.ImportWindow, s.ImportIntervalMinutes, s.Zone })
             : AppData.Key(new { UseDataServices = true, s.Provider, s.Start, s.End, s.Latitude, s.Longitude, s.Zone });
-        keys[ArtifactGroup.Solar] = AppData.Key(new { Raw = keys[ArtifactGroup.Irradiance], s.Start, s.End, s.Zone, s.Latitude, s.Longitude, s.Elevation, s.Substeps });
+        keys[ArtifactGroup.Solar] = AppData.Key(new { Raw = keys[ArtifactGroup.Irradiance],
+            Start = services ? s.Start : (DateTime?)null, End = services ? s.End : (DateTime?)null,
+            s.Zone, s.Latitude, s.Longitude, s.Elevation, s.Substeps });
         keys[ArtifactGroup.SunPath] = AppData.Key(new { Solar = keys[ArtifactGroup.Solar], Camera = keys[ArtifactGroup.Orientation], s.Zone });
         keys[ArtifactGroup.Transposition] = AppData.Key(new { Solar = keys[ArtifactGroup.Solar], s.PanelTilt, s.PanelAzimuth, s.Isotropic });
         keys[ArtifactGroup.Shading] = AppData.Key(new { Panel = keys[ArtifactGroup.Transposition], Camera = keys[ArtifactGroup.Orientation], Mask = keys[ArtifactGroup.Mask] });
@@ -92,7 +94,8 @@ public sealed class InputDependencies
         "BottomAzimuth" or "CameraTilt" or "CameraRoll" or nameof(UserSettings.PhoneInclination)
             or nameof(UserSettings.PhoneTopHeading) or nameof(UserSettings.PhoneFacingAzimuth) or nameof(UserSettings.FlatImageTopBearing) => PoseChain,
         "PanelTilt" or "PanelAzimuth" or nameof(UserSettings.PanelTopHeading) or nameof(UserSettings.PanelFacingAzimuth) or "Isotropic" => PanelChain,
-        "Latitude" or "Longitude" or "Start" or "End" => !WeatherSourceSelection.UsesServices(settings) ? GeometryChain : WeatherChain,
+        "Latitude" or "Longitude" => !WeatherSourceSelection.UsesServices(settings) ? GeometryChain : WeatherChain,
+        "Start" or "End" => WeatherSourceSelection.UsesServices(settings) ? WeatherChain : ArtifactGroup.None,
         "Elevation" or "Substeps" => GeometryChain,
         "Zone" or "ImportPath" or "UseDataServices" => WeatherChain,
         "ImportWindow" or "ImportIntervalMinutes" => !WeatherSourceSelection.UsesServices(settings) ? WeatherChain : ArtifactGroup.None,

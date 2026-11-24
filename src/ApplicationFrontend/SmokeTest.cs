@@ -199,8 +199,8 @@ public static class SmokeTest
                             throw new InvalidOperationException("A time-zone edit regenerated cardinal directions.");
                         if (current.Settings.Zone != zoneId || current.Raw.TimeZoneId != zoneId) throw new InvalidOperationException("A system time-zone change left stale data or graph settings.");
                         var firstLocal = TimeZoneInfo.ConvertTime(current.Run.Rows[0].Start, simulatedSystemZone);
-                        if (firstLocal.Date != current.Settings.Start || firstLocal.TimeOfDay != TimeSpan.Zero)
-                            throw new InvalidOperationException("The recalculated period does not start at local midnight.");
+                        if (firstLocal != current.Raw.Intervals[0].Start || current.Run.Rows[^1].End != current.Raw.Intervals[^1].End)
+                            throw new InvalidOperationException("The recalculated period does not span the imported weather intervals.");
                         var shared = previous.Run.Rows.Join(current.Run.Rows, r => r.Start, r => r.Start, (a, b) => (a, b)).ToArray();
                         if (shared.Length < 600 || shared.Any(p => Math.Abs(p.a.BeforeTotal - p.b.BeforeTotal) > 1e-8))
                             throw new InvalidOperationException("Changing time zones reinterpreted UTC data or changed irradiance at the same instant.");

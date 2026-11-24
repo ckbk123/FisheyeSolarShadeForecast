@@ -251,7 +251,8 @@ public sealed class AppServices : IIrradianceService
             }
             var rawArtifacts = debug.NeedsWrite(ArtifactGroup.Irradiance)
                 ? new[] { (await Task.Run(() => IrradianceDatasetFiles.Export(raw!, Path.Combine(rawDirectory, "horizontal-irradiance.xlsx"), ct), ct)).OutputPath! } : [];
-            var selected = IrradianceDatasets.SelectCalendarRange(raw!, s.Start, s.End, zone);
+            var period = StudyPeriod.FromSource(s, raw!);
+            var selected = IrradianceDatasets.Select(raw!, period.Start, period.End);
             debug.RecordInput("source-dataset", new { Fingerprint = IrradianceDatasets.Fingerprint(raw!), raw!.Source, raw.FetchedUtc });
             debug.CompleteStage("03-irradiance", rawArtifacts);
 
@@ -358,7 +359,7 @@ public sealed class AppServices : IIrradianceService
             {
                 tracked.Dirty |= dependencies.Difference(InputDependencies.Capture(s));
                 if (tracked.Dirty != ArtifactGroup.None) throw new OperationCanceledException("Inputs changed during the update.", ct);
-                ct.ThrowIfCancellationRequested(); debug.Complete();
+                ct.ThrowIfCancellationRequested(); debug.Complete(period);
             }
             string note = scene == null ? "Add a calibrated camera profile and sky photo for shading." : "Unknown sky is treated as blocked. No ground reflection. Camera coverage may be provisional.";
             accepted = new(result, raw!, persisted, activeMask, note, timer.Elapsed.TotalMilliseconds, PreparationCount)

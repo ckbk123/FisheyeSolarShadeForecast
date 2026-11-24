@@ -71,17 +71,22 @@ public sealed class IrradianceChart : FrameworkElement
         while (lo < hi) { int mid = (lo + hi + 1) / 2; if (rows[mid].Start <= time) lo = mid; else hi = mid - 1; }
         return lo;
     }
-    public void SetData(IReadOnlyList<PanelRow> values, TimeZoneInfo timeZone)
+    /// <returns>True when the chart reset its view to the full study.</returns>
+    public bool SetData(IReadOnlyList<PanelRow> values, TimeZoneInfo timeZone)
     {
         HoverText?.Invoke("");
-        bool same = rows.Length == values.Count && rows.Length > 0 && rows[0].Start == values[0].Start && rows[^1].End == values[^1].End;
+        bool same = zone.Id == timeZone.Id && rows.Length == values.Count && rows.Length > 0 &&
+            rows[0].Start == values[0].Start && rows[^1].End == values[^1].End;
         rows = values.ToArray(); zone = timeZone; if (!same) Reset(); else InvalidateVisual();
+        return !same;
     }
     public void Reset() { first = 0; last = Math.Max(0, rows.Length - 1); InvalidateVisual(); }
     public void Day(DateTime day)
     {
-        int a = Array.FindIndex(rows, r => TimeZoneInfo.ConvertTime(r.Start, zone).Date == day.Date);
-        int b = Array.FindLastIndex(rows, r => TimeZoneInfo.ConvertTime(r.Start, zone).Date == day.Date);
+        bool TouchesDay(PanelRow row) => TimeZoneInfo.ConvertTime(row.Start, zone).Date <= day.Date &&
+            TimeZoneInfo.ConvertTime(row.End.AddTicks(-1), zone).Date >= day.Date;
+        int a = Array.FindIndex(rows, TouchesDay);
+        int b = Array.FindLastIndex(rows, TouchesDay);
         if (a >= 0) { first = a; last = b; InvalidateVisual(); }
     }
     private double Before(PanelRow r) => Component switch { 1 => r.BeforeDirect, 2 => r.BeforeDiffuse, _ => r.BeforeTotal };
