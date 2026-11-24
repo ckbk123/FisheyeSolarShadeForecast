@@ -22,6 +22,21 @@ public sealed class SkyPhotoFieldOfViewTests
         Assert.Equal(140, view.CalibratedFullDegrees); Assert.Null(view.CircularFullDegrees);
         Assert.Contains("140° full (70° half-angle)", view.Text);
         Assert.Contains("coverage unconfirmed", view.Text);
+        Assert.Null(view.StampLabel);
+    }
+
+    [Fact]
+    public void OnlyActualFailuresOrRejectedSelectedProfilesHaveAStamp()
+    {
+        var settings = new UserSettings();
+        Assert.Null(SkyPhotoFieldOfView.Load(settings, 201, 303, null).StampLabel);
+        settings.ProfilePath = "missing-test-profile.json";
+        Assert.Null(SkyPhotoFieldOfView.Load(settings, 0, 0, null).StampLabel);
+        Assert.Equal(CalibrationStamp.UnusableLabel, SkyPhotoFieldOfView.Load(settings, 201, 303, null).StampLabel);
+        var failed = SkyPhotoFieldOfView.CalibrationFailed("No complete checkerboards found.");
+        Assert.Equal(CalibrationStamp.FailureLabel, failed.StampLabel);
+        Assert.Equal("Calibration failed", failed.Text);
+        Assert.Null(failed.CalibratedOutline);
     }
 
     [Theory]

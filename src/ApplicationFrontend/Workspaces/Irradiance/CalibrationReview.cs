@@ -6,6 +6,14 @@ using SolarShade.Calibration.Validation;
 
 namespace SolarShade.Desktop;
 
+public sealed record FailedCalibrationAttempt(string BoardFolder, int Columns, int Rows, double SquareMm,
+    string Reason, string? ReviewDirectory, string? EvidenceFingerprint)
+{
+    public bool Matches(UserSettings settings) => string.IsNullOrWhiteSpace(settings.ProfilePath) &&
+        BoardFolder.Equals(PortablePaths.Store(settings.CalibrationFolder), StringComparison.OrdinalIgnoreCase) &&
+        Columns == settings.Columns && Rows == settings.Rows && SquareMm == settings.SquareMm;
+}
+
 public sealed record CalibrationReview(string Directory, CalibrationDetectionReport Report, string? Note = null, string? FitSummary = null)
 {
     public string EvidenceFingerprint { get; init; } = "";

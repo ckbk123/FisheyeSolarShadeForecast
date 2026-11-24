@@ -18,6 +18,7 @@ internal sealed class SkyPhotoViewport : Canvas
     private readonly Grid plane = new() { ClipToBounds = true, UseLayoutRounding = false };
     private readonly MatrixTransform transform = new();
     private readonly FieldOfViewOverlay guide = new();
+    private readonly CalibrationStamp stamp = new();
     internal ImageOverlayPreview Photo { get; } = new();
     internal double Zoom { get; private set; } = 1;
     internal Rect ImageBounds { get; private set; } = Rect.Empty;
@@ -46,6 +47,8 @@ internal sealed class SkyPhotoViewport : Canvas
         plane.Children.Add(Photo);
         plane.Children.Add(guide);
         Children.Add(plane);
+        AutomationProperties.SetAutomationId(stamp, "SkyCalibrationStamp");
+        Children.Add(stamp);
         SizeChanged += (_, _) => UpdateTransform();
         LostMouseCapture += (_, _) => lastDrag = null;
     }
@@ -60,7 +63,6 @@ internal sealed class SkyPhotoViewport : Canvas
         sourcePath = path;
         photoRevision++;
         requestedDetail = false;
-        StudioTheme.Help(this, Gestures);
         HasNativePhoto = preview.PixelWidth == nativeWidth && preview.PixelHeight == nativeHeight;
         SetFieldOfView(null);
         Fit();
@@ -81,6 +83,21 @@ internal sealed class SkyPhotoViewport : Canvas
     {
         HasCalibratedOutline = view?.CalibratedOutline != null;
         guide.SetOutlines(view?.CalibratedOutline, view?.UsableOutline);
+        var warning = HasPhoto ? view?.StampLabel : null;
+        stamp.SetMessage(warning, view?.Explanation);
+        if (warning != null)
+        {
+            Photo.ClearOverlay();
+            PositionStamp();
+        }
+        SetPreviewHelp(Gestures);
+    }
+
+    private void SetPreviewHelp(string detail)
+    {
+        if (stamp.Visibility == Visibility.Visible)
+            detail = AutomationProperties.GetName(stamp) + ". " + AutomationProperties.GetHelpText(stamp) + " " + detail;
+        StudioTheme.Help(this, detail);
     }
 
     internal void Fit()
@@ -130,9 +147,21 @@ internal sealed class SkyPhotoViewport : Canvas
             ImageBounds = new((ActualWidth - width) / 2 + offset.X, (ActualHeight - height) / 2 + offset.Y, width, height);
             transform.Matrix = new(scale, 0, 0, scale, ImageBounds.X, ImageBounds.Y);
             guide.DisplayScale = scale;
+            if (stamp.Visibility == Visibility.Visible) PositionStamp();
         }
         Cursor = Zoom > 1 ? Cursors.Hand : Cursors.Arrow;
         ViewChanged?.Invoke();
+    }
+
+    // Anchor the warning to the visible part of the photo so a pan cannot carry it out of sight.
+    private void PositionStamp()
+    {
+        Rect visible = Rect.Intersect(ImageBounds, new Rect(RenderSize));
+        if (visible.IsEmpty) return;
+        stamp.Width = visible.Width;
+        stamp.Height = visible.Height;
+        SetLeft(stamp, visible.X);
+        SetTop(stamp, visible.Y);
     }
 
     // Defer the full-resolution decode until inspection; mouse moves and wheel ticks reuse the frozen image.
@@ -164,7 +193,7 @@ internal sealed class SkyPhotoViewport : Canvas
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             if (revision == photoRevision)
-                StudioTheme.Help(this, "Showing the available sky photo preview. Full-resolution detail could not be loaded. " + ex.Message);
+                SetPreviewHelp("Showing the available sky photo preview. Full-resolution detail could not be loaded. " + ex.Message);
         }
     }
 

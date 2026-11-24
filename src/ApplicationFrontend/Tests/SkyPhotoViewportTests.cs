@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -82,6 +83,70 @@ public sealed class SkyPhotoViewportTests
         Assert.InRange(GreenPixelsAcrossRim(), 1, 3);
         viewport.SetFieldOfView(null);
         Assert.Equal(0, GreenPixelsAcrossRim());
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public void FailedCalibrationStampStaysOnTheVisiblePhotoAndClearsForAValidProfile() => ManualUpdateTests.Sta(() =>
+    {
+        using var fixture = new ManualUpdateTests.Fixture();
+        var viewport = new SkyPhotoViewport { Width = 240, Height = 120 };
+        viewport.SetPhoto(Bitmap(201, 303), 201, 303, "");
+        viewport.Photo.SetOverlay(Bitmap(201, 303));
+        viewport.SetFieldOfView(SkyPhotoFieldOfView.CalibrationFailed("Too few complete boards."));
+        viewport.Measure(new Size(240, 120)); viewport.Arrange(new Rect(0, 0, 240, 120)); viewport.UpdateLayout();
+        var stamp = Assert.Single(viewport.Children.OfType<CalibrationStamp>());
+        Assert.Equal(Visibility.Visible, stamp.Visibility);
+        Assert.Equal("CALIBRATION FAILED", AutomationProperties.GetName(stamp));
+        Assert.Contains("Too few complete boards.", AutomationProperties.GetHelpText(viewport));
+        Assert.False(stamp.IsHitTestVisible);
+        Assert.False(viewport.HasCalibratedOutline);
+        Assert.False(viewport.Photo.OverlayVisible);
+        void StampCoversVisiblePhoto()
+        {
+            viewport.UpdateLayout();
+            var bounds = stamp.TransformToAncestor(viewport).TransformBounds(new Rect(stamp.RenderSize));
+            var photoArea = Rect.Intersect(viewport.ImageBounds, new Rect(viewport.RenderSize));
+            Assert.Equal(photoArea.X, bounds.X, 7);
+            Assert.Equal(photoArea.Y, bounds.Y, 7);
+            Assert.Equal(photoArea.Width, bounds.Width, 7);
+            Assert.Equal(photoArea.Height, bounds.Height, 7);
+        }
+        StampCoversVisiblePhoto();
+        viewport.ZoomAt(new Point(100, 50), 4);
+        viewport.PanBy(new Vector(1000, 1000));
+        StampCoversVisiblePhoto();
+        var mismatched = SkyPhotoFieldOfView.Load(fixture.Settings, 303, 201, null);
+        viewport.SetFieldOfView(mismatched);
+        Assert.Equal("PROFILE UNUSABLE", AutomationProperties.GetName(stamp));
+        Assert.Contains("dimensions", AutomationProperties.GetHelpText(stamp));
+        viewport.SetFieldOfView(SkyPhotoFieldOfView.Load(fixture.Settings, 201, 303, null));
+        Assert.Equal(Visibility.Collapsed, stamp.Visibility);
+        Assert.True(viewport.HasCalibratedOutline);
+        viewport.SetFieldOfView(mismatched);
+        viewport.ClearPhoto();
+        Assert.Equal(Visibility.Collapsed, stamp.Visibility);
+        return Task.CompletedTask;
+    });
+
+    [Fact]
+    public void WarningStampScalesWithThePreviewWithinItsScreenSizeLimit() => ManualUpdateTests.Sta(() =>
+    {
+        var stamp = new CalibrationStamp();
+        stamp.SetMessage(CalibrationStamp.FailureLabel);
+        var badge = Assert.Single(stamp.Children.OfType<Viewbox>());
+        double RenderedWidth(double width, double height)
+        {
+            stamp.Measure(new Size(width, height));
+            stamp.Arrange(new Rect(0, 0, width, height));
+            stamp.UpdateLayout();
+            Assert.InRange(badge.ActualWidth, 1, Math.Min(410, width * .8) + 1);
+            Assert.InRange(badge.ActualHeight, 1, height * .44 + 1);
+            return badge.ActualWidth;
+        }
+        double compact = RenderedWidth(160, 220);
+        double expanded = RenderedWidth(740, 550);
+        Assert.InRange(expanded, compact * 2, 410);
         return Task.CompletedTask;
     });
 

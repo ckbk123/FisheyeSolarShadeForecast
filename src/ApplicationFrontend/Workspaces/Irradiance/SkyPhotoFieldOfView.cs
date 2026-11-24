@@ -15,8 +15,11 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
     /// <summary>Present when the known photo coverage clips the calibrated cone. A disjoint footprint is empty.</summary>
     public Geometry? UsableOutline { get; private init; }
     public string OutlineLabel { get; private init; } = "FOV unavailable";
+    internal string? StampLabel { get; private init; }
 
     public static SkyPhotoFieldOfView Unavailable(string reason) => new(null, null, "FOV unavailable", reason);
+    internal static SkyPhotoFieldOfView CalibrationFailed(string reason) =>
+        new(null, null, "Calibration failed", reason) { StampLabel = CalibrationStamp.FailureLabel, OutlineLabel = "Calibration failed" };
 
     internal static double CalibratedRadiusPixels(CalibrationResult calibration) =>
         RadiusAt(calibration.IncidentAngleToRadiusPolynomial, calibration.MaximumIncidentAngleDegrees * Math.PI / 180);
@@ -39,7 +42,10 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
             return Describe(profile, orientedWidth, orientedHeight, selectedDisk);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
-        { return Unavailable("The selected camera profile cannot be used with this photo: " + ex.Message); }
+        {
+            return Unavailable("The selected camera profile cannot be used with this photo: " + ex.Message)
+                with { StampLabel = CalibrationStamp.UnusableLabel };
+        }
     }
 
     public static SkyPhotoFieldOfView Describe(CalibrationProfile profile, int width, int height, ImageDisk? selectedDisk)
