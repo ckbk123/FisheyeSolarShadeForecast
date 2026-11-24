@@ -91,3 +91,16 @@ test("copy panel pose is a snapshot and independent edits preserve the original 
   copy.topHeading = 45;
   near(panel.topHeading, 90);
 });
+
+test("illustrated phone and panel stay apart in the same face plane when their poses match", () => {
+  require("../scene.js");
+  for (const tilt of [0, 22.6, 45, 90]) {
+    for (const topHeading of [0, 30, 90, 180, 270]) {
+      const frame = G.equipmentFrame({tilt, topHeading});
+      const {panel, phone} = globalThis.AngleScene.displayCenters(frame);
+      const offset = phone.map((v, i) => v - panel[i]);
+      assert.ok(Math.hypot(...offset) > 1.36 + .51, "clearance for panel and phone");
+      near(offset.reduce((total, v, i) => total + v * frame.normal[i], 0), 0);
+    }
+  }
+});
