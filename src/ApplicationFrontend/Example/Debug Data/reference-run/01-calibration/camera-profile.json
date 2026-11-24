@@ -20,9 +20,9 @@
     "RmsError": null,
     "UsedImageCount": 0,
     "RejectedImages": [],
-    "CreatedUtc": "2026-09-05T07:11:55.8974047+00:00",
+    "CreatedUtc": "2026-09-05T07:11:55+00:00",
     "Algorithm": "Native OmniCalib YAML; caller-provided angular coverage"
   },
-  "Source": "C:\\Users\\baokh\\OneDrive\\BKHCM\\Solar Forecast Estimator\\artifacts\\application-publish-a55662fe4f694009b532529b70492ab6\\Example\\Calib Images\\calibration.yml",
+  "Source": "Example/Calib Images/calibration.yml",
   "CoverageNote": "Caller override of maximum incident angle. Caller-provided maximum incident angle; not inferred from lens advertising or polynomial extrapolation."
 }

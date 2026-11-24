@@ -1,6 +1,8 @@
+using System.IO;
 using System.Text.Json;
 using SolarShade.Core.Models;
 using SolarShade.Desktop;
+using SolarShade.Irradiance;
 using SolarShade.Shading;
 using Xunit;
 
@@ -11,6 +13,41 @@ public sealed class EquipmentOrientationTests
         var calibration = new CalibrationResult(2, CameraModelKind.OmniCalibIncidentAnglePolynomial,
             501, 501, [250, 250], [0, 500 / Math.PI], 90, 250, null, 0, [], DateTimeOffset.UnixEpoch, "Equidistant lens");
         return new(calibration, EquipmentOrientation.ToCameraPose(settings));
+    }
+
+    [Fact]
+    public void BundledExampleShowsTheSouthFacingUphillPlacement()
+    {
+        var settings = PortablePaths.Example();
+        var angles = EquipmentOrientation.Describe(settings);
+        Assert.Equal(28, settings.PanelTilt);
+        Assert.Equal(28, settings.PhoneInclination);
+        Assert.Equal(0, settings.PanelTopHeading);
+        Assert.Equal(0, settings.PhoneTopHeading);
+        Assert.Equal(0, angles.PanelAzimuth);
+        Assert.Equal(0, angles.PhoneAzimuth);
+        Assert.Equal("Lens end uphill", angles.PhonePlacement);
+        var (right, down, lens) = EquipmentOrientation.ToCameraPose(settings).Axes();
+        var southFacingNormal = Direction.FromAngles(180, 28);
+        Assert.Equal(1, lens.Dot(southFacingNormal), 12);
+        Assert.True(down.Up < 0 && down.North < 0 && right.East < 0);
+    }
+
+    [Fact]
+    public void BundledReferenceUsesTheExamplePoseAndEveryWeatherInterval()
+    {
+        var example = PortablePaths.Example();
+        var reference = PortablePaths.Resolve("Example/Debug Data/reference-run");
+        using var manifest = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(reference, "run.json")));
+        var saved = manifest.RootElement.GetProperty("Settings").Deserialize<UserSettings>()!;
+        var pose = EquipmentAngleReport.From(example);
+        Assert.Equal(pose, EquipmentAngleReport.From(saved));
+        Assert.Equal(pose, manifest.RootElement.GetProperty("EquipmentAngles").Deserialize<EquipmentAngleReport>());
+
+        var weather = IrradianceDatasetFiles.Import(PortablePaths.Resolve(example.ImportPath),
+            TimeZoneSelection.Resolve(saved.Zone), TimeSpan.FromMinutes(example.ImportIntervalMinutes), TimestampLabel.End);
+        var run = AppData.Read<PanelRun>(Path.Combine(reference, "06-shading", "panel-results.json"))!;
+        Assert.Equal(weather.Intervals.Select(r => (r.Start, r.End)), run.Rows.Select(r => (r.Start, r.End)));
     }
 
     [Theory]
