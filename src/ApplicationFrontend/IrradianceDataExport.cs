@@ -61,7 +61,7 @@ internal static class IrradianceDataExport
                     Status = "Complete", ResultId = snapshot.Id, ExportedUtc = exported,
                     Products = new[] { "Irradiance" }, Workbook = "irradiance.xlsx", WorkbookSha256 = AppData.FileKey(workbook),
                     SourceArtifactSha256 = snapshot.ArtifactHashes[PanelResults],
-                    SelectedFields = options.Fields.ToString(), WeatherSource = weather?.Source,
+                    SelectedFields = options.Fields.ToString(), options.SourceIntervalBounds, WeatherSource = weather?.Source,
                     WeatherArtifactSha256 = weather == null ? null : snapshot.ArtifactHashes[HorizontalResults],
                     Model = root.GetProperty("Model").GetString(), TimeZoneId = root.GetProperty("TimeZoneId").GetString(),
                     TimestampConvention = root.GetProperty("TimestampConvention").GetString(), FactorSemantics, snapshot.EquipmentAngles,
@@ -137,9 +137,10 @@ internal static class IrradianceDataExport
                 Source = root.TryGetProperty("Source", out var source) && source.ValueKind == JsonValueKind.String ? source.GetString() : null
             });
         var columns = IrradianceExportColumn.ForModel(model).Where(c => options.Fields.HasFlag(c.Field)).ToArray();
-        List<ScientificSheet> sheets = [new("Irradiance", ["Timeseries", .. columns.Select(c => c.Header)],
-            rows.EnumerateArray().Select((row, i) => Values(row, weather?.Intervals[i], columns)))
-            { ColumnWidths = [36, .. columns.Select(c => c.Width)] }];
+        string[] timeHeaders = options.SourceIntervalBounds ? ["Timeseries", "Source interval start", "Source interval end"] : ["Timeseries"];
+        List<ScientificSheet> sheets = [new("Irradiance", [.. timeHeaders, .. columns.Select(c => c.Header)],
+            rows.EnumerateArray().Select((row, i) => Values(row, weather?.Intervals[i], columns, options.SourceIntervalBounds)))
+            { ColumnWidths = [.. timeHeaders.Select(_ => 36d), .. columns.Select(c => c.Width)] }];
         if (weather != null)
         {
             sheets.Add(new("Weather source", ["Property", "Value"], [
@@ -153,12 +154,18 @@ internal static class IrradianceDataExport
         ScientificWorkbook.Write(path, sheets, metadata);
     }
 
-    private static object?[] Values(JsonElement row, IrradianceInterval? weather, IrradianceExportColumn[] columns)
+    private static object?[] Values(JsonElement row, IrradianceInterval? weather, IrradianceExportColumn[] columns, bool sourceBounds)
     {
-        var values = new object?[columns.Length + 1];
+        int firstQuantity = sourceBounds ? 3 : 1;
+        var values = new object?[firstQuantity + columns.Length];
         values[0] = Instant(row, "Timestamp");
+        if (sourceBounds)
+        {
+            values[1] = weather?.SourceStart ?? Instant(row, "SourceStart");
+            values[2] = weather?.SourceEnd ?? Instant(row, "SourceEnd");
+        }
         for (int i = 0; i < columns.Length; i++)
-            values[i + 1] = columns[i].Field switch
+            values[firstQuantity + i] = columns[i].Field switch
             {
                 IrradianceFields.PanelDirect => Number(row, "BeforeDirect"),
                 IrradianceFields.PanelDiffuse => Number(row, "BeforeDiffuse"),
