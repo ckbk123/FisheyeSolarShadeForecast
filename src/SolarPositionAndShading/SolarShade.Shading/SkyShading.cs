@@ -20,7 +20,8 @@ public sealed record CameraPose(double ImageTopAzimuthDegrees = 0, double TiltDe
     }
     /// <summary>Exact convention adapter for legacy Python psi/omega.</summary>
     public static CameraPose FromLegacy(double psiDegrees, double omegaDegrees) => new(-psiDegrees, -omegaDegrees);
-    internal (Direction X, Direction Y, Direction Z) Axes()
+    /// <summary>World directions of image right (X), image down (Y) and the outward lens axis (Z), in east/north/up coordinates.</summary>
+    public (Direction X, Direction Y, Direction Z) Axes()
     {
         if (!double.IsFinite(ImageTopAzimuthDegrees) || !double.IsFinite(TiltDegrees) || Math.Abs(TiltDegrees) > 180 || !double.IsFinite(RollDegrees))
             throw new ArgumentOutOfRangeException(nameof(CameraPose));

@@ -14,6 +14,10 @@ using static ManualUpdateTests;
 [Collection("Manual update UI")]
 public sealed class CalibrationReviewTests
 {
+    private static System.Windows.FrameworkElement ReviewStamp(Window window) =>
+        Assert.IsAssignableFrom<System.Windows.FrameworkElement>(
+            System.Windows.LogicalTreeHelper.FindLogicalNode(window, "CheckerboardStatusStamp"));
+
     private static string BoundReview(Fixture fixture)
     {
         string directory = Path.Combine(fixture.Root, "bound-review"); Directory.CreateDirectory(directory);
@@ -164,8 +168,12 @@ public sealed class CalibrationReviewTests
         {
             window.SelectPhoto(review.Report.Images.ToList().IndexOf(board));
             Assert.Same(board, window.SelectedPhoto); Assert.True(window.HasPreview);
+            var stamp = ReviewStamp(window);
+            Assert.Equal(System.Windows.Visibility.Visible, stamp.Visibility);
+            Assert.Equal("CALIBRATION FAILED", System.Windows.Automation.AutomationProperties.GetName(stamp));
             window.SelectPhoto(review.Report.Images.ToList().FindIndex(p => p.Name == "unreadable.jpg"));
             Assert.False(window.HasPreview);
+            Assert.Equal(System.Windows.Visibility.Visible, stamp.Visibility);
         }
         finally { window.Close(); }
         Assert.Empty(Directory.GetDirectories(fixture.Root, ".calibration-*", SearchOption.AllDirectories));
@@ -205,6 +213,17 @@ public sealed class CalibrationReviewTests
         Assert.Contains("RMSE", review.FitSummary);
         Sta(async () =>
         {
+            var photoReview = new CalibrationReviewWindow(review);
+            try
+            {
+                var stamp = ReviewStamp(photoReview);
+                photoReview.SelectPhoto(review.Report.Images.ToList().FindIndex(p => !p.Detected));
+                Assert.Equal(System.Windows.Visibility.Visible, stamp.Visibility);
+                Assert.Equal("PHOTO REJECTED", System.Windows.Automation.AutomationProperties.GetName(stamp));
+                photoReview.SelectPhoto(review.Report.Images.ToList().FindIndex(p => p.Detected));
+                Assert.Equal(System.Windows.Visibility.Collapsed, stamp.Visibility);
+            }
+            finally { photoReview.Close(); }
             var window = new MainWindow(applicationServices: service);
             try
             {

@@ -1,23 +1,42 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.2.0
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.5
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
 No separate .NET installation is required. The first launch/model use can take
 longer while Windows extracts the bundled runtime and model.
 
+Hover over a study control for guidance, or focus it and press F1. Escape closes
+keyboard help. Open Help for the full guide while working on your study.
+
+The Orientation map tab illustrates the phone, panel and sun in 3D. Its angles
+apply only to the illustration. The map works offline with Microsoft Edge
+WebView2 or through the tab's option to open it locally in a browser.
+
 1. Open Solar Irradiance. Load the example or select your study inputs.
+   Set each top heading clockwise from true north as if the device lay flat.
+   The phone top is its lens end. Raise the marked top edge to set the tilt.
+   You can also turn either top while flat. Copy panel pose to phone aligns
+   both top headings and tilts once. The lens and panel-front azimuths are
+   measured clockwise from south and are undefined at zero tilt.
+   Existing studies keep their saved pose.
+
    Choose sky photo selects a photograph directly. Import existing mask accepts
    an opaque, exact black/white grayscale PNG at the oriented photo dimensions
    without AI. Choose white or black for open sky, name the mask, then import it.
 2. Click Update results. Editing inputs alone does not calculate.
    Use Edit mask on the mask preview to paint a new black/white variant in a
-   separate window. Adjust mask opacity and zoom while editing, then save.
+   separate window. You can paint across the whole photo and save those strokes.
+   Zoom the original sky photo to inspect the compass. The green FOV guide in
+   the preview and editor shows the angular limit of your selected calibration.
+   A CALIBRATION FAILED stamp on the sky photo means the checkerboard run
+   failed. Open Review checkerboard photos for the cause. PROFILE UNUSABLE
+   means the selected profile could not be applied to this sky photo.
    Select the mask for calculation below the preview and update results.
 3. Once a complete shaded irradiance result is ready, open PV Autonomy.
 4. Enter 24 hourly load values in Wh, panel area and efficiencies, battery
    capacity in Wh and initial charge. Click Evaluate system.
 5. In Solar Irradiance, click Export data, keep Irradiance (.xlsx) checked,
-   choose a destination folder and click Export. The workbook includes all
+   choose a destination folder and confirm with Export data. The workbook includes all
    intervals, direct/diffuse panel irradiance, both shading factors and final
    shaded total. The diffuse header names Isotropic or Hay-Davies. Irradiance
    uses W/m2; factors are shaded/unshaded, blank when the baseline is zero.

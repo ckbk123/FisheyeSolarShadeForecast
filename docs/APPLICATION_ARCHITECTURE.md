@@ -12,6 +12,8 @@ Scientific algorithms and their file formats remain in the existing libraries. T
 
 Completed accepted studies are archived under `Data/AcceptedResults` with content-addressed artifact blobs. An exact input match is hash-verified and republished into the one current `Debug Data` dataset without scientific recomputation. Matching PV results have a separate archived scope and are rebound to the restored irradiance result. New mask selections invalidate the mask and shading groups while retaining independent solar, weather, transposition and geometric overlays. Returning to a prior mask or photo restores green/export-ready state only after full source and artifact verification.
 
+The Orientation map workspace hosts the local HTML, CSS and JavaScript from the Solar Angle Studio folder. It opens its web view on first use and has no connection to the study controller, weather services or result storage. The same files can be opened in a browser.
+
 ## Stage ownership and APIs
 
 | Stage | Owning library | Application-facing operations |

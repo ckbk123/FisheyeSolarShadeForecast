@@ -2,6 +2,8 @@
 
 Status: implemented in the Preview 0.2.0 source branch, 4 October 2026. This records the design and its acceptance checks. The calibration, solar-position, irradiance, transposition, shading-correction and PV/battery equations are unchanged.
 
+Preview 0.3.4 supersedes the original disk-only painting design below. The editor stores brush strokes across the whole photograph and shows the calibrated field of view. See the [current mask editor workflow](../src/ApplicationFrontend/RUNNING.md#editing-and-choosing-a-sky-mask).
+
 ## User workflow
 
 1. Run **Update results** to generate the AI mask for the selected sky photo. The mask preview gets an **Edit mask** button at its lower corner. It is enabled only when the displayed full-resolution mask still matches the selected photo and no update is in progress.

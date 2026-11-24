@@ -34,7 +34,7 @@ The following are proposed defaults awaiting the user's answers. They are not re
 | End-date meaning | Inclusive calendar day in the selected time zone: 01.05.2025–31.05.2025 includes the entire last day. |
 | Main graph | Two total-irradiance curves with optional direct/diffuse component toggles. |
 
-Other draft choices: B5 segmentation at 1024 resolution initially, with B4–B7 selectable and 512 available under advanced settings; Perez–Driesse initially, with Hay–Davies and an isotropic baseline in advanced settings; camera image bottom south and optical axis vertical; panel tilt 0°, azimuth 180° as visible, editable starting values. None of these defaults implies that they are optimal or measured for the user's site. The distribution model selection remains open: all four bundled models preserve all offline choices but make the download much larger than a one-model edition.
+Other draft choices: B5 segmentation at 1024 resolution initially, with B4–B7 selectable and 512 available under advanced settings; Perez–Driesse initially, with Hay–Davies and an isotropic baseline in advanced settings; the original draft predates the shared equipment convention documented below. None of these defaults implies that they are optimal or measured for the user's site. The distribution model selection remains open: all four bundled models preserve all offline choices but make the download much larger than a one-model edition.
 
 ## 3. Required inputs and conventions
 
@@ -45,11 +45,11 @@ Other draft choices: B5 segmentation at 1024 resolution initially, with B4–B7 
 | Square side length | Physical side length of one square in millimetres; finite and positive. Existing library defaults are 6 × 9 inner corners and 22 mm, but the user must confirm their actual board values. |
 | Sky-photo folder and active photo | If one supported photo exists, select it; if several exist, show thumbnails and require an active selection. Never silently use the first file in directory order. |
 | Camera/profile match | Same physical lens setup, image geometry and orientation convention as calibration. Matching JPEG/PNG extensions alone is insufficient. No silent cropping, stretching or re-centering. |
-| Image-bottom bearing | Degrees clockwise from true north; default 180° (south), so image top is north. Display cardinal labels and an orientation preview. |
-| Camera tilt | Optical-axis tilt from vertical, default 0°. A tilted camera needs its tilt direction as well as magnitude. See the pose rule below. |
-| Camera roll | Advanced input, default 0°; rotation of the image axes around the optical axis. |
+| Phone azimuth | Direction of the outward fisheye optical axis, clockwise from south. Undefined when flat. |
+| Phone tilt | Angle of the phone plane above horizontal, from 0° to 90°, with the lens end uphill. |
+| Flat-phone image orientation | Bearing of the top of the oriented image clockwise from geographic north. Older saved image roll is preserved. |
 | Panel tilt | 0° horizontal/upward-facing through 90° vertical; slider plus numeric field. |
-| Panel azimuth | Direction the panel front faces; true north 0°, east 90°, south 180°, west 270°. Normalize 360° to 0°. At zero panel tilt it has no physical effect, but retain the selected value. |
+| Panel azimuth | Direction the panel front faces. South 0°, west +90°, north ±180°, east −90° or 270°. Undefined when flat. |
 | Latitude / longitude | Decimal degrees with N/S/E/W cues; latitude −90…90, longitude −180…180. Separate controls avoid reversing their order. |
 | Elevation | Metres above sea level; explicitly supplied or visibly accepted as an estimate. Do not silently treat photo height above the roof as site elevation. |
 | Time zone | Visible field, initially the computer's zone and editable. GPS coordinates do not determine a zone in the present libraries. Needed even when display dates use a fixed format. |
@@ -57,7 +57,7 @@ Other draft choices: B5 segmentation at 1024 resolution initially, with B4–B7 
 | Irradiance provider | Only the agreed two choices in this UI. Changing providers never silently substitutes data or resamples one provider to resemble another. |
 | Segmentation model | B4/B5/B6/B7 by readable names. Model choice changes the mask; it does not change the camera calibration. |
 
-Camera pose rule: the backend's positive `CameraPose.TiltDegrees` tilts the optical axis toward `ImageTopAzimuthDegrees`. With default roll 0, the UI's bottom-bearing input maps to `ImageTopAzimuthDegrees = (bottomBearing + 180) % 360`. Explain tilt direction with a preview. A generic phone inclination number without a direction is insufficient to describe arbitrary placement. Provide an advanced pose editor for roll and a tested mapping for arbitrary phone poses; do not treat a phone's sensor pitch/roll as interchangeable with these fields. Heading refers to true north; automatic magnetic correction is not currently provided.
+The desktop adapter maps the shared equipment inputs to the original geometry used by the shading and transposition libraries. For a 28° south-facing phone with the lens end uphill, the stored image bottom is 180° true, signed camera tilt is −28°, and roll is zero. Solar and cardinal bearings use true north. See the [capture examples and compatibility notes](RUNNING.md#phone-and-panel-angles).
 
 All image coordinates refer to the EXIF-oriented image shown to the user. Display the active image dimensions and profile pairing. Sensor GPS/orientation autofill is optional future convenience, not a prerequisite for manual use.
 

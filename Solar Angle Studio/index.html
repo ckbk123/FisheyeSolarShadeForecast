@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#172738">
+  <title>Orientation map</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='9' fill='%23172738'/%3E%3Ccircle cx='27' cy='12' r='5' fill='%23ffc76b'/%3E%3Cpath d='m7 25 15-7 11 5-15 8Z' fill='%23ffc76b'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="studio.css">
+  <script defer src="geometry.js"></script>
+  <script defer src="scene.js"></script>
+  <script defer src="inspection.js"></script>
+  <script defer src="studio.js"></script>
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true">
+
+    <symbol id="i-guide" viewBox="0 0 24 24"><path d="M3 5.5c3.2-.8 6-.5 9 1.3 3-1.8 5.8-2.1 9-1.3v13c-3.2-.8-6-.5-9 1.2-3-1.7-5.8-2-9-1.2zM12 7v12"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 2.5 9 4.8v9.4l-9 4.8-9-4.8V7.3l9-4.8Zm-9 4.8 9 5 9-5M12 12v9"/></symbol>
+    <symbol id="i-panel" viewBox="0 0 24 24"><path d="M5 4h14l3 12H2L5 4Zm4.5 0L8 16m6.5-12L16 16M3.5 10h17M12 16v4m-4 0h8"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><circle cx="10.2" cy="6.4" r="1"/><path d="M10.5 18.5h3"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3.5 11a8.5 8.5 0 1 1 1.7 6M3.5 5v6h6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M3 6h5m4 0h9M3 12h11m4 0h3M3 18h3m4 0h11"/><circle cx="10" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M11 4v16"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="m10 13 4-4m-6 6-1 1a3.5 3.5 0 0 1-5-5l4-4a3.5 3.5 0 0 1 5 0m2 10a3.5 3.5 0 0 0 5 0l4-4a3.5 3.5 0 0 0-5-5l-1 1" transform="translate(1 -1) scale(.92)"/></symbol>
+    <symbol id="i-orbit" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="4.7" transform="rotate(-35 12 12)"/><circle cx="12" cy="12" r="3.4"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m3 8 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5m-18 5 9 5 9-5" transform="translate(0 -1)"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  </svg>
+
+  <main>
+    <div class="page-heading">
+      <div><h1>Orientation map</h1><p>Explore the angles in an example scene. Changes apply only to this illustration.</p></div>
+      <div class="heading-actions">
+        <button class="guide-button" id="open-guide"><svg class="icon"><use href="#i-guide"/></svg>Angle guide</button>
+        <div class="preset-control"><label for="preset">Example</label><div class="preset-row"><div class="select-shell"><select id="preset"></select><svg class="icon"><use href="#i-chevron"/></svg></div><button class="icon-button" id="reset-preset" title="Restore example angles" aria-label="Restore example angles"><svg class="icon"><use href="#i-reset"/></svg></button></div></div>
+      </div>
+    </div>
+    <div class="workspace">
+      <section class="card scene-card" aria-labelledby="scene-heading">
+        <div class="card-head"><h2 id="scene-heading"><svg class="icon"><use href="#i-cube"/></svg>3D scene</h2>
+          <div class="seg view-seg" aria-label="View direction" role="group">
+            <button data-view="orbit" aria-pressed="true"><svg class="icon"><use href="#i-orbit"/></svg>Orbit</button><button data-view="top" aria-pressed="false">Top</button><button data-view="side" aria-pressed="false">Side</button>
+          </div>
+        </div>
+        <div class="viewport"><div id="scene" aria-label="Interactive 3D scene"></div>
+          <div class="orbit-hint"><svg class="icon"><use href="#i-orbit"/></svg><span>Drag to orbit <b>·</b> <span class="wheel-hint">Scroll</span><span class="pinch-hint">Pinch</span> to zoom</span></div>
+          <div class="zoom-tools"><button id="zoom-out" title="Zoom out" aria-label="Zoom out"><svg class="icon"><use href="#i-minus"/></svg></button><button id="zoom-in" title="Zoom in" aria-label="Zoom in"><svg class="icon"><use href="#i-plus"/></svg></button><button id="fit-view" title="Reset view" aria-label="Reset view"><svg class="icon"><use href="#i-fit"/></svg></button></div>
+        </div>
+        <div class="scene-foot"><div class="legend"><span><i class="panel"></i>Panel</span><span><i class="phone"></i>Phone</span><span><i class="sun"></i>Sun</span></div>
+          <div class="layer-controls"><label><input id="show-angles" type="checkbox" checked>Angles</label><label><input id="show-labels" type="checkbox" checked>Labels</label></div>
+        </div>
+      </section>
+      <aside class="card controls" aria-labelledby="controls-heading">
+        <div class="card-head"><h2 id="controls-heading"><svg class="icon"><use href="#i-sliders"/></svg>Illustrated angles</h2></div>
+        <div class="control-body">
+          <div class="object-tabs" role="group" aria-label="Object to inspect">
+            <button data-active="panel" aria-pressed="true"><svg class="icon"><use href="#i-panel"/></svg>Panel</button><button data-active="phone" aria-pressed="false"><svg class="icon"><use href="#i-phone"/></svg>Phone</button><button data-active="sun" aria-pressed="false"><svg class="icon"><use href="#i-sun"/></svg>Sun</button>
+          </div>
+          <div id="fields"></div>
+          <p id="control-note" class="control-note"></p>
+          <button id="copy-panel" class="copy-button" title="Copy this example panel’s tilt and top heading to the illustrated phone."><svg class="icon"><use href="#i-link"/></svg>Copy panel pose to phone</button>
+          <div id="photo-inspection" hidden></div>
+        </div>
+      </aside>
+    </div>
+    <section class="card readout" aria-labelledby="readout-heading">
+      <div class="card-head"><h2 id="readout-heading"><svg class="icon"><use href="#i-grid"/></svg>Angle readout</h2></div>
+      <div class="table-wrap"><table><thead><tr><th scope="col">Object</th><th scope="col">Top heading</th><th scope="col">Tilt or solar angles</th><th scope="col">Azimuth</th></tr></thead><tbody id="readout"></tbody></table></div>
+      <div class="measurements"><span>Sun to panel normal <strong id="incidence"></strong></span><span>Lens to panel normal <strong id="separation"></strong></span></div>
+    </section>
+  </main>
+  <dialog id="guide" aria-labelledby="guide-heading"><div class="dialog-head"><h2 id="guide-heading">Angle guide</h2><button class="icon-button" id="close-guide" aria-label="Close guide"><svg class="icon"><use href="#i-close"/></svg></button></div>
+    <div class="guide-body">
+      <h3>Panel top and phone top</h3><p>Follow the arrow along each face, from the centre toward the marked top edge. The phone top is its lens end. With the device flat, measure this heading clockwise from true north. Keep the heading as you raise that edge from 0° flat to 90° vertical. At 90° the top points straight up, and the ground compass shows its heading when laid flat.</p>
+      <h3>Panel front and lens azimuth</h3><p>The arrows pointing out of the faces show the panel front normal and lens axis. Their horizontal projections give azimuths measured clockwise from geographic south. South is 0°, west +90°, north ±180° and east −90° or 270°. When the marked tops point east and you lift them, both faces point west (+90°). At 0° tilt the normals point straight up and their azimuths are undefined.</p>
+      <h3>Phone image</h3><p>The lens end points straight uphill and aligns with image top (zero additional roll). Turn the phone’s top heading to rotate the photograph. With the phone flat and its top pointing north, east appears on the left.</p>
+      <p>The phone image shows an ideal 180° fisheye. A calibrated study uses the lens and field of view of the photograph.</p>
+      <h3>Sun</h3><p>Solar azimuth is clockwise from true north. Elevation starts at the horizon, and zenith angle starts at straight up. Their sum is 90°. Azimuth is undefined when the sun is directly overhead or directly below. The gold line points toward the sun. Incoming sunlight travels in the opposite direction.</p>
+      <p>The example sun position is set manually. The irradiance calculation determines solar position from site, date and time.</p>
+      <h3>Explore the scene</h3><p>Choose Panel, Phone or Sun to see its angles. Use the arrows on a focused scene to orbit, + or − to zoom and Home to reset. Top view places north up and east right. Copy panel pose to phone aligns both illustrated top edges and both tilts once, including when flat.</p>
+    </div></dialog>
+  <noscript>Enable JavaScript to use the 3D angle controls.</noscript>
+</body>
+</html>

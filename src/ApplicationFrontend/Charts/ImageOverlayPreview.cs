@@ -32,6 +32,12 @@ public class ImageOverlayPreview : Viewbox
             throw new ArgumentException("Overlay dimensions must match the native image coordinate space.");
         overlay.Source = bitmap; ShowOverlay = showOverlay;
     }
+    internal void SetNativePhoto(BitmapSource bitmap)
+    {
+        if (mask.Source == null || bitmap.PixelWidth != surface.Width || bitmap.PixelHeight != surface.Height)
+            throw new ArgumentException("The detailed photo must match the oriented preview dimensions.");
+        mask.Source = bitmap;
+    }
     public void ClearOverlay() { overlay.Source = null; overlay.Visibility = Visibility.Collapsed; }
     public void ClearImage() { mask.Source = null; ClearOverlay(); }
 }

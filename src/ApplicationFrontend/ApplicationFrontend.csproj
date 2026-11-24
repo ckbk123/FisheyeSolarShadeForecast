@@ -4,7 +4,8 @@
     <UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
     <PlatformTarget>x64</PlatformTarget><AssemblyName>APPLICATION</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.2.0</Version><DebugType>none</DebugType>
+    <ApplicationIcon>Packaging/SolarShade.ico</ApplicationIcon>
+    <Version>0.3.5</Version><DebugType>none</DebugType>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
@@ -22,11 +23,13 @@
     <ProjectReference Include="../IrradianceTransposition/SolarShade.Irradiance.Transposition/SolarShade.Irradiance.Transposition.csproj" />
     <ProjectReference Include="../ShadingCorrectionApplication/SolarShade.ShadingCorrection/SolarShade.ShadingCorrection.csproj" />
     <EmbeddedResource Include="ThirdPartyNotices.txt" LogicalName="Notices" />
+    <EmbeddedResource Include="../../Solar Angle Studio/index.html;../../Solar Angle Studio/*.css;../../Solar Angle Studio/*.js" LogicalName="OrientationMap.%(Filename)%(Extension)" />
     <Content Include="Example/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="Debug Data/Read me.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <EmbeddedResource Include="../SkyPhotoMasking/Models/*.onnx" LogicalName="Models.%(Filename)%(Extension)" Condition="'$(BundleModels)' == 'true'" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4370.26" />
     <PackageReference Include="PDFsharp-WPF" Version="6.2.4" />
   </ItemGroup>
   <Target Name="RemoveDevelopmentPublishFiles" BeforeTargets="_ComputeFilesToBundle">

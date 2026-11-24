@@ -10,10 +10,12 @@ using SolarShade.SkyPhotoMasking;
 
 namespace SolarShade.Desktop;
 
-public sealed record UserSettings
+public sealed partial record UserSettings
 {
     public bool FirstRun { get; set; }
     public string CalibrationFolder { get; set; } = "";
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public FailedCalibrationAttempt? LastCalibrationFailure { get; set; }
     public string SkyFolder { get; set; } = "";
     public string SkyImage { get; set; } = "";
     public string ProfilePath { get; set; } = "";

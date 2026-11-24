@@ -37,19 +37,21 @@ public sealed class FixedUpdateControlsTests
             Assert.Contains(viewport, Ancestors<WorkspaceViewport>(inputs));
             Assert.Equal(348, block.MaxWidth);
             Assert.Equal(FontWeights.Bold, indicator.FontWeight);
-            Assert.Contains(Descendants<TextBlock>(block), text => text.Text == "UPDATE RESULTS" && text.FontWeight == FontWeights.Bold);
+            Assert.Contains(Descendants<TextBlock>(block), text => text.Text == "Calculation" && text.FontWeight == FontWeights.SemiBold);
             Assert.All(buttons, button => Assert.Equal(FontWeights.Bold, button.FontWeight));
             var footer = Assert.Single(Descendants<ScrollViewer>(Assert.IsType<Grid>(VisualTreeHelper.GetParent(block))));
             Assert.Equal(80, footer.MaxHeight); Assert.DoesNotContain(footer, Ancestors<ScrollViewer>(block));
             Assert.True(Bounds(block, surface).Top >= Bounds(viewport, surface).Bottom - 1,
                 "Update commands must remain below the scrollable study panes.");
 
-            foreach (string property in new[] { "PanelTilt", "PanelAzimuth" })
+            foreach (string property in new[] { "PanelTilt", "PanelTopHeading" })
             {
                 var field = Assert.Single(Descendants<TextBox>(inputs), box => Equals(box.Tag, property));
                 Assert.Contains(inputs, Ancestors<ScrollViewer>(field));
             }
-            Assert.Contains(Descendants<TextBlock>(inputs), text => text.Text.StartsWith("Update results reuses matching weather data.", StringComparison.Ordinal));
+            Assert.Contains("reuses matching weather data", AutomationProperties.GetHelpText(buttons[0]));
+            Assert.NotNull(buttons[0].ToolTip);
+            Assert.DoesNotContain(Descendants<TextBlock>(inputs), text => text.Text.Contains("reuses matching weather data"));
 
             FrameworkElement[] fixedElements = [block, indicator, .. buttons];
             var originalBounds = fixedElements.ToDictionary(element => element, element => Bounds(element, surface));
@@ -69,7 +71,7 @@ public sealed class FixedUpdateControlsTests
             Assert.InRange(viewport.VerticalOffset, 0, 1); AssertFixed("study top");
 
             chart.BringIntoView(); await Layout(surface, width, height); AssertFixed("chart BringIntoView");
-            foreach (string property in new[] { "Latitude", "PanelAzimuth" })
+            foreach (string property in new[] { "Latitude", "PanelTopHeading" })
             {
                 Assert.Single(Descendants<TextBox>(inputs), box => Equals(box.Tag, property)).BringIntoView();
                 await Layout(surface, width, height); AssertFixed(property + " BringIntoView");

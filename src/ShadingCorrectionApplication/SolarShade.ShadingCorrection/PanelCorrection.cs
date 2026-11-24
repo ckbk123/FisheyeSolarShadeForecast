@@ -115,7 +115,7 @@ public static partial class ShadingCorrectionModule
         string metadata = "Panel irradiance in W/m²; timestamps preserve source labels and explicit source/effective bounds. " +
             "Transmission=shaded/unshaded (1=open,0=blocked), blank when baseline is zero. " +
             "Main result assumes unknown sky blocked; upper bound assumes unknown sky open. No ground reflection. " +
-            "Provenance: " + JsonSerializer.Serialize(new { run.Panel, run.Source, run.TimeZoneId, run.TimestampConvention,
+            PanelOrientation.SolverConvention + " Provenance: " + JsonSerializer.Serialize(new { run.Panel, run.Source, run.TimeZoneId, run.TimestampConvention,
                 run.NativeCadence, run.SourceLatitude, run.SourceLongitude, run.DatasetFingerprint, run.SolarConvention });
         void Write(string filename, string[] headers, IEnumerable<object?[]> values)
         {
@@ -156,7 +156,7 @@ public static partial class ShadingCorrectionModule
         try
         {
             File.WriteAllText(temporary, JsonSerializer.Serialize(new { run.Rows, run.Model, run.SkyCoverage,
-                run.Panel, run.Source, run.TimeZoneId, run.TimestampConvention, run.NativeCadence,
+                run.Panel, PanelConvention = PanelOrientation.SolverConvention, run.Source, run.TimeZoneId, run.TimestampConvention, run.NativeCadence,
                 run.SourceLatitude, run.SourceLongitude, run.DatasetFingerprint, run.SolarConvention,
                 run.BeforeEnergy, run.AfterEnergy, run.EnergyTransmission, run.LossFraction, run.LossPercent }, new JsonSerializerOptions { WriteIndented = true }));
             ct.ThrowIfCancellationRequested(); File.Move(temporary, json, true); paths.Add(json);

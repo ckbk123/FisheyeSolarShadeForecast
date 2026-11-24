@@ -48,8 +48,11 @@ public sealed class HourlyConsumptionTests
         Assert.Equal(new[] { "Wh", "J", "W", "VA (DC)" }, units.Items.Cast<string>());
         int edits = 0; editor.Edited += _ => edits++;
         entry.Text = "1,5"; units.SelectedIndex = 1; Assert.Equal("5400", entry.Text);
+        Assert.Contains("3,600 J", AutomationProperties.GetHelpText(entry));
         units.SelectedIndex = 2; Assert.Equal("1.5", entry.Text);
         units.SelectedIndex = 3; Assert.Equal("1.5", entry.Text);
+        Assert.Contains("For DC loads", AutomationProperties.GetHelpText(entry));
+        Assert.Equal(AutomationProperties.GetHelpText(entry), entry.ToolTip);
         Assert.Equal(before, editor.Values); Assert.Equal(0, edits);
         apply.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert.All(editor.Values, value => Assert.Equal("1.5", value)); Assert.Equal(1, edits);

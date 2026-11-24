@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 using OpenCvSharp;
 using SolarShade.Desktop;
 using SolarShade.MaskEditor;
+using SolarShade.Camera;
+using SolarShade.Shading;
 using SolarShade.SkyPhotoMasking;
 using SolarShade.ShadingCorrection;
 using SolarShade.PvBattery.Integration;
@@ -13,15 +15,26 @@ using static ManualUpdateTests;
 public sealed class MaskEditingTests
 {
     [Fact]
-    public void NativeBrushIsBinaryDiskBoundedAndUndoable() => Sta(() =>
+    public void NativeBrushPaintsAcrossDiskAndImageEdgesAndSupportsUndo() => Sta(() =>
     {
-        var canvas = new MaskCanvas(41, 41, new byte[41 * 41], 20, 20, 15);
-        canvas.BeginStroke(); canvas.PaintLine(0, 20, 40, 20, 7, 255); canvas.EndStroke();
-        Assert.Equal((byte)0, canvas.Pixel(0, 20)); Assert.Equal((byte)255, canvas.Pixel(20, 20));
+        var canvas = new MaskCanvas(41, 41, new byte[41 * 41]);
+        canvas.BeginStroke(); canvas.PaintLine(-7, 20, 47, 20, 7, 255); canvas.EndStroke();
+        Assert.Equal((byte)255, canvas.Pixel(0, 20)); Assert.Equal((byte)255, canvas.Pixel(20, 20));
+        Assert.Equal((byte)255, canvas.Pixel(40, 20));
         Assert.True(canvas.IsDirty); canvas.Undo(); Assert.False(canvas.IsDirty); canvas.Redo(); Assert.True(canvas.IsDirty);
+        canvas.BeginStroke(); canvas.PaintLine(0, 20, 1, 20, 1, 0); canvas.EndStroke();
+        Assert.Equal((byte)0, canvas.Pixel(0, 20)); Assert.Equal((byte)255, canvas.Pixel(40, 20));
         canvas.Reset(); Assert.False(canvas.IsDirty);
+        // Position at the last pixel center in a view magnified 8x, transformed back to image DIPs by WPF.
+        var point = MaskCanvas.PixelCenterCoordinates(new(324.0 / 8, 324.0 / 8));
+        canvas.BeginStroke(); canvas.PaintLine(point.X, point.Y, point.X, point.Y, 1, 255); canvas.EndStroke();
+        Assert.Equal((byte)255, canvas.Pixel(40, 40)); Assert.Equal((byte)0, canvas.Pixel(39, 40));
+        point = MaskCanvas.PixelCenterCoordinates(new(0.01, 0.01));
+        canvas.BeginStroke(); canvas.PaintLine(point.X, point.Y, point.X, point.Y, 1, 255); canvas.EndStroke();
+        Assert.Equal((byte)255, canvas.Pixel(0, 0)); Assert.Equal((byte)0, canvas.Pixel(1, 0));
         using var decoded = Cv2.ImDecode(canvas.EncodePng(), ImreadModes.Grayscale);
         Assert.Equal(41, decoded.Width); Assert.Equal(41, decoded.Height);
+        Assert.Equal((byte)255, decoded.At<byte>(40, 40));
         return Task.CompletedTask;
     });
 
@@ -34,8 +47,9 @@ public sealed class MaskEditingTests
         var pixels = new byte[checked(result.Width * result.Height)];
         for (int y = 0; y < result.Height; y++)
             System.Runtime.InteropServices.Marshal.Copy(decoded.Ptr(y), pixels, y * result.Width, result.Width);
-        var canvas = new MaskCanvas(result.Width, result.Height, pixels, result.Disk.CenterX, result.Disk.CenterY, result.Disk.Radius);
+        var canvas = new MaskCanvas(result.Width, result.Height, pixels);
         Assert.Equal(result.Width, canvas.Width); Assert.Equal(result.Height, canvas.Height);
+        Assert.Equal(pixels, canvas.CopyPixels());
         return Task.CompletedTask;
     });
 
@@ -58,6 +72,63 @@ public sealed class MaskEditingTests
         File.WriteAllBytes(ManualMaskStore.VariantPngPath(variant.PhotoSha256, variant.Id), [0, 1, 2]);
         Assert.Throws<InvalidDataException>(() => ManualMaskStore.Load(fixture.Settings.SkyImage, variant.Id));
         return Task.CompletedTask;
+    });
+
+    [Fact]
+    public void FullFrameEditsRoundTripAndUseTheExportedPixelsAtTheFovEdge() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        var s = fixture.Settings;
+        const int width = 201, height = 303;
+        string openingFile = Path.Combine(fixture.Root, "black.png");
+        var canvas = new MaskCanvas(width, height, new byte[width * height]);
+        File.WriteAllBytes(openingFile, canvas.EncodePng());
+        var original = ManualMaskStore.Import(s.SkyImage, openingFile, "Blocked", centeredDisk: true);
+        var normal = new Direction(0, 0, 1);
+        // The fixture maps an incident angle in radians to 70 pixels/radian. Its 70° cap is at radius 85.52.
+        var nearRim = Direction.FromAngles(270, 85.3 / 70 * 180 / Math.PI);
+        var beyondRim = Direction.FromAngles(270, 75);
+        PanelSkyScene? applicationScene = null;
+        using var service = new AppServices(fixture.Debug, (input, scene, ct) =>
+        { applicationScene = scene; return ShadingCorrectionModule.ApplyToPanel(input, scene, ct); });
+
+        async Task<Evaluation> Evaluate(MaskVariant variant, double coverage = 0)
+        {
+            var inputs = s with { SelectedMaskId = variant.Id, CoverageAngle = coverage };
+            service.ObserveInputs(inputs, refreshSources: true);
+            return await service.Evaluate(inputs, false, _ => { }, null, CancellationToken.None);
+        }
+
+        var black = await Evaluate(original);
+        Assert.Equal(0, black.Run.AfterEnergy);
+        canvas.BeginStroke(); canvas.PaintLine(0, 0, 4, 0, 3, 255); canvas.EndStroke();
+        var corner = ManualMaskStore.Save(s.SkyImage, original.BaseMask, "", original.Id, "White corner", canvas.EncodePng());
+        var exterior = await Evaluate(corner);
+        Assert.Equal(black.Run.Rows.ToArray(), exterior.Run.Rows.ToArray());
+        Assert.Equal(black.Run.Visibility.ToArray(), exterior.Run.Visibility.ToArray());
+        var reopened = SkyShadingModule.DecodeMask(ManualMaskStore.Load(s.SkyImage, corner.Id).Png);
+        Assert.Equal((byte)255, reopened.Pixels[0]);
+        canvas = new MaskCanvas(width, height, reopened.Pixels);
+        canvas.BeginStroke(); canvas.PaintLine(0, 0, 0, 0, 1, 0); canvas.EndStroke();
+        canvas.BeginStroke(); canvas.PaintLine(186, 148, 186, 154, 1, 255); canvas.EndStroke();
+        var edge = ManualMaskStore.Save(s.SkyImage, corner.BaseMask, "", corner.Id, "Edit near angular limit", canvas.EncodePng());
+        var selected = await Evaluate(edge);
+        string folder = AppServices.Export(selected, Path.Combine(fixture.Root, "exports"));
+        string stage = Path.Combine(folder, "02-sky-mask");
+        byte[] exportedPng = File.ReadAllBytes(Path.Combine(stage, "sky-mask.png"));
+        Assert.Equal(ManualMaskStore.Load(s.SkyImage, edge.Id).Png, exportedPng);
+        Assert.Contains("full oriented image", File.ReadAllText(Path.Combine(stage, "mask-details.json")));
+        var exported = SkyShadingModule.DecodeMask(exportedPng);
+        Assert.Equal((byte)0, exported.Pixels[0]); Assert.Equal((byte)255, exported.Pixels[1]);
+        var disk = edge.BaseMask.Disk;
+        var direct = new PanelSkyScene(exported, CameraProfileFiles.Load(s.ProfilePath).Calibration,
+            EquipmentOrientation.ToCameraPose(s), new(disk.CenterX, disk.CenterY, disk.Radius));
+        var visibility = applicationScene!.Disk(nearRim, normal);
+        Assert.InRange(visibility.Visible, 0.01, 0.99);
+        Assert.Equal(direct.Disk(nearRim, normal), visibility);
+        Assert.Equal(new FluxVisibility(0, 0), applicationScene.Disk(beyondRim, normal));
+        await Evaluate(edge, 80);
+        Assert.Equal(1, applicationScene.Disk(beyondRim, normal).Known, 10);
     });
 
     [Fact]

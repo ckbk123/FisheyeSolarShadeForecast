@@ -19,13 +19,25 @@ public sealed class PvSystemChart : FrameworkElement
     public bool ShowSoc { get; set; } = true;
     public bool Stale { get; set; }
     public event Action<string>? Hover;
-    public static readonly Brush LoadBrush = Brushes.DarkOrange, PvBrush = Brushes.Teal, SocBrush = Brushes.RoyalBlue;
+    public static readonly Brush LoadBrush = StudioTheme.Amber, PvBrush = StudioTheme.Teal, SocBrush = StudioTheme.Blue;
+    private static readonly Typeface ChartFace = new(StudioTheme.Font, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+    private static readonly Pen LoadLine = Line(LoadBrush, 1.4, DashStyles.Dash), PvLine = Line(PvBrush, 1.5), SocLine = Line(SocBrush, 1.8);
+    private static readonly Pen GridLine = Line(StudioTheme.Line, .8), Crosshair = Line(StudioTheme.Muted, .8);
+
+    private static Pen Line(Brush brush, double width, DashStyle? dashes = null)
+    {
+        var pen = new Pen(brush, width);
+        if (dashes != null) pen.DashStyle = dashes;
+        pen.Freeze();
+        return pen;
+    }
     private static double Time(DateTimeOffset value) => (value - DateTimeOffset.UnixEpoch).TotalSeconds;
     private Rect Plot => new(58, 28, Math.Max(1, ActualWidth - 115), Math.Max(1, ActualHeight - 85));
     public PvSystemChart()
     {
         MinHeight = 140; Focusable = true; ClipToBounds = true;
-        System.Windows.Automation.AutomationProperties.SetName(this, "Hourly energy and battery charge. Details are shown beneath the graph and available in exports.");
+        System.Windows.Automation.AutomationProperties.SetName(this, "Hourly energy and battery charge");
+        System.Windows.Automation.AutomationProperties.SetHelpText(this, "Scroll to zoom and drag to pan. Hourly values lists the intervals and their energy and charge values. Red marks indicate unmet load.");
         MouseWheel += (_, e) =>
         {
             if (result == null) return; var p = Plot;
@@ -85,11 +97,11 @@ public sealed class PvSystemChart : FrameworkElement
         }
         dc.DrawDrawing(cachedDrawing);
         if (result != null && (ShowLoad || ShowPv || ShowSoc) && pointer is { } point && Plot.Contains(point))
-            dc.DrawLine(new Pen(Brushes.Gray, .8), new(point.X, Plot.Top), new(point.X, Plot.Bottom));
+            dc.DrawLine(Crosshair, new(point.X, Plot.Top), new(point.X, Plot.Bottom));
     }
     private void Draw(DrawingContext dc)
     {
-        dc.DrawRectangle(Brushes.White, null, new Rect(RenderSize));
+        dc.DrawRectangle(StudioTheme.Surface, null, new Rect(RenderSize));
         if (result == null) { Text(dc, "Evaluate your system to display hourly results.", 20, 45); return; }
         if (!ShowLoad && !ShowPv && !ShowSoc) { Text(dc, "Select a series above to show the graph.", 20, 45); return; }
         var plot = Plot; var visible = result.Hours.Where(h => Time(h.End) >= from && Time(h.Start) <= to).ToArray();
@@ -102,7 +114,7 @@ public sealed class PvSystemChart : FrameworkElement
         for (int i = 0; i <= 4; i++)
         {
             double y = plot.Bottom - i / 4d * plot.Height;
-            dc.DrawLine(new Pen(Brushes.LightGray, .6), new(plot.Left, y), new(plot.Right, y));
+            dc.DrawLine(GridLine, new(plot.Left, y), new(plot.Right, y));
             Text(dc, (energyMax * i / 4).ToString("0.#", CultureInfo.InvariantCulture), 3, y - 7);
             Text(dc, (i * 25).ToString(), plot.Right + 7, y - 7);
         }
@@ -116,8 +128,6 @@ public sealed class PvSystemChart : FrameworkElement
             Text(dc, local.ToString("dd MMM\nHH:mm zzz", CultureInfo.InvariantCulture), Math.Clamp(x - 33, 0, Math.Max(0, ActualWidth - 76)), plot.Bottom + 8);
         }
         dc.PushClip(new RectangleGeometry(plot));
-        var loadPen = new Pen(LoadBrush, 1.4) { DashStyle = DashStyles.Dash };
-        var pvPen = new Pen(PvBrush, 1.5); var socPen = new Pen(SocBrush, 1.8);
         if (visible.Length <= plot.Width * 3)
         {
             Point? previousSoc = null;
@@ -125,17 +135,17 @@ public sealed class PvSystemChart : FrameworkElement
             foreach (var h in visible)
             {
                 double a = X(Time(h.Start)), b = X(Time(h.End));
-                if (ShowLoad) dc.DrawLine(loadPen, new(a, Energy(h.LoadWh)), new(b, Energy(h.LoadWh)));
-                if (ShowPv) dc.DrawLine(pvPen, new(a, Energy(h.PvWh)), new(b, Energy(h.PvWh)));
+                if (ShowLoad) dc.DrawLine(LoadLine, new(a, Energy(h.LoadWh)), new(b, Energy(h.LoadWh)));
+                if (ShowPv) dc.DrawLine(PvLine, new(a, Energy(h.PvWh)), new(b, Energy(h.PvWh)));
                 if (previousHour is { } previous && previous.End == h.Start)
                 {
-                    if (ShowLoad) dc.DrawLine(loadPen, new(a, Energy(previous.LoadWh)), new(a, Energy(h.LoadWh)));
-                    if (ShowPv) dc.DrawLine(pvPen, new(a, Energy(previous.PvWh)), new(a, Energy(h.PvWh)));
+                    if (ShowLoad) dc.DrawLine(LoadLine, new(a, Energy(previous.LoadWh)), new(a, Energy(h.LoadWh)));
+                    if (ShowPv) dc.DrawLine(PvLine, new(a, Energy(previous.PvWh)), new(a, Energy(h.PvWh)));
                 }
                 if (ShowSoc)
                 {
                     var start = previousSoc ?? new Point(a, Soc(h.StartStoredWh / result.Input.Settings.BatteryCapacityWh * 100));
-                    var end = new Point(b, Soc(h.EndSocPercent)); dc.DrawLine(socPen, start, end); previousSoc = end;
+                    var end = new Point(b, Soc(h.EndSocPercent)); dc.DrawLine(SocLine, start, end); previousSoc = end;
                 }
                 if (h.UnmetLoadWh > 0) dc.DrawRectangle(Brushes.Crimson, null, new Rect(a, plot.Bottom - 4, Math.Max(1, b - a), 4));
                 previousHour = h;
@@ -147,9 +157,9 @@ public sealed class PvSystemChart : FrameworkElement
             foreach (var group in visible.GroupBy(h => (int)X(Time(h.End))))
             {
                 double x = group.Key;
-                if (ShowLoad) dc.DrawLine(loadPen, new(x, Energy(group.Min(h => h.LoadWh))), new(x, Energy(group.Max(h => h.LoadWh)) - .5));
-                if (ShowPv) dc.DrawLine(pvPen, new(x, Energy(group.Min(h => h.PvWh))), new(x, Energy(group.Max(h => h.PvWh)) - .5));
-                if (ShowSoc) dc.DrawLine(socPen, new(x, Soc(group.Min(h => Math.Min(h.EndSocPercent, h.StartStoredWh / result.Input.Settings.BatteryCapacityWh * 100)))) , new(x, Soc(group.Max(h => Math.Max(h.EndSocPercent, h.StartStoredWh / result.Input.Settings.BatteryCapacityWh * 100))) - .5));
+                if (ShowLoad) dc.DrawLine(LoadLine, new(x, Energy(group.Min(h => h.LoadWh))), new(x, Energy(group.Max(h => h.LoadWh)) - .5));
+                if (ShowPv) dc.DrawLine(PvLine, new(x, Energy(group.Min(h => h.PvWh))), new(x, Energy(group.Max(h => h.PvWh)) - .5));
+                if (ShowSoc) dc.DrawLine(SocLine, new(x, Soc(group.Min(h => Math.Min(h.EndSocPercent, h.StartStoredWh / result.Input.Settings.BatteryCapacityWh * 100)))) , new(x, Soc(group.Max(h => Math.Max(h.EndSocPercent, h.StartStoredWh / result.Input.Settings.BatteryCapacityWh * 100))) - .5));
                 if (group.Any(h => h.UnmetLoadWh > 0)) dc.DrawRectangle(Brushes.Crimson, null, new Rect(x, plot.Bottom - 4, 1, 4));
             }
         }
@@ -159,5 +169,5 @@ public sealed class PvSystemChart : FrameworkElement
     }
     private void Text(DrawingContext dc, string value, double x, double y, Brush? brush = null, double size = 10) =>
         dc.DrawText(new FormattedText(value, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-            new Typeface("Segoe UI"), size, brush ?? Brushes.DarkSlateGray, VisualTreeHelper.GetDpi(this).PixelsPerDip), new(x, y));
+            ChartFace, size, brush ?? StudioTheme.Muted, VisualTreeHelper.GetDpi(this).PixelsPerDip), new(x, y));
 }

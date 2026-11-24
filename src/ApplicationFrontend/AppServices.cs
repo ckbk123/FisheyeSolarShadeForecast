@@ -287,7 +287,7 @@ public sealed class AppServices : IIrradianceService
                     progress("Drawing sun paths on the calibrated image");
                     var next = await Task.Run(() => SunPathOverlayGenerator.Generate(geometry!,
                         new CalibratedSkyProjection(activeProfile.Calibration,
-                            CameraPose.FromImageBottom(s.BottomAzimuth, s.CameraTilt, s.CameraRoll),
+                            EquipmentOrientation.ToCameraPose(s),
                             new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius)), zone, ct: ct), ct);
                     ct.ThrowIfCancellationRequested(); sunPath = next; sunPathKey = nextSunPath; SunPathGenerationCount++;
                     await Task.Run(() => Values.Write("sun-path", nextSunPath, next), ct);
@@ -312,7 +312,7 @@ public sealed class AppServices : IIrradianceService
                 {
                     progress("Preparing panel visibility");
                     var next = await Task.Run(() => new PanelSkyScene(SkyShadingModule.DecodeMask(activeMask.Png), activeProfile.Calibration,
-                        CameraPose.FromImageBottom(s.BottomAzimuth, s.CameraTilt, s.CameraRoll),
+                        EquipmentOrientation.ToCameraPose(s),
                         new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius)), ct);
                     ct.ThrowIfCancellationRequested(); scene = next; sceneKey = nextScene;
                 }
@@ -321,14 +321,20 @@ public sealed class AppServices : IIrradianceService
 
             string transpositionDirectory = debug.BeginStage("05-transposition", "Computed", typeof(TranspositionModule));
             progress("Calculating irradiance on the panel");
-            string nextTransposed = AppData.Key(new { Solar = nextGeometry, s.PanelTilt, s.PanelAzimuth, s.Isotropic });
+            var panel = new PanelOrientation(s.PanelTilt, s.PanelAzimuth);
+            // Rotating a horizontal panel changes its marked edge and saved study, but not its receiver normal.
+            // Share the numerical rows while keeping the requested orientation in every exported stage.
+            double numericalAzimuth = s.PanelTilt == 0 && s.PanelAzimuth is >= 0 and <= 360 ? 180 : s.PanelAzimuth;
+            string nextTransposed = AppData.Key(new { Solar = nextGeometry, s.PanelTilt, PanelAzimuth = numericalAzimuth, s.Isotropic });
             // Transposition is cheaper to compute than to deserialize its duplicated solar timeline.
             if (transposedCache == null || transposedKey != nextTransposed || refresh)
             {
-                var next = await Task.Run(() => TranspositionModule.ComputePrepared(geometry!, new(s.PanelTilt, s.PanelAzimuth),
+                var next = await Task.Run(() => TranspositionModule.ComputePrepared(geometry!, panel,
                     s.Isotropic ? DiffuseModel.Isotropic : DiffuseModel.HayDavies, ct: ct), ct);
                 ct.ThrowIfCancellationRequested(); transposedCache = next; transposedKey = nextTransposed;
             }
+            else if (transposedCache.Panel != panel)
+                transposedCache = transposedCache with { Panel = panel };
             var panelArtifacts = debug.NeedsWrite(ArtifactGroup.Transposition)
                 ? new[] { (await Task.Run(() => TranspositionModule.ExportPrepared(transposedCache, Path.Combine(transpositionDirectory, "panel-unshaded.xlsx"), ct), ct)).OutputPath! } : [];
             debug.CompleteStage("05-transposition", panelArtifacts);
@@ -344,7 +350,8 @@ public sealed class AppServices : IIrradianceService
                 ct.ThrowIfCancellationRequested(); resultCache = next; resultKey = nextResult;
                 await Task.Run(() => Values.Write("shading", nextResult, next), ct);
             }
-            var result = resultCache;
+            var result = resultCache.Panel.HasValue && resultCache.Panel != panel
+                ? resultCache with { Panel = panel } : resultCache;
             debug.CompleteStage("06-shading", debug.NeedsWrite(ArtifactGroup.Shading)
                 ? await Task.Run(() => ShadingCorrectionModule.ExportPanel(result, correctionDirectory, ct), ct) : [], skipped: scene == null);
             lock (inputGate)
@@ -488,6 +495,15 @@ public sealed class AppServices : IIrradianceService
                 debug.CompleteStage("02-sky-mask", debug.NeedsWrite(ArtifactGroup.Mask) ? await Task.Run(() =>
                 {
                     var files = SkyMaskExporter.Export(activeMask.Result, directory, maskOrigin, ct).ToList();
+                    string pixelConvention = "255 = open sky; 0 = obstruction or outside lens; no automatic inversion";
+                    if (activeMask.Variant?.Source == "Edited")
+                    {
+                        pixelConvention = "255 = open sky; 0 = obstruction. Edited pixels cover the full oriented image. Only rays within calibrated coverage, the lens disk and the image are observed. At the boundary, in-range rays use normal bilinear sampling.";
+                        string detailsPath = Path.Combine(directory, "mask-details.json");
+                        var details = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(detailsPath))!.AsObject();
+                        details["PixelConvention"] = pixelConvention;
+                        AppData.Write(detailsPath, details);
+                    }
                     string provenance = Path.Combine(directory, "mask-provenance.json");
                     AppData.Write(provenance, new { Source = activeMask.Variant?.Source ?? "AI",
                         VariantId = activeMask.Variant?.Id, Label = activeMask.Variant?.Label,
@@ -496,7 +512,7 @@ public sealed class AppServices : IIrradianceService
                         ImportedFileSha256 = activeMask.Variant?.ImportedFileSha256,
                         ImportedAncestorSha256 = activeMask.Variant?.ImportedAncestorSha256,
                         ImportInverted = activeMask.Variant?.ImportInverted,
-                        PixelConvention = "255 = open sky; 0 = obstruction or outside lens; no automatic inversion",
+                        PixelConvention = pixelConvention,
                         ParentVariantId = activeMask.Variant?.ParentId,
                         ActiveMaskSha256 = Convert.ToHexString(SHA256.HashData(activeMask.Png)) });
                     files.Add(provenance); return files;
@@ -540,7 +556,7 @@ public sealed class AppServices : IIrradianceService
                     progress("Drawing cardinal directions on the sky photograph");
                     var next = await Task.Run(() => CardinalDirectionOverlayGenerator.Generate(
                         new CalibratedSkyProjection(activeProfile.Calibration,
-                            CameraPose.FromImageBottom(s.BottomAzimuth, s.CameraTilt, s.CameraRoll),
+                            EquipmentOrientation.ToCameraPose(s),
                             new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius)), ct: ct), ct);
                     ct.ThrowIfCancellationRequested(); cardinals = next; cardinalKey = nextCardinal; CardinalGenerationCount++;
                     await Task.Run(() => Values.Write("cardinals", nextCardinal, next), ct);

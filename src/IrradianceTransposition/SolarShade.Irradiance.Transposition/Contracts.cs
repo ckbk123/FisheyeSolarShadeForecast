@@ -5,6 +5,8 @@ public enum DiffuseModel { HayDavies, PerezDriesse, Isotropic }
 /// <summary>Tilt from horizontal (0 faces up, 90 vertical); front-normal azimuth clockwise from true north.</summary>
 public readonly record struct PanelOrientation(double TiltDegrees, double AzimuthDegrees)
 {
+    public const string SolverConvention = "Panel.TiltDegrees is measured from horizontal. Panel.AzimuthDegrees is the front-normal solver input clockwise from true north. A flat panel has no physical azimuth.";
+
     internal void Validate()
     {
         Guard.Range(TiltDegrees, 0, 90, nameof(TiltDegrees));

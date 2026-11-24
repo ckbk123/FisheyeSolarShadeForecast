@@ -13,6 +13,7 @@ public sealed class CalibrationReviewWindow : Window
     private readonly CalibrationReview review;
     private readonly ComboBox photos = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch };
     private readonly Image preview = new() { Stretch = Stretch.Uniform };
+    private readonly CalibrationStamp stamp = new() { Name = "CheckerboardStatusStamp" };
     private readonly TextBlock feedback = IrradianceWorkspace.Label("", 13);
     public CalibrationImageDetection? SelectedPhoto => photos.SelectedItem is PhotoChoice choice ? choice.Image : null;
     public bool HasPreview => preview.Source != null;
@@ -30,23 +31,28 @@ public sealed class CalibrationReviewWindow : Window
             ShowActivated = false;
         Width = 900; Height = 760;
         if (owner != null) WindowWorkArea.FitToOwner(this, owner);
-        else WindowWorkArea.FitOnStartup(this);
+        else { StudioTheme.Apply(this); WindowWorkArea.FitOnStartup(this); }
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var root = new StackPanel { Margin = new(16) };
         Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         var header = new StackPanel(); root.Children.Add(header);
-        header.Children.Add(IrradianceWorkspace.Label(review.Summary, 18));
-        header.Children.Add(IrradianceWorkspace.Label(review.Report.Failure is { } error
-            ? "Calibration could not complete: " + error : "Colored corner markers show the detected inner corners.", 13));
+        var summary = IrradianceWorkspace.Label(review.Summary, 18, StudioTheme.Ink);
+        summary.FontWeight = FontWeights.SemiBold; header.Children.Add(summary);
+        if (review.Report.Failure is { } error) header.Children.Add(IrradianceWorkspace.Label("Calibration could not complete. " + error, 13));
         if (review.Note != null) header.Children.Add(IrradianceWorkspace.Label(review.Note, 12));
         if (review.FitSummary != null) header.Children.Add(IrradianceWorkspace.Label(review.FitSummary, 12));
         header.Children.Add(IrradianceWorkspace.Label("Checkerboard photo", 12));
         AutomationProperties.SetName(photos, "Checkerboard photo detection results");
+        StudioTheme.Help(photos, "Choose a checkerboard photo to review its detection. Colored markers show the detected inner corners.");
         photos.ItemsSource = review.Report.Images.Select(i => new PhotoChoice(i)).ToArray();
         photos.Margin = new(0, 6, 0, 8); header.Children.Add(photos);
         header.Children.Add(feedback);
-        root.Children.Add(new Border { Height = 360, Margin = new(0, 8, 0, 0), Background = Brushes.Black, Child = preview });
+        var photoPane = new Grid { Background = StudioTheme.Navy, Height = 360, Margin = new(0, 8, 0, 0), ClipToBounds = true };
+        photoPane.Children.Add(preview);
+        AutomationProperties.SetAutomationId(stamp, "CheckerboardStatusStamp");
+        photoPane.Children.Add(stamp);
+        root.Children.Add(photoPane);
         var footer = new StackPanel { Margin = new(0, 8, 0, 0) }; root.Children.Add(footer);
         footer.Children.Add(IrradianceWorkspace.Label("Saved review and diagnostics", 12));
         footer.Children.Add(new TextBox { Text = review.Directory, IsReadOnly = true, TextWrapping = TextWrapping.Wrap });
@@ -63,13 +69,21 @@ public sealed class CalibrationReviewWindow : Window
         close.Click += (_, _) => Close(); buttons.Children.Add(close);
         photos.SelectionChanged += (_, _) => ShowPhoto();
         photos.SelectedIndex = review.Report.Images.Count > 0 ? 0 : -1;
-        if (photos.SelectedIndex < 0) feedback.Text = "No supported photos reached checkerboard detection. Check the folder and board settings.";
+        if (photos.SelectedIndex < 0) ShowPhoto();
     }
 
     private void ShowPhoto()
     {
         preview.Source = null;
-        if (SelectedPhoto is not { } image) return;
+        var image = SelectedPhoto;
+        if (review.Report.Failure is { } reason) stamp.SetMessage(CalibrationStamp.FailureLabel, reason);
+        else if (image is { Detected: false }) stamp.SetMessage("PHOTO REJECTED", image.Message);
+        else stamp.SetMessage(null);
+        if (image == null)
+        {
+            feedback.Text = "No supported photos reached checkerboard detection. Check the folder and board settings.";
+            return;
+        }
         feedback.Text = image.Message + "\nSource: " + image.Path;
         AutomationProperties.SetName(preview, image.Name + " · checkerboard detection preview");
         try

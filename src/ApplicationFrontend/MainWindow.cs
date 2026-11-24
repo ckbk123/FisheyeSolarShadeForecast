@@ -12,7 +12,7 @@ namespace SolarShade.Desktop;
 public sealed class MainWindow : Window
 {
     private readonly WorkspaceHost host = new();
-    private readonly ContentControl actions = new();
+    private readonly Grid actions = new();
     public IrradianceWorkspace Irradiance { get; }
     public PvAutonomyWorkspace PvAutonomy { get; }
     public IrradianceWorkspaceController IrradianceController => Irradiance.Controller;
@@ -20,28 +20,35 @@ public sealed class MainWindow : Window
 
     public MainWindow(Func<TimeZoneInfo>? systemZoneProvider = null, bool loadExampleOnFirstRun = true, AppServices? applicationServices = null)
     {
-        Title = "SolarShade · Solar Forecast Estimator · Preview 0.2.0"; Width = 1440; Height = 960; MinWidth = 480; MinHeight = 320;
+        Title = $"SolarShade · Solar Forecast Estimator · Preview {Program.PreviewVersion}"; Width = 1440; Height = 960; MinWidth = 480; MinHeight = 320;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         WindowWorkArea.FitOnStartup(this);
-        Background = new SolidColorBrush(Color.FromRgb(242, 246, 246));
-        FontFamily = new("Segoe UI"); FontSize = 13; Foreground = new SolidColorBrush(Color.FromRgb(25, 48, 58));
+        StudioTheme.Apply(this);
+        Background = StudioTheme.Canvas;
+        FontSize = 13;
         UseLayoutRounding = true;
         var root = new DockPanel(); Content = root;
-        var header = new Grid { MinHeight = 72, Background = Foreground };
+        var header = new Grid { MinHeight = 58, Background = StudioTheme.Navy };
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
         header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         header.RowDefinitions.Add(new() { Height = GridLength.Auto }); header.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var title = new StackPanel { Margin = new(18, 8, 12, 8) };
-        title.Children.Add(Label("SOLARSHADE", 24, Brushes.White));
-        title.Children.Add(Label("Solar energy studies", 12, Brushes.LightGray)); header.Children.Add(title);
+        var title = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new(18, 6, 10, 6) };
+        title.Children.Add(new Image { Source = StudioTheme.MakeLogo(), Width = 31, Height = 31, Margin = new(0, 0, 9, 0), IsHitTestVisible = false });
+        title.Children.Add(new TextBlock { Text = "SolarShade", Foreground = Brushes.White,
+            FontWeight = FontWeights.SemiBold, FontSize = 22, VerticalAlignment = VerticalAlignment.Center });
+        header.Children.Add(title);
+        if (TryFindResource("HeaderButton") is Style headerButton) actions.Resources[typeof(Button)] = headerButton;
         actions.Margin = new(8, 4, 14, 4); actions.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(actions, 1); header.Children.Add(actions);
         bool? stackedHeader = null;
+        FrameworkElement? visibleActions = null;
+        void FitWordmark() => title.Visibility = header.ActualWidth < 600 && visibleActions != null
+            ? Visibility.Collapsed : Visibility.Visible;
         header.SizeChanged += (_, _) =>
         {
             bool narrow = header.ActualWidth < 850;
             // The native title bar still identifies the app; reserve short, narrow windows for actions.
-            title.Visibility = header.ActualWidth < 600 ? Visibility.Collapsed : Visibility.Visible;
+            FitWordmark();
             if (narrow == stackedHeader) return;
             stackedHeader = narrow;
             Grid.SetColumn(actions, narrow ? 0 : 1); Grid.SetRow(actions, narrow ? 1 : 0);
@@ -49,24 +56,31 @@ public sealed class MainWindow : Window
             header.ColumnDefinitions[1].Width = narrow ? new(0) : GridLength.Auto;
         };
         root.Children.Add(host);
+        host.Register(new("orientation", "Orientation map", new OrientationWorkspace()));
         Irradiance = new(this, new(applicationServices ?? new()), systemZoneProvider, loadExampleOnFirstRun);
         host.Register(new("irradiance", "Solar Irradiance", Irradiance, Irradiance.Actions));
+        host.Select("irradiance");
         var pvService = new PvEvaluationService(IrradianceController);
         PvAutonomy = new(this, IrradianceController, new(IrradianceController, pvService), Irradiance.RecheckSourcesAsync, () => host.Select("irradiance"));
         host.Register(new("pv", "PV Autonomy", PvAutonomy, PvAutonomy.Actions));
-        var availability = Label("", 11); availability.Margin = new(20, 3, 20, 3);
-        var availabilityViewport = new ScrollViewer { Content = availability, MaxHeight = 42,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-        DockPanel.SetDock(availabilityViewport, Dock.Top); root.Children.Insert(1, availabilityViewport);
         void RefreshAvailability()
         {
             var state = IrradianceController.Source; host.SetAvailability("pv", state.IsReady, state.Reason);
-            availability.Text = state.IsReady ? "" : "PV Autonomy · " + state.Reason;
-            availabilityViewport.Visibility = state.IsReady ? Visibility.Collapsed : Visibility.Visible;
         }
         IrradianceController.SourceChanged += (_, _) => RefreshAvailability(); RefreshAvailability();
-        host.ActiveChanged += (_, _) => actions.Content = host.Active?.Actions;
-        actions.Content = Irradiance.Actions;
+        // Keep each toolbar attached after its first visit so switching tabs can reuse its visual tree.
+        void ShowActions(FrameworkElement? next)
+        {
+            if (ReferenceEquals(visibleActions, next)) return;
+            if (visibleActions != null) visibleActions.Visibility = Visibility.Collapsed;
+            visibleActions = next;
+            FitWordmark();
+            if (next == null) return;
+            if (!actions.Children.Contains(next)) actions.Children.Add(next);
+            next.Visibility = Visibility.Visible;
+        }
+        host.ActiveChanged += (_, _) => ShowActions(host.Active?.Actions);
+        ShowActions(Irradiance.Actions);
         Closed += (_, _) => host.Dispose();
     }
 

@@ -28,7 +28,8 @@ public sealed class WorkspaceHost : TabControl, IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         if (string.IsNullOrWhiteSpace(workspace.Id) || tabs.ContainsKey(workspace.Id)) throw new ArgumentException("Unique workspace ID required.");
         var tab = new TabItem { Header = workspace.Title, Content = workspace.View, Tag = workspace,
-            Padding = new Thickness(18, 8, 18, 8) };
+            Padding = new Thickness(17, 8, 17, 7) };
+        ToolTipService.SetShowOnDisabled(tab, true);
         tabs.Add(workspace.Id, tab); availability.Add(workspace.Id, true); Items.Add(tab);
         if (Items.Count == 1) SelectedItem = tab;
     }

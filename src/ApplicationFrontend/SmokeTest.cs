@@ -76,7 +76,7 @@ public static class SmokeTest
                     throw new InvalidOperationException("Saved cardinal overlay differs from the displayed library image.");
                 foreach (string artifact in new[] { "cardinal-directions.xlsx", "cardinal-directions-details.json" })
                     if (!File.Exists(Path.Combine(first.DebugDirectory!, "02-orientation", artifact))) throw new InvalidOperationException("Missing cardinal artifact: " + artifact);
-                var originalPhoto = Find<ImageOverlayPreview>(window, preview => preview is not MaskOverlayPreview);
+                var originalPhoto = Find<SkyPhotoViewport>(window, _ => true);
                 Capture(originalPhoto, Path.Combine(output, "original-photo-with-cardinals.png"));
                 long orientationToggleRevision = window.OrientationRevisionForTest;
                 int cardinalToggleCount = window.CardinalGenerationCountForTest;
@@ -87,6 +87,7 @@ public static class SmokeTest
                 window.SetCardinalsVisibleForTest(true);
                 if (!window.CardinalsVisibleForTest || !ReferenceEquals(first.Cardinals, window.CardinalsForTest))
                     throw new InvalidOperationException("Cardinal display toggle replaced or lost the cached overlay.");
+                await VerifySkyPhoto(window, originalPhoto, first, output);
                 long toggleRevision = window.RevisionForTest;
                 window.SetSunPathVisibleForTest(false);
                 if (window.SunPathVisibleForTest || AppData.ReadSettings()?.ShowSunPath != false)
@@ -154,14 +155,14 @@ public static class SmokeTest
                     throw new InvalidOperationException("Camera pose did not refresh cardinal directions exactly once.");
                 Capture(window, Path.Combine(output, "sun-path-camera-edited.png"));
                 long validCameraRevision = window.RevisionForTest;
-                window.CommitFieldForTest("CameraTilt", "not-a-number");
+                window.CommitFieldForTest("PhoneInclination", "not-a-number");
                 if (window.RevisionForTest <= validCameraRevision || window.SunPathVisibleForTest || window.CardinalsVisibleForTest)
                     throw new InvalidOperationException("An invalid camera commit did not reject stale callbacks and hide the sun path.");
                 await Task.Delay(450);
                 if (window.Completed != reprojected || window.SunPathVisibleForTest || window.CardinalsVisibleForTest)
                     throw new InvalidOperationException("Invalid camera input allowed an old result or overlay to publish.");
                 Capture(window, Path.Combine(output, "sun-path-invalid-camera.png"));
-                window.CommitFieldForTest("CameraTilt", reprojected.Settings.CameraTilt.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                window.CommitFieldForTest("PhoneInclination", reprojected.Settings.PhoneInclination.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 window.Calculate();
                 await Until(() => window.Completed != reprojected, 30);
                 var correctedCamera = window.Completed!;
@@ -295,6 +296,38 @@ public static class SmokeTest
     }
     private static async Task Until(Func<bool> ready, int seconds)
     { var end = DateTime.UtcNow.AddSeconds(seconds); while (!ready()) { if (DateTime.UtcNow > end) throw new TimeoutException("Application calculation did not complete. See app-data/errors.log."); await Task.Delay(100); } }
+
+    private static async Task VerifySkyPhoto(MainWindow window, SkyPhotoViewport photo, Evaluation study, string output)
+    {
+        var expand = Find<Button>(window, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "ExpandSkyPhoto");
+        expand.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        window.UpdateLayout();
+        photo.Fit();
+        var fitted = photo.ImageBounds;
+        var center = new Point(photo.ActualWidth / 2, photo.ActualHeight / 2);
+        photo.ZoomAt(center, 1.6);
+        await Until(() => photo.HasNativePhoto, 30);
+        window.UpdateLayout();
+        var enlarged = photo.ImageBounds;
+        if (enlarged.Height <= 1.5 * fitted.Height || !photo.HasCalibratedOutline || !window.CardinalsVisibleForTest)
+            throw new InvalidOperationException("Magnified sky photo is missing its native image, calibrated limit or compass.");
+        Capture(photo, Path.Combine(output, "sky-photo-zoom.png"));
+        Capture(window, Path.Combine(output, "sky-photo-expanded.png"));
+        photo.PanBy(new Vector(0, 35));
+        window.UpdateLayout();
+        if (Math.Abs(enlarged.Y - photo.ImageBounds.Y) < 1)
+            throw new InvalidOperationException("The magnified photo did not pan.");
+        photo.Fit();
+        if (Math.Abs(fitted.Height - photo.ImageBounds.Height) > 1 || Math.Abs(fitted.Y - photo.ImageBounds.Y) > 1)
+            throw new InvalidOperationException("Fit did not restore the whole sky photograph.");
+        expand.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        window.UpdateLayout();
+        if (window.Completed != study || !window.ExportEnabledForTest)
+            throw new InvalidOperationException("Inspecting the photo changed the accepted study.");
+        AppData.Write(Path.Combine(output, "sky-preview-result.json"), new { Passed = true,
+            NativePhotoZoomed = true, PanAndFit = true, CardinalAndFovVisible = true, FieldOfView = window.Irradiance.FieldOfViewTextForTest });
+    }
+
     private static async Task VerifyPv(MainWindow window, string output)
     {
         if (!window.Workspaces.Select("pv")) throw new InvalidOperationException("Completed irradiance did not unlock PV Autonomy.");
@@ -328,6 +361,11 @@ public static class SmokeTest
         using var original = Cv2.ImDecode(source.Png, ImreadModes.Grayscale);
         int x = (int)Math.Round(source.Disk.CenterX), y = (int)Math.Round(source.Disk.CenterY);
         byte value = original.At<byte>(y, x) == 255 ? (byte)0 : (byte)255;
+        int edgeX = source.Disk.CenterX < original.Width / 2.0 ? original.Width - 1 : 0;
+        int edgeY = source.Disk.CenterY < original.Height / 2.0 ? original.Height - 1 : 0;
+        byte edgeValue = original.At<byte>(edgeY, edgeX) == 255 ? (byte)0 : (byte)255;
+        if (double.Hypot(edgeX - source.Disk.CenterX, edgeY - source.Disk.CenterY) <= source.Disk.Radius + 3)
+            throw new InvalidOperationException("The editor smoke fixture needs a photo corner outside the detected lens disk.");
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var edit = Find<Button>(window, b => Equals(b.Content, "Edit mask"));
         _ = window.Dispatcher.BeginInvoke(() =>
@@ -338,6 +376,9 @@ public static class SmokeTest
                 editor = Application.Current.Windows.OfType<MaskEditorWindow>().Single();
                 if (editor.Owner != window || IsWindowEnabled(new System.Windows.Interop.WindowInteropHelper(window).Handle))
                     throw new InvalidOperationException("The secondary editor did not block the main study window.");
+                var legend = Find<TextBlock>(editor, text => System.Windows.Automation.AutomationProperties.GetAutomationId(text) == "MaskEditorFieldOfView");
+                if (!legend.Text.Contains("°") || !legend.Text.Contains("FOV"))
+                    throw new InvalidOperationException("The mask editor did not identify the calibrated angular boundary.");
                 Capture(editor, Path.Combine(output, "mask-editor-fit.png"));
                 var maskOpacity = Find<Slider>(editor, s => s.Minimum == 0 && s.Maximum == 100);
                 maskOpacity.Value = 30;
@@ -345,6 +386,7 @@ public static class SmokeTest
                 Find<Slider>(editor, s => s.Maximum == 300).Value = 25;
                 Capture(editor, Path.Combine(output, "mask-editor-window.png"));
                 editor.PaintStrokeForSmoke(x, y, 25, value);
+                editor.PaintStrokeForSmoke(edgeX, edgeY, 5, edgeValue);
                 maskOpacity.Value = 65;
                 Capture(editor, Path.Combine(output, "mask-editor-painted.png"));
                 Find<TextBox>(editor, t => t.Text.StartsWith("Edited ", StringComparison.Ordinal)).Text = "Smoke edited mask";
@@ -368,6 +410,9 @@ public static class SmokeTest
         if (accepted.Mask?.Variant?.Id != id || !window.ExportEnabledForTest)
             throw new InvalidOperationException("Edited mask did not reach the accepted calculation.");
         string exported = AppServices.Export(accepted, Path.Combine(output, "mask-editor-export"));
+        using (var savedMask = Cv2.ImRead(Path.Combine(exported, "02-sky-mask", "sky-mask.png"), ImreadModes.Grayscale))
+            if (savedMask.Empty() || savedMask.At<byte>(edgeY, edgeX) != edgeValue || savedMask.At<byte>(y, x) != value)
+                throw new InvalidOperationException("The exported full-size mask lost an interior or exterior brush stroke.");
         string provenance = File.ReadAllText(Path.Combine(exported, "02-sky-mask", "mask-provenance.json"));
         if (!provenance.Contains(id, StringComparison.Ordinal) || !provenance.Contains("Edited", StringComparison.Ordinal))
             throw new InvalidOperationException("Edited mask provenance was lost from the export.");
@@ -405,7 +450,7 @@ public static class SmokeTest
         AppData.Write(Path.Combine(output, "mask-editor-result.json"), new { Passed = true, Modal = true,
             OpacityAdjusted = true, ZoomAdjusted = true, BrushAdjusted = true, VariantId = id,
             SelectedInCalculation = true, ExportIdentifiesEdit = true, DropdownRestoredAiAndEdit = true,
-            CancelPreservedStudy = true });
+            CancelPreservedStudy = true, OutsideDiskEditExported = true });
     }
 
     private static void Capture(FrameworkElement window, string path, double scale = 1)

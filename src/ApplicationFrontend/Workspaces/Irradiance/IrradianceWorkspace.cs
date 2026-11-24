@@ -3,6 +3,7 @@ using System.Globalization;
 using SolarShade.Camera;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -17,7 +18,7 @@ using SolarShade.Calibration.Validation;
 
 namespace SolarShade.Desktop;
 
-public sealed class IrradianceWorkspace : UserControl, IDisposable
+public sealed partial class IrradianceWorkspace : UserControl, IDisposable
 {
     private readonly Window owner;
     private HelpWindow? helpWindow, noticesWindow;
@@ -52,24 +53,28 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private Evaluation? completed { get => controller.Completed; set => controller.Completed = value; }
     private readonly Dictionary<string, TextBox> fields = new();
     private readonly HashSet<string> invalidFields = new();
-    private readonly TextBlock status = Label("Ready when you are", 13), detail = Label("Start with your data, or load the included example.", 12), maskInfo = Label("Choose a sky photo to begin", 12), calibrationInfo = Label("No camera profile selected", 11);
+    private readonly TextBlock status = Label("", 13), detail = Label("", 12), maskInfo = Label("Choose a sky photo", 12), calibrationInfo = Label("No camera profile selected", 12);
     private readonly Button reviewCalibration = new() { Content = "Review checkerboard photos", IsEnabled = false };
+    private readonly Button loadProfile = new() { Content = "Load camera profile…" };
     private CalibrationReview? calibrationReview;
     private CalibrationReviewWindow? calibrationReviewWindow;
+    private long profileSelectionRevision;
     private string? reviewedProfile;
     private string? reviewedProfileFingerprint;
-    private readonly TextBlock beforeEnergy = Label("—", 26), afterEnergy = Label("—", 26), reduction = Label("—", 26), hover = Label("Scroll to zoom · drag to pan · click Full period to reset", 11);
-    private readonly TextBlock provenance = Label("Horizontal data is retained; both graph curves refer to the panel.", 11);
-    private readonly ImageOverlayPreview photo = new();
+    private readonly TextBlock beforeEnergy = Label("—", 27), afterEnergy = Label("—", 27), reduction = Label("—", 27), hover = Label("", 12);
+    private readonly TextBlock provenance = Label("", 12);
+    private readonly SkyPhotoViewport skyViewport = new();
+    private ImageOverlayPreview photo => skyViewport.Photo;
     private readonly CheckBox showCardinals = new() { Content = "Show cardinal directions", VerticalAlignment = VerticalAlignment.Center, Margin = new(8, 0, 8, 0) };
-    private readonly TextBlock cardinalInfo = Label("Cardinal directions unavailable · add a calibrated sky photo", 11);
+    private readonly TextBlock cardinalInfo = Label("", 12);
     private readonly TextBlock fieldOfViewInfo = Label("FOV unavailable", 11);
+    private SkyPhotoFieldOfView currentFieldOfView = SkyPhotoFieldOfView.Unavailable("Choose a compatible sky photo.");
     private int orientedPhotoWidth, orientedPhotoHeight;
     private long orientationRevision;
     private byte[]? displayedPhoto, displayedCardinals;
     private CardinalDirectionOverlayResult? currentCardinals;
     private readonly MaskOverlayPreview maskPreview = new();
-    private readonly TextBlock sunPathInfo = Label("Sun path unavailable · add a calibrated sky photo", 11);
+    private readonly TextBlock sunPathInfo = Label("", 12);
     private readonly CheckBox showSunPath = new() { Content = "Show sun path", VerticalAlignment = VerticalAlignment.Center, Margin = new(12, 0, 16, 0) };
     private bool sunPathPublishedEarly;
     private bool sunPathIsCurrent;
@@ -87,7 +92,6 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private ComboBox provider = null!, model = null!, resolution = null!, images = null!, zone = null!, window = null!;
     private CheckBox isotropic = null!, useSystemZone = null!;
     private DatePicker graphDay = null!;
-    private readonly Brush ink = new SolidColorBrush(Color.FromRgb(25, 48, 58)), accent = new SolidColorBrush(Color.FromRgb(15, 125, 111));
     public IrradianceWorkspace(Window owner, IrradianceWorkspaceController controller, Func<TimeZoneInfo>? systemZoneProvider = null, bool loadExampleOnFirstRun = true)
     {
         this.owner = owner; this.controller = controller;
@@ -100,10 +104,9 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         systemZone = systemZoneProvider ?? TimeZoneSelection.CurrentSystemZone;
         settings = WeatherSourceSelection.Normalize(AppData.ReadSettings() ?? PortablePaths.Example());
         TimeZoneSelection.ApplySystemZone(settings, systemZone());
-        AddStyles();
         var root = new DockPanel(); Content = root;
         var actions = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
-        Actions = actions; actions.Resources = Resources;
+        Actions = actions;
         actions.Children.Add(Button("Load example", async () => await LoadExample()));
         actions.Children.Add(Button("Help", ShowHelp));
         savedStudies.Click += (_, _) => ShowSavedStudies(); actions.Children.Add(savedStudies);
@@ -131,11 +134,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         fixedFooter.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         fixedFooter.ColumnDefinitions.Add(new());
         var updateControls = new StackPanel();
-        var updateBlock = new Border { Child = updateControls, MaxWidth = 348, Padding = new(10, 5, 10, 3),
-            Background = new SolidColorBrush(Color.FromRgb(231, 243, 240)),
-            BorderBrush = accent, BorderThickness = new(4, 0, 0, 0) };
+        var updateBlock = new Border { Child = updateControls, MaxWidth = 348, Padding = new(12, 6, 10, 4),
+            Background = StudioTheme.Surface, BorderBrush = StudioTheme.Line, BorderThickness = new(1), CornerRadius = new(6) };
         System.Windows.Automation.AutomationProperties.SetAutomationId(updateBlock, "IrradianceUpdateControls");
-        var updateHeading = Label("UPDATE RESULTS", 13, ink); updateHeading.FontWeight = FontWeights.Bold;
+        var updateHeading = Label("Calculation", 13, StudioTheme.Ink); updateHeading.FontWeight = FontWeights.SemiBold;
         var updateHeader = new WrapPanel(); updateHeader.Children.Add(updateHeading);
         updateIndicator.FontWeight = FontWeights.Bold; updateIndicator.Margin = new(10, 0, 0, 0);
         System.Windows.Automation.AutomationProperties.SetAutomationId(updateIndicator, "IrradianceUpdateState");
@@ -144,40 +146,44 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         DockPanel.SetDock(fixedFooter, Dock.Bottom); root.Children.Add(fixedFooter);
         var body = new Grid { Margin = new(16, 12, 16, 0) };
         var inputs = new StackPanel { Margin = new(14) };
-        var inputHost = new Border { Background = Brushes.White }; body.Children.Add(inputHost);
+        var inputHost = Card(); inputHost.VerticalAlignment = VerticalAlignment.Top; body.Children.Add(inputHost);
         var tuning = new StackPanel { Margin = new(0, 0, 0, 8) };
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs, Background = Brushes.White }; inputHost.Child = scroll;
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs }; inputHost.Child = scroll;
         System.Windows.Automation.AutomationProperties.SetAutomationId(scroll, "IrradianceInputs");
-        Section(inputs, "01  IMAGES & CALIBRATION");
+        Section(inputs, "Images & calibration");
         PathField(inputs, "Calibration folder", "CalibrationFolder", () => PickCalibrationFolder());
         var board = new Grid(); for (int i = 0; i < 3; i++) board.ColumnDefinitions.Add(new());
         inputs.Children.Add(board);
         SmallField(board, 0, "Inner columns", "Columns"); SmallField(board, 1, "Inner rows", "Rows"); SmallField(board, 2, "Square, mm", "SquareMm");
-        inputs.Children.Add(Label("Count inner corners, not squares: 7 × 10 squares → 6 × 9 corners.", 11));
-        var calButtons = new WrapPanel(); calButtons.Children.Add(Button("Calibrate", async () => await Calibrate())); calButtons.Children.Add(Button("Load camera profile…", PickProfile));
+        const string boardHelp = "Count the checkerboard’s inner corners. A board with 7 × 10 squares has 6 × 9 inner corners.";
+        StudioTheme.Help(fields["Columns"], boardHelp);
+        StudioTheme.Help(fields["Rows"], boardHelp);
+        StudioTheme.Help(fields["SquareMm"], "Measure the side of one checkerboard square in millimetres.");
+        var calButtons = new WrapPanel();
+        var calibrate = Button("Calibrate", async () => await Calibrate());
+        loadProfile.Click += (_, _) => PickProfile();
+        StudioTheme.Help(calibrate, "Fit the checkerboard photos and save the reusable camera profile under Data/Profiles. Diagnostic files are saved under Debug Data/01-calibration.");
+        calButtons.Children.Add(calibrate); calButtons.Children.Add(loadProfile);
         reviewCalibration.Click += (_, _) => { RefreshCalibrationReview(); ShowCalibrationReview(); }; calButtons.Children.Add(reviewCalibration);
         inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
-        inputs.Children.Add(Label("Load camera-profile.json for camera parameters and validated coverage. Calibrate saves this reusable profile under Data/Profiles and diagnostics under Debug Data/01-calibration.", 11));
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
         var imageButtons = new WrapPanel(); imageButtons.Children.Add(choosePhoto); imageButtons.Children.Add(importMask); inputs.Children.Add(imageButtons);
         choosePhoto.Click += (_, _) => PickSkyPhoto(); importMask.Click += (_, _) => PickMask();
-        importMask.ToolTip = "Use an existing black-and-white PNG without AI segmentation. White is open sky and black is obstruction; inversion is an explicit import option.";
-        inputs.Children.Add(Label("Choose the photograph first. Import a ready-made black-and-white mask to skip AI segmentation.", 11));
+        StudioTheme.Help(choosePhoto, "Choose the original sky photograph taken with the calibrated lens.");
+        StudioTheme.Help(importMask, "Select a sky photograph first. Import an opaque black-and-white PNG at the same oriented dimensions. White means open sky by default. You can invert the mask during import.");
         images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) { settings.SkyImage = Path.Combine(settings.SkyFolder, name); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } };
         model = Combo(inputs, "Sky segmentation", Enum.GetNames<SkyModel>()); model.SelectionChanged += (_, _) => { if (!loading && model.SelectedIndex >= 0) { settings.Model = (SkyModel)model.SelectedIndex; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
         resolution = Combo(inputs, "Mask resolution", ["1024 · original quality", "512 · faster"]); resolution.SelectionChanged += (_, _) => { if (!loading) { settings.Resolution = resolution.SelectedIndex == 1 ? 512 : 1024; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
-        Section(inputs, "02  CAMERA POSE");
-        Field(inputs, "Image bottom bearing, ° true north", "BottomAzimuth"); Field(inputs, "Camera tilt from vertical, °", "CameraTilt");
-        inputs.Children.Add(Label("Default: image bottom south (180°), camera looking straight up. Positive tilt points toward image top before additional roll.", 11));
-        inputs.Children.Add(Label("True north means geographic north. Bearings increase clockwise: N 0°, E 90°, S 180°, W 270°. Use your compass's true-north setting; magnetic correction is not automatic.", 11));
-        inputs.Children.Add(Label("Looking up: with bottom south and roll 0°, north is at the top, east on the left and west on the right. Arrows, sun paths and shading use this same orientation.", 11));
-        Section(inputs, "03  SITE LOCATION");
+        AddPhoneControls(inputs);
+        Section(inputs, "Site location");
         Field(inputs, "Latitude, ° N (+) / S (−)", "Latitude"); Field(inputs, "Longitude, ° E (+) / W (−)", "Longitude"); Field(inputs, "Elevation above sea level, m", "Elevation");
-        inputs.Children.Add(Label("Use decimal degrees, for example latitude 43.56 and longitude 1.48. Southern latitudes and western longitudes are negative.", 11));
+        StudioTheme.Help(fields["Latitude"], "Enter geographic latitude in decimal degrees. North is positive, south is negative.");
+        StudioTheme.Help(fields["Longitude"], "Enter geographic longitude in decimal degrees. East is positive, west is negative.");
         useSystemZone = new() { Content = "Use Windows time zone (automatic)", Margin = new(0, 8, 0, 4) };
         useSystemZone.Checked += (_, _) => ChangeTimeZoneMode(true);
         useSystemZone.Unchecked += (_, _) => ChangeTimeZoneMode(false);
         inputs.Children.Add(useSystemZone);
+        StudioTheme.Help(useSystemZone, "Use the Windows time zone for study dates and the graph. Clear this option to choose a different region or a fixed UTC offset.");
         zone = Combo(inputs, "Time zone for dates and graph", []);
         zone.DisplayMemberPath = nameof(TimeZoneInfo.DisplayName); zone.SelectedValuePath = nameof(TimeZoneInfo.Id);
         zone.ItemsSource = TimeZoneSelection.Choices();
@@ -190,11 +196,12 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                 list.MaxWidth = Math.Min(760, available);
             }
         };
-        zone.SelectionChanged += (_, _) => { if (!loading && !settings.UseSystemTimeZone && zone.SelectedValue is string z) { settings.Zone = z; zone.ToolTip = (zone.SelectedItem as TimeZoneInfo)?.DisplayName; Changed(); } };
-        inputs.Children.Add(Label("Turn off automatic to choose. Named regions follow daylight saving; fixed UTC offsets never change. Coordinates select the weather location.", 11));
-        Section(inputs, "04  HISTORICAL DATA");
+        zone.SelectionChanged += (_, _) => { if (!loading && !settings.UseSystemTimeZone && zone.SelectedValue is string z) { settings.Zone = z; Changed(); } };
+        StudioTheme.Help(zone, "Regional time zones follow daylight saving time. A fixed UTC offset applies year-round. Site coordinates set the weather location.");
+        Section(inputs, "Weather data");
         Field(inputs, "Start date · DD.MM.YYYY", "Start"); Field(inputs, "End date · inclusive · DD.MM.YYYY", "End");
         inputs.Children.Add(weatherMode);
+        StudioTheme.Help(weatherMode, "Choose a weather service or import a local file containing direct horizontal and diffuse horizontal irradiance.");
         weatherMode.Checked += (_, _) => SelectWeatherMode(true);
         weatherMode.Unchecked += (_, _) => SelectWeatherMode(false);
         inputs.Children.Add(serviceWeatherControls); inputs.Children.Add(importWeatherControls);
@@ -205,18 +212,17 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             if (!loading && provider.SelectedIndex >= 0) { settings.Provider = provider.SelectedIndex; Changed(); }
         };
         chooseWeatherFile.Click += (_, _) => PickImport(); importWeatherControls.Children.Add(chooseWeatherFile);
-        importWeatherControls.Children.Add(Label("Import: timestamp, direct horizontal (BHI), diffuse horizontal (DHI), in W/m². Native metadata sets the intervals; otherwise choose their duration and label below.", 11));
-        importWeatherControls.Children.Add(Label("Example CSV header: Timestamp,BHI,DHI\n2025-05-15T12:00:00+07:00,500,100\nA total-only (GHI) measurement cannot supply both components. Example/Irradiance includes a workbook.", 11));
+        StudioTheme.Help(chooseWeatherFile, "Include Timestamp, BHI (direct horizontal) and DHI (diffuse horizontal), in W/m². A sample CSV row is 2025-05-15T12:00:00+07:00,500,100. Example/Irradiance contains a sample workbook.");
         window = Combo(importWeatherControls, "Imported rows represent", ["Preceding interval · end labels", "Following interval · start labels", "Centered interval"]); window.SelectionChanged += (_, _) => { if (!loading) { settings.ImportWindow = window.SelectedIndex; Changed(); } };
         Field(importWeatherControls, "Import interval, minutes (without metadata)", "ImportIntervalMinutes");
+        StudioTheme.Help(window, "Use the source file’s timestamp convention. Native workbook metadata takes precedence over these interval settings.");
+        StudioTheme.Help(fields["ImportIntervalMinutes"], "For a file without interval metadata, enter the duration represented by one source row in minutes.");
         inputs.Children.Add(weatherSource); inputs.Children.Add(lastWeatherResult);
         isotropic = new() { Content = "Use isotropic diffuse instead of Hay–Davies", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; inputs.Children.Add(isotropic);
-        inputs.Children.Add(Label("Neither diffuse model is always the lower estimate. The result depends on weather, panel direction and the mask.", 11));
+        StudioTheme.Help(isotropic, "Hay–Davies includes a circumsolar component. An isotropic sky distributes diffuse light uniformly. Their estimates depend on the weather, panel direction and mask.");
         inputs.Children.Add(tuning);
-        Section(tuning, "05  PANEL INSTALLATION");
-        PanelSlider(tuning, "Tilt from horizontal, °", "PanelTilt", 90); PanelSlider(tuning, "Front azimuth, ° true north", "PanelAzimuth", 360);
-        tuning.Children.Add(Label("N 0° · E 90° · S 180° · W 270°", 11));
-        update.Background = accent; update.Foreground = Brushes.White;
+        AddPanelControls(tuning);
+        update.Background = StudioTheme.Blue; update.Foreground = Brushes.White;
         System.Windows.Automation.AutomationProperties.SetAutomationId(update, "UpdateResults");
         System.Windows.Automation.AutomationProperties.SetAutomationId(refreshData, "RefreshData");
         System.Windows.Automation.AutomationProperties.SetAutomationId(stop, "StopUpdate");
@@ -232,39 +238,48 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         update.Click += (_, _) => Calculate(); refreshData.Click += (_, _) => Begin(true); stop.Click += (_, _) => StopUpdate();
         var runButtons = new WrapPanel(); runButtons.Children.Add(update); runButtons.Children.Add(stop); updateControls.Children.Add(runButtons);
         updateControls.Children.Add(refreshData);
-        tuning.Children.Add(Label("Update results reuses matching weather data. Download weather again bypasses the weather cache; camera calibration and masks are reused when unchanged.", 11));
 
         var right = new Grid(); body.Children.Add(right);
         root.Children.Add(new WorkspaceViewport(body, inputHost, right));
         right.RowDefinitions.Add(new() { Height = GridLength.Auto }); right.RowDefinitions.Add(new() { Height = new GridLength(10) }); right.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var preview = new Grid { Background = Brushes.White }; right.Children.Add(preview); preview.RowDefinitions.Add(new() { Height = GridLength.Auto }); preview.RowDefinitions.Add(new() { Height = new GridLength(220) }); preview.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        var preview = new Grid(); right.Children.Add(Card(preview)); preview.RowDefinitions.Add(new() { Height = GridLength.Auto }); preview.RowDefinitions.Add(new() { Height = new GridLength(220) }); preview.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var previewHeader = new WrapPanel { Margin = new(12, 8, 12, 6) }; preview.Children.Add(previewHeader);
-        var previewTitle = Label("SKY PHOTO  /  MASK", 14); previewTitle.Margin = new(4, 4, 12, 4); previewHeader.Children.Add(previewTitle);
+        var previewTitle = Label("Sky photo & mask", 16, StudioTheme.Ink); previewTitle.FontWeight = FontWeights.SemiBold; previewTitle.Margin = new(4, 3, 12, 4); previewHeader.Children.Add(previewTitle);
         previewHeader.Children.Add(showCardinals);
         showCardinals.Checked += (_, _) => SetCardinalVisibility(); showCardinals.Unchecked += (_, _) => SetCardinalVisibility();
-        showCardinals.ToolTip = "Show compass bearings at the calibrated image boundary. Uses the same heading, tilt and roll as sun paths and shading. Visibility does not recalculate.";
+        StudioTheme.Help(showCardinals, "Update the study to project the compass at the edge of the calibrated view. The bearings use the same camera pose as shading.");
         previewHeader.Children.Add(showSunPath);
         showSunPath.Checked += (_, _) => SetSunPathVisibility(); showSunPath.Unchecked += (_, _) => SetSunPathVisibility();
-        showSunPath.ToolTip = "Display the sun path for the selected period on the calibrated mask. This changes only the preview.";
+        StudioTheme.Help(showSunPath, "Update the study to project the sun path for the selected dates onto the mask. This switch controls its visibility.");
         var pair = new Grid { Margin = new(12, 0, 12, 0) }; pair.ColumnDefinitions.Add(new()); pair.ColumnDefinitions.Add(new() { Width = new GridLength(12) }); pair.ColumnDefinitions.Add(new()); Grid.SetRow(pair, 1); preview.Children.Add(pair);
-        pair.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = photo });
         var maskPane = new Grid(); maskPane.Children.Add(maskPreview); maskPane.Children.Add(editMask);
-        var maskBorder = new Border { Background = new SolidColorBrush(Color.FromRgb(233, 239, 239)), Child = maskPane }; Grid.SetColumn(maskBorder, 2); pair.Children.Add(maskBorder);
+        var maskBorder = new Border { Background = StudioTheme.Canvas, Child = maskPane }; Grid.SetColumn(maskBorder, 2);
+        pair.Children.Add(CreateSkyPhotoPane(preview.RowDefinitions[1], maskBorder)); pair.Children.Add(maskBorder);
         editMask.Click += (_, _) => OpenMaskEditor();
         var previewInfo = new StackPanel { Margin = new(16, 6, 16, 10) };
-        var previewLabels = new StackPanel(); previewLabels.Children.Add(fieldOfViewInfo); previewLabels.Children.Add(maskInfo); previewLabels.Children.Add(sunPathInfo); previewLabels.Children.Add(cardinalInfo); previewInfo.Children.Add(previewLabels);
+        previewInfo.Children.Add(fieldOfViewInfo); previewInfo.Children.Add(maskInfo);
+        sunPathInfo.Visibility = cardinalInfo.Visibility = Visibility.Collapsed;
+        previewInfo.Children.Add(sunPathInfo); previewInfo.Children.Add(cardinalInfo);
         System.Windows.Automation.AutomationProperties.SetAutomationId(fieldOfViewInfo, "SkyPhotoFieldOfView");
         var maskPicker = new StackPanel(); maskPicker.Children.Add(Label("Mask for calculation", 11)); maskPicker.Children.Add(maskChoice);
+        AutomationProperties.SetName(maskChoice, "Mask for calculation");
         maskChoice.SelectionChanged += (_, _) => SelectMaskChoice(); previewInfo.Children.Add(maskPicker);
         Grid.SetRow(previewInfo, 2); preview.Children.Add(previewInfo);
-        var graph = new Grid { Background = Brushes.White, Margin = new(0, 0, 0, 0) }; Grid.SetRow(graph, 2); right.Children.Add(graph);
+        var graph = new Grid(); var graphCard = Card(graph); Grid.SetRow(graphCard, 2); right.Children.Add(graphCard);
         graph.RowDefinitions.Add(new() { Height = GridLength.Auto }); graph.RowDefinitions.Add(new() { Height = GridLength.Auto }); graph.RowDefinitions.Add(new() { Height = new GridLength(260) }); graph.RowDefinitions.Add(new() { Height = GridLength.Auto }); graph.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var cards = new UniformGridCompat(3) { Margin = new(18, 10, 18, 0) }; graph.Children.Add(cards);
-        cards.Children.Add(Metric("BEFORE SHADING · kWh/m²", beforeEnergy, new SolidColorBrush(Color.FromRgb(185, 121, 26)))); cards.Children.Add(Metric("AFTER SHADING · kWh/m²", afterEnergy, accent)); cards.Children.Add(Metric("ESTIMATED LOSS", reduction, ink));
+        cards.Children.Add(Metric("Before shading · kWh/m²", beforeEnergy, IrradianceChart.BeforeBrush));
+        cards.Children.Add(Metric("After shading · kWh/m²", afterEnergy, IrradianceChart.AfterBrush));
+        cards.Children.Add(Metric("Estimated loss", reduction, StudioTheme.Ink));
         var toolbar = new WrapPanel { Margin = new(14, 4, 10, 0), VerticalAlignment = VerticalAlignment.Center }; Grid.SetRow(toolbar, 1); graph.Children.Add(toolbar);
         var component = new ComboBox { ItemsSource = new[] { "Total irradiance", "Direct component", "Sky diffuse component" }, SelectedIndex = 0, Width = 170 }; component.SelectionChanged += (_, _) => { chart.Component = component.SelectedIndex; chart.InvalidateVisual(); }; toolbar.Children.Add(component);
-        toolbar.Children.Add(Button("Full period", chart.Reset)); graphDay = new DatePicker { Width = 125, Margin = new(4, 0, 0, 0) }; graphDay.SelectedDateChanged += (_, _) => { if (graphDay.SelectedDate is { } d) chart.Day(d); }; toolbar.Children.Add(graphDay);
-        toolbar.Children.Add(Label("  ● Before", 12, new SolidColorBrush(Color.FromRgb(185, 121, 26)))); toolbar.Children.Add(Label("  ● After", 12, accent));
+        AutomationProperties.SetName(component, "Irradiance component");
+        var fullPeriod = Button("Full period", chart.Reset);
+        StudioTheme.Help(fullPeriod, "Show the entire study period. Scroll over the plot to zoom, drag to pan, or choose a day.");
+        StudioTheme.Help(component, "Both curves show irradiance on the panel. The model treats unobserved sky as blocked and excludes ground reflection.");
+        toolbar.Children.Add(fullPeriod); graphDay = new DatePicker { Width = 125, Margin = new(4, 0, 0, 0) }; graphDay.SelectedDateChanged += (_, _) => { if (graphDay.SelectedDate is { } d) chart.Day(d); }; toolbar.Children.Add(graphDay);
+        AutomationProperties.SetName(graphDay, "Day to display");
+        toolbar.Children.Add(Label("  ● Before", 12, IrradianceChart.BeforeBrush)); toolbar.Children.Add(Label("  ● After", 12, IrradianceChart.AfterBrush));
         chart.HoverText = text => hover.Text = text; Grid.SetRow(chart, 2); graph.Children.Add(chart); hover.Margin = new(18, 4, 10, 0); Grid.SetRow(hover, 3); graph.Children.Add(hover);
         provenance.Margin = new(18, 0, 14, 0); provenance.TextWrapping = TextWrapping.Wrap; Grid.SetRow(provenance, 4); graph.Children.Add(provenance);
         
@@ -295,6 +310,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     {
         if (closing) return;
         closing = true; revision++; pending?.Cancel();
+        skyViewport.ClearPhoto();
         owner.ContentRendered -= OnContentRendered; owner.Activated -= OnActivated;
         SystemEvents.TimeChanged -= SystemTimeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged;
         sourceWatch.Dispose();
@@ -305,26 +321,24 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         else _ = DisposeAfterObservation();
         async Task DisposeAfterObservation() { await inputWork; controller.Dispose(); }
     }
-    private void AddStyles()
+    private static Border Card(UIElement? content = null) => new()
     {
-        var text = new Style(typeof(TextBox)); text.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 5, 8, 5))); text.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(202, 215, 219)))); text.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0, 3, 6, 7))); Resources.Add(typeof(TextBox), text);
-        var combo = new Style(typeof(ComboBox)); combo.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(6, 5, 6, 5))); combo.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0, 3, 6, 7))); Resources.Add(typeof(ComboBox), combo);
-        var button = new Style(typeof(Button)); button.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 7, 12, 7))); button.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(0, 3, 6, 5))); button.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.White)); button.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(191, 209, 214)))); button.Setters.Add(new Setter(Control.ForegroundProperty, ink)); button.Setters.Add(new Setter(Control.CursorProperty, Cursors.Hand)); Resources.Add(typeof(Button), button);
-    }
-    public static TextBlock Label(string text, double size = 13, Brush? brush = null) => new() { Text = text, FontSize = size, Foreground = brush ?? new SolidColorBrush(Color.FromRgb(73, 94, 104)), TextWrapping = TextWrapping.Wrap };
-    private static StackPanel Metric(string name, TextBlock value, Brush color) { value.Foreground = color; var p = new StackPanel(); p.Children.Add(Label(name, 10)); p.Children.Add(value); return p; }
-    private void Section(Panel parent, string text)
+        Child = content, Background = StudioTheme.Surface, BorderBrush = StudioTheme.Line, BorderThickness = new(1), CornerRadius = new(7)
+    };
+    public static TextBlock Label(string text, double size = 13, Brush? brush = null) => new() { Text = text, FontSize = size, Foreground = brush ?? StudioTheme.Muted, TextWrapping = TextWrapping.Wrap };
+    private static StackPanel Metric(string name, TextBlock value, Brush color)
     {
-        var title = Label(text, 14, ink); title.FontWeight = FontWeights.Bold;
-        parent.Children.Add(new Border
-        {
-            Child = title, Background = new SolidColorBrush(Color.FromRgb(235, 244, 242)),
-            BorderBrush = accent, BorderThickness = new(4, 0, 0, 0),
-            Padding = new(10, 8, 8, 8), Margin = new(0, 14, 0, 10)
-        });
+        value.Foreground = color; value.FontWeight = FontWeights.SemiBold;
+        var metric = new StackPanel(); metric.Children.Add(Label(name, 12)); metric.Children.Add(value); return metric;
     }
-    private Button Button(string text, Action click, bool primary = false) { var b = new Button { Content = text }; if (primary) { b.Background = accent; b.Foreground = Brushes.White; } b.Click += (_, _) => click(); return b; }
-    private void Field(Panel parent, string label, string property) { parent.Children.Add(Label(label, 12)); var t = MakeField(property); parent.Children.Add(t); }
+    private static void Section(Panel parent, string text)
+    {
+        var title = Label(text, 15, StudioTheme.Ink); title.FontWeight = FontWeights.SemiBold;
+        parent.Children.Add(new Border { Child = title, BorderBrush = StudioTheme.Line, BorderThickness = new(0, 0, 0, 1),
+            Padding = new(0, 0, 0, 6), Margin = new(0, parent.Children.Count == 0 ? 0 : 15, 0, 8) });
+    }
+    private Button Button(string text, Action click, bool primary = false) { var b = new Button { Content = text }; if (primary) { b.Background = StudioTheme.Blue; b.Foreground = Brushes.White; } b.Click += (_, _) => click(); return b; }
+    private void Field(Panel parent, string label, string property) { parent.Children.Add(Label(label, 12)); var t = MakeField(property); System.Windows.Automation.AutomationProperties.SetName(t, label); parent.Children.Add(t); }
     private TextBox MakeField(string property)
     {
         var t = new TextBox { Tag = property }; fields[property] = t;
@@ -338,37 +352,68 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                 else if (p.PropertyType == typeof(DateTime)) value = DateTime.ParseExact(t.Text.Trim(), "dd.MM.yyyy", CultureInfo.InvariantCulture);
                 else if (p.PropertyType == typeof(int)) value = int.Parse(t.Text.Trim(), CultureInfo.InvariantCulture);
                 else value = double.Parse(t.Text.Trim().Replace(',', '.'), CultureInfo.InvariantCulture);
-                if (value is double number && !double.IsFinite(number)) throw new FormatException();
-                bool changed = !Equals(p.GetValue(settings), value) || invalidFields.Contains(property);
-                p.SetValue(settings, value); invalidFields.Remove(property); t.ClearValue(Control.BorderBrushProperty);
+                if (value is double number && (!double.IsFinite(number) ||
+                    (property is nameof(UserSettings.PhoneInclination) or nameof(UserSettings.PanelTilt) && (number < 0 || number > 90))))
+                    throw new FormatException();
+                bool changed = !Equals(p.GetValue(settings), value) || invalidFields.Contains(property) ||
+                    (property == nameof(UserSettings.PanelTopHeading) && settings.PanelAzimuth is not (>= 0 and <= 360));
+                if (property == nameof(UserSettings.PhoneInclination))
+                {
+                    // Typing "0.8" passes through "0". Apply each draft to the frame at the start
+                    // of this edit, so only committing an actual zero flattens a rolled camera.
+                    phoneTiltEditOrigin ??= settings with { };
+                    var draft = phoneTiltEditOrigin with { PhoneInclination = (double)value };
+                    settings.BottomAzimuth = draft.BottomAzimuth;
+                    settings.CameraTilt = draft.CameraTilt;
+                    settings.CameraRoll = draft.CameraRoll;
+                }
+                else
+                {
+                    phoneTiltEditOrigin = null;
+                    p.SetValue(settings, value);
+                }
+                invalidFields.Remove(property); t.ClearValue(Control.BorderBrushProperty);
+                if (IsEquipmentField(property)) RefreshEquipmentControls(property);
                 if (changed) Changed(saveSettings: false);
             }
             catch
             {
                 invalidFields.Add(property); t.BorderBrush = Brushes.Firebrick;
+                if (IsEquipmentField(property)) RefreshEquipmentControls(property);
                 Changed(saveSettings: false);
             }
         }
         t.TextChanged += (_, _) => ReadText();
-        t.LostKeyboardFocus += (_, _) => SaveInputs();
-        t.KeyDown += (_, e) => { if (e.Key == Key.Enter) { SaveInputs(); e.Handled = true; } }; return t;
+        void CommitText()
+        {
+            if (loading) return;
+            phoneTiltEditOrigin = null;
+            if (IsEquipmentField(property)) RefreshEquipmentControls();
+            SaveInputs();
+        }
+        t.LostKeyboardFocus += (_, _) => CommitText();
+        t.KeyDown += (_, e) => { if (e.Key == Key.Enter) { CommitText(); e.Handled = true; } }; return t;
     }
     private void SmallField(Grid grid, int col, string label, string property) { var p = new StackPanel(); Grid.SetColumn(p, col); grid.Children.Add(p); Field(p, label, property); }
     private void PathField(Panel p, string label, string property, Action browse)
-    { p.Children.Add(Label(label, 12)); var row = new DockPanel(); var b = Button("…", browse); DockPanel.SetDock(b, Dock.Right); row.Children.Add(b); var t = MakeField(property); t.IsReadOnly = true; row.Children.Add(t); p.Children.Add(row); }
-    private static ComboBox Combo(Panel p, string label, string[] items) { p.Children.Add(Label(label, 12)); var c = new ComboBox { ItemsSource = items }; p.Children.Add(c); return c; }
-    private void PanelSlider(Panel p, string label, string property, double max)
     {
-        var row = new DockPanel(); var number = MakeField(property); number.Width = 66; DockPanel.SetDock(number, Dock.Right); row.Children.Add(number); var caption = Label(label, 12); caption.VerticalAlignment = VerticalAlignment.Center; row.Children.Add(caption); p.Children.Add(row);
-        var slider = new Slider { Minimum = 0, Maximum = max, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new(0, 0, 8, 7), Tag = property }; p.Children.Add(slider);
-        slider.Value = (double)typeof(UserSettings).GetProperty(property)!.GetValue(settings)!;
-        slider.ValueChanged += (_, _) => { if (loading) return; typeof(UserSettings).GetProperty(property)!.SetValue(settings, slider.Value); invalidFields.Remove(property); fields[property].ClearValue(Control.BorderBrushProperty); fields[property].Text = slider.Value.ToString("0", CultureInfo.InvariantCulture); Changed(); };
-        fields[property].TextChanged += (_, _) => { if (double.TryParse(fields[property].Text, out double value) && value >= 0 && value <= max) { bool prior = loading; loading = true; slider.Value = value; loading = prior; } };
+        p.Children.Add(Label(label, 12));
+        var row = new DockPanel(); var b = Button("…", browse);
+        AutomationProperties.SetName(b, "Choose " + label.ToLowerInvariant());
+        DockPanel.SetDock(b, Dock.Right); row.Children.Add(b);
+        var t = MakeField(property); t.IsReadOnly = true;
+        AutomationProperties.SetName(t, label); row.Children.Add(t); p.Children.Add(row);
+    }
+    private static ComboBox Combo(Panel p, string label, string[] items)
+    {
+        p.Children.Add(Label(label, 12)); var c = new ComboBox { ItemsSource = items };
+        AutomationProperties.SetName(c, label); p.Children.Add(c); return c;
     }
     private void LoadFields()
     {
-        loading = true; invalidFields.Clear();
+        loading = true; invalidFields.Clear(); phoneTiltEditOrigin = null;
         foreach (var (name, box) in fields) { box.ClearValue(Control.BorderBrushProperty); var value = typeof(UserSettings).GetProperty(name)!.GetValue(settings); box.Text = value is DateTime d ? d.ToString("dd.MM.yyyy") : Convert.ToString(value, CultureInfo.InvariantCulture); }
+        RefreshEquipmentControls();
         model.SelectedIndex = (int)settings.Model; resolution.SelectedIndex = settings.Resolution == 512 ? 1 : 0; provider.SelectedIndex = settings.Provider; UpdateTimeZoneControls(); window.SelectedIndex = settings.ImportWindow; isotropic.IsChecked = settings.Isotropic;
         showSunPath.IsChecked = settings.ShowSunPath; maskPreview.ShowOverlay = settings.ShowSunPath;
         showCardinals.IsChecked = settings.ShowCardinalDirections; photo.ShowOverlay = settings.ShowCardinalDirections;
@@ -383,13 +428,12 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         bool imported = !WeatherSourceSelection.UsesServices(settings), previous = loading; loading = true;
         weatherMode.IsChecked = !imported; weatherMode.Content = imported ? "Import Own Excel" : "Use Data Services";
         System.Windows.Automation.AutomationProperties.SetName(weatherMode, (string)weatherMode.Content);
-        weatherMode.ToolTip = "Switch right to use a weather data service, or left to import your Excel or CSV file.";
         provider.SelectedIndex = settings.Provider;
         serviceWeatherControls.Visibility = imported ? Visibility.Collapsed : Visibility.Visible;
         importWeatherControls.Visibility = imported ? Visibility.Visible : Visibility.Collapsed;
-        weatherSource.Text = imported ? string.IsNullOrWhiteSpace(settings.ImportPath) ? "Choose an Excel or CSV file to enable Update results."
-            : "Selected file: " + Path.GetFileName(settings.ImportPath) + "\nUpdate results rereads changed files. No weather download is used."
-            : "Matching weather data is reused locally. Download weather again requests a fresh copy from the selected provider.";
+        weatherSource.Visibility = imported ? Visibility.Visible : Visibility.Collapsed;
+        weatherSource.Text = !imported ? "" : string.IsNullOrWhiteSpace(settings.ImportPath) ? "Choose an Excel or CSV file."
+            : "Selected file: " + Path.GetFileName(settings.ImportPath);
         weatherSource.ToolTip = imported && !string.IsNullOrWhiteSpace(settings.ImportPath) ? PortablePaths.Resolve(settings.ImportPath) : null;
         loading = previous;
         RefreshButtons();
@@ -446,9 +490,15 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         bool previous = loading; loading = true;
         try { maskChoice.ItemsSource = choices; maskChoice.SelectedItem = choices.First(c => c.Id == settings.SelectedMaskId); }
         finally { loading = previous; }
-        bool imported = (maskChoice.SelectedItem as MaskChoice)?.Imported == true;
+        SetMaskOptions((maskChoice.SelectedItem as MaskChoice)?.Imported == true);
+    }
+    private void SetMaskOptions(bool imported)
+    {
+        const string importedHelp = "This imported mask is used directly. Choose the AI mask to enable model and resolution settings.";
         model.IsEnabled = resolution.IsEnabled = !imported;
-        model.ToolTip = resolution.ToolTip = imported ? "The imported mask is used directly. Choose AI mask to use these settings." : null;
+        StudioTheme.Help(model, imported ? importedHelp : "Select the AI model used to separate open sky from obstructions.");
+        StudioTheme.Help(resolution, imported ? importedHelp : "Select the resolution used for AI segmentation.");
+        StudioTheme.Help(maskChoice, imported ? importedHelp : "Use Update results to generate the AI mask, or choose a saved mask for this photograph.");
     }
     private void SelectMaskChoice()
     {
@@ -469,7 +519,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                 if (choice.Id == null) settings.LastMaskByPhoto.Remove(hash);
                 else settings.LastMaskByPhoto[hash] = choice.Id;
             }
-            Changed(); ShowSelectedMaskPreview();
+            SetMaskOptions(choice.Imported); Changed(); ShowSelectedMaskPreview();
         }
         catch (Exception ex) { RefreshMaskChoices(); ShowError(ex); }
     }
@@ -485,10 +535,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                     using var unmaskedPhoto = Cv2.ImRead(PortablePaths.Resolve(settings.SkyImage), ImreadModes.Color);
                     if (unmaskedPhoto.Empty()) throw new InvalidDataException("The selected photograph could not be decoded.");
                     displayedPhoto = AppServices.Preview(unmaskedPhoto);
-                    photo.SetImage(Bitmap(displayedPhoto), unmaskedPhoto.Width, unmaskedPhoto.Height);
+                    skyViewport.SetPhoto(Bitmap(displayedPhoto), unmaskedPhoto.Width, unmaskedPhoto.Height, PortablePaths.Resolve(settings.SkyImage));
                     orientedPhotoWidth = unmaskedPhoto.Width; orientedPhotoHeight = unmaskedPhoto.Height;
                     RefreshFieldOfView();
-                    maskInfo.Text = "Photo selected · Update results for AI, or import an existing mask";
+                    maskInfo.Text = "Mask pending";
                 }
                 else { orientedPhotoWidth = orientedPhotoHeight = 0; RefreshFieldOfView(); }
                 return;
@@ -535,7 +585,8 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                     settings.LastMaskByPhoto = new(settings.LastMaskByPhoto) { [photoHash] = variant.Id };
                     Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
                     return true;
-                })) { Owner = owner };
+                }) { CalibratedOutline = currentFieldOfView.CalibratedOutline, UsableOutline = currentFieldOfView.UsableOutline,
+                    FieldOfViewLabel = currentFieldOfView.OutlineLabel, FieldOfViewHelp = currentFieldOfView.Explanation }) { Owner = owner };
             WindowWorkArea.FitToOwner(editor, owner); editor.ShowDialog();
         }
         catch (Exception ex) { ShowError(ex); }
@@ -545,6 +596,13 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         if (loading || closing) return;
         try
         {
+            if (settings.LastCalibrationFailure is { } failure && !failure.Matches(settings))
+            {
+                settings.LastCalibrationFailure = null;
+                RefreshCalibrationReview();
+                RefreshFieldOfView();
+                RefreshInputState();
+            }
             var next = InputDependencies.Capture(settings, uiInputs, false);
             var forced = invalidFields.Aggregate(ArtifactGroup.None, (a, f) => a | InputDependencies.ForField(f, settings));
             var changed = (uiInputs?.Difference(next) ?? ArtifactGroup.All) | forced | uiInvalid;
@@ -605,7 +663,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
                 {
                     revision++; pending?.Cancel(); ApplyInvalidation(result.changed); RefreshInputState();
                 }
-                if (result.restored != null && !updating && !calibrating)
+                if (result.restored != null && !updating && !calibrating && settings.LastCalibrationFailure == null)
                     PresentResult(result.restored, restored: true);
             }
             catch (Exception ex) { if (!closing && observedRevision == revision) { revision++; pending?.Cancel(); ApplyInvalidation(ArtifactGroup.All); ShowError(ex); } }
@@ -630,10 +688,10 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         if ((groups & ArtifactGroup.Mask) != 0)
         {
             bool geometryChanged = (groups & (ArtifactGroup.Profile | ArtifactGroup.Orientation)) != 0;
-            if (geometryChanged) { photo.ClearImage(); displayedPhoto = null; orientedPhotoWidth = orientedPhotoHeight = 0; }
+            if (geometryChanged) { skyViewport.ClearPhoto(); displayedPhoto = null; orientedPhotoWidth = orientedPhotoHeight = 0; }
             maskPreview.ClearImage(); displayedMaskPng = null;
             displayedAsset = null; editMask.IsEnabled = false;
-            maskInfo.Text = "Sky inputs changed · click Update results";
+            maskInfo.Text = "Mask pending";
         }
         if ((groups & (ArtifactGroup.Profile | ArtifactGroup.Mask)) != 0) RefreshFieldOfView();
         if ((groups & ArtifactGroup.Orientation) != 0) InvalidateOrientation("Cardinal directions waiting for Update results");
@@ -654,7 +712,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     {
         string? problem = InputProblem();
         SetUpdateState(problem == null ? UpdateState.UpdateRequired : UpdateState.NeedsAttention,
-            problem ?? "Inputs changed or not yet calculated. Click Update results when ready.");
+            problem ?? "");
     }
     private void SetUpdateState(UpdateState state, string message)
     {
@@ -666,20 +724,20 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             UpdateState.Stopped => "Update stopped", _ => "Update failed"
         };
         updateIndicator.Text = "● " + label;
-        updateIndicator.Foreground = state == UpdateState.UpToDate ? accent
-            : state is UpdateState.NeedsAttention or UpdateState.Failed ? Brushes.Firebrick : new SolidColorBrush(Color.FromRgb(145, 100, 0));
+        updateIndicator.Foreground = state == UpdateState.UpToDate ? StudioTheme.Teal
+            : state is UpdateState.NeedsAttention or UpdateState.Failed ? Brushes.Firebrick : StudioTheme.Amber;
         System.Windows.Automation.AutomationProperties.SetName(updateIndicator, label);
-        status.Text = label; detail.Text = message;
+        status.Text = ""; detail.Text = message;
         RefreshButtons();
     }
     private void RefreshButtons()
     {
         update.IsEnabled = refreshData.IsEnabled = !controller.DependentBusy && !updating && !calibrating && InputProblem() == null;
         refreshData.IsEnabled &= WeatherSourceSelection.UsesServices(settings);
-        update.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : "Recalculate changed inputs; reuse matching weather, calibration and masks.";
-        refreshData.ToolTip = controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : WeatherSourceSelection.UsesServices(settings)
+        StudioTheme.Help(update, controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : "Update results reuses matching weather data, calibration and masks. Changed inputs are recalculated.");
+        StudioTheme.Help(refreshData, controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : WeatherSourceSelection.UsesServices(settings)
             ? "Download fresh weather from the selected provider, then update. Unchanged calibration and masks are reused."
-            : "Imported file selected: use Update results to reread it. There is no weather download to refresh.";
+            : "Use Update results to reread the imported file. Weather downloads are available when a data service is selected.");
         stop.IsEnabled = updating && pending?.IsCancellationRequested == false;
         controller.RefreshSource();
         export.IsEnabled = !controller.Verifying && !exporting && !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null &&
@@ -703,7 +761,6 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         bool previous = loading; loading = true;
         useSystemZone.IsChecked = settings.UseSystemTimeZone; zone.IsEnabled = !settings.UseSystemTimeZone;
         zone.SelectedValue = settings.Zone;
-        zone.ToolTip = (zone.SelectedItem as TimeZoneInfo)?.DisplayName;
         loading = previous;
     }
     private void ChangeTimeZoneMode(bool automatic)
@@ -769,7 +826,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         chart.SetData(result.Run.Rows, TimeZoneSelection.Resolve(result.Settings.Zone));
         beforeEnergy.Text = result.Run.BeforeEnergy.ToString("F2"); afterEnergy.Text = result.Run.AfterEnergy?.ToString("F2") ?? "—";
         reduction.Text = result.Run.LossPercent is { } loss ? loss.ToString("F1") + "%" : "—";
-        provenance.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1} for this panel. Unobserved sky assumed blocked. No ground reflection." : "Baseline ready. Add a compatible camera profile and sky photo for the shaded curve.";
+        provenance.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1}" : "Baseline only · add a camera profile and sky photo for shading.";
         bool complete = IrradianceReadiness.Inspect(services, result).IsReady;
         SetUpdateState(complete ? UpdateState.UpToDate : UpdateState.NeedsAttention,
             complete ? restored ? $"{result.Run.Rows.Count:N0} intervals · saved result restored · {result.Raw.Source} · {result.Settings.Zone}"
@@ -781,7 +838,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         if (displayedPhoto != null) asset = asset with { OriginalPreview = displayedPhoto };
         if (!ReferenceEquals(displayedPhoto, asset.OriginalPreview))
         {
-            photo.SetImage(Bitmap(asset.OriginalPreview), asset.Result.Width, asset.Result.Height);
+            skyViewport.SetPhoto(Bitmap(asset.OriginalPreview), asset.Result.Width, asset.Result.Height, PortablePaths.Resolve(settings.SkyImage));
             displayedPhoto = asset.OriginalPreview; displayedCardinals = null; currentCardinals = null;
         }
         // The mask and overlay share one native-resolution viewport; preview rounding cannot misalign them.
@@ -797,28 +854,42 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     private void RefreshFieldOfView()
     {
         var disk = displayedAsset?.Disk;
-        var view = SkyPhotoFieldOfView.Load(settings, orientedPhotoWidth, orientedPhotoHeight,
-            disk == null ? null : new ImageDisk(disk.CenterX, disk.CenterY, disk.Radius));
-        fieldOfViewInfo.Text = view.Text; fieldOfViewInfo.ToolTip = view.Explanation;
+        currentFieldOfView = settings.LastCalibrationFailure is { } failure && failure.Matches(settings)
+            ? SkyPhotoFieldOfView.CalibrationFailed(failure.Reason)
+            : SkyPhotoFieldOfView.Load(settings, orientedPhotoWidth, orientedPhotoHeight,
+                disk == null ? null : new ImageDisk(disk.CenterX, disk.CenterY, disk.Radius));
+        if (currentFieldOfView.StampLabel != null)
+        {
+            if (currentCardinals != null) InvalidateOrientation(currentFieldOfView.Explanation);
+            if (sunPathIsCurrent) ClearSunPath(currentFieldOfView.Explanation);
+        }
+        skyViewport.SetFieldOfView(currentFieldOfView);
+        fieldOfViewInfo.Text = currentFieldOfView.Text;
+        fieldOfViewInfo.Foreground = currentFieldOfView.StampLabel != null ? Brushes.Firebrick :
+            currentFieldOfView.CalibratedOutline == null ? StudioTheme.Muted : Brushes.DarkGreen;
+        StudioTheme.Help(fieldOfViewInfo, currentFieldOfView.OutlineLabel + ". " + currentFieldOfView.Explanation);
+        StudioTheme.Help(images, currentFieldOfView.Explanation);
     }
     public static string OrientationInputKey(UserSettings s) => AppData.Key(new
     { s.SkyImage, s.ProfilePath, s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle, s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
     private void InvalidateOrientation(string message)
     {
         orientationRevision++;
-        photo.ClearOverlay(); displayedCardinals = null; currentCardinals = null; cardinalInfo.Text = message;
+        photo.ClearOverlay(); displayedCardinals = null; currentCardinals = null;
+        SetOverlayStatus(cardinalInfo, showCardinals, message, false);
     }
     private void ShowCardinals(CardinalDirectionOverlayResult? result)
     {
+        if (currentFieldOfView.StampLabel != null) result = null;
         currentCardinals = result;
         if (result == null)
         {
             photo.ClearOverlay(); displayedCardinals = null;
-            cardinalInfo.Text = "Cardinal directions unavailable · add a calibrated sky photo"; return;
+            SetOverlayStatus(cardinalInfo, showCardinals, "Add a calibrated sky photo to project compass bearings.", false); return;
         }
         if (!ReferenceEquals(displayedCardinals, result.Png)) { photo.SetOverlay(Bitmap(result.Png)); displayedCardinals = result.Png; }
         photo.ShowOverlay = settings.ShowCardinalDirections;
-        cardinalInfo.Text = result.HasMarkers ? "Cardinal bearings · calibrated image boundary" : "No cardinal bearings inside the calibrated view";
+        SetOverlayStatus(cardinalInfo, showCardinals, result.HasMarkers ? "The compass marks bearings at the edge of the calibrated view." : "No cardinal bearings inside this view.", !result.HasMarkers);
     }
     private void SetCardinalVisibility()
     {
@@ -828,13 +899,20 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         try { AppData.SaveSettings(settings); } catch (Exception ex) { detail.Text = "Could not save settings: " + ex.Message; }
     }
     private void ClearSunPath(string message)
-    { maskPreview.ClearOverlay(); sunPathIsCurrent = false; sunPathInfo.Text = message; }
+    { maskPreview.ClearOverlay(); sunPathIsCurrent = false; SetOverlayStatus(sunPathInfo, showSunPath, message, false); }
     private void ShowSunPath(SunPathOverlayResult? result)
     {
+        if (currentFieldOfView.StampLabel != null) { ClearSunPath(currentFieldOfView.Explanation); return; }
         if (result == null) { ClearSunPath("Sun path unavailable · add a calibrated sky photo"); return; }
         maskPreview.SetOverlay(Bitmap(result.Png)); maskPreview.ShowOverlay = settings.ShowSunPath;
         sunPathIsCurrent = true;
-        sunPathInfo.Text = result.HasPaths ? "Sun path · selected period" : "No sun path inside the calibrated view for this period";
+        SetOverlayStatus(sunPathInfo, showSunPath, result.HasPaths ? "The sun path shows the study period on the calibrated mask." : "No sun path inside this view for the selected period.", !result.HasPaths);
+    }
+    private static void SetOverlayStatus(TextBlock notice, CheckBox toggle, string text, bool showNotice)
+    {
+        StudioTheme.Help(toggle, text);
+        notice.Text = showNotice ? text : "";
+        notice.Visibility = showNotice ? Visibility.Visible : Visibility.Collapsed;
     }
     private void SetSunPathVisibility()
     {
@@ -871,10 +949,11 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         var panel = new StackPanel { Margin = new(20) }; dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         panel.Children.Add(Label("Photo: " + Path.GetFileName(settings.SkyImage), 13));
         panel.Children.Add(Label("Mask: " + Path.GetFileName(pick.FileName), 13));
-        panel.Children.Add(Label("Use the same pixel dimensions as the oriented photo. Gray, colored and transparent pixels are rejected. Pixels outside the photo's lens disk become black.", 12));
         panel.Children.Add(Label("Mask name", 12)); var name = new TextBox { Text = Path.GetFileNameWithoutExtension(pick.FileName), MaxLength = 100 }; panel.Children.Add(name);
         var polarity = Combo(panel, "Meaning of the source pixels", ["White = open sky; black = obstruction", "Black = open sky; white = obstruction (invert)"]); polarity.SelectedIndex = 0;
+        StudioTheme.Help(polarity, "Import an opaque black-and-white mask with the same pixel dimensions as the oriented photo. Choose which pixel color marks open sky.");
         var disk = Combo(panel, "Lens disk in the photograph", ["Detect from photo", "Centered full disk"]); disk.SelectedIndex = settings.CenteredDisk ? 1 : 0;
+        StudioTheme.Help(disk, "Pixels outside the photograph’s lens disk become black in the imported mask.");
         var error = Label("", 12); error.Foreground = Brushes.Firebrick; panel.Children.Add(error);
         var commands = new WrapPanel(); panel.Children.Add(commands);
         bool importing = false;
@@ -921,16 +1000,24 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
             detail.Text = "This file includes the validated lens coverage. For a native YAML calibration, choose its matching camera-profile.json or use Calibrate to create one.";
             return;
         }
-        settings.ProfilePath = PortablePaths.Store(picker.FileName); settings.CoverageAngle = 0; LoadFields(); Changed();
+        SelectProfile(picker.FileName);
+    }
+    private void SelectProfile(string path)
+    {
+        profileSelectionRevision++;
+        settings.ProfilePath = PortablePaths.Store(path);
+        settings.CoverageAngle = 0;
+        settings.LastCalibrationFailure = null;
+        LoadFields(); Changed(); RefreshFieldOfView();
     }
     private void RefreshCalibrationReview()
     {
         string? fingerprint = ProfileFingerprint();
         CalibrationReview? savedReview = null;
-        if (calibrationReview?.Report.Failure != null && reviewedProfile == settings.ProfilePath && fingerprint == reviewedProfileFingerprint)
+        if (settings.LastCalibrationFailure is { ReviewDirectory: { } directory } failure && failure.Matches(settings))
         {
-            var failed = CalibrationReview.TryLoad(calibrationReview.Directory);
-            if (failed?.EvidenceFingerprint == calibrationReview.EvidenceFingerprint) savedReview = failed;
+            var failed = CalibrationReview.TryLoad(PortablePaths.Resolve(directory));
+            if (failed?.Report.Failure != null && failed.EvidenceFingerprint == failure.EvidenceFingerprint) savedReview = failed;
         }
         savedReview ??= string.IsNullOrWhiteSpace(settings.ProfilePath) ? null : CalibrationReview.ForProfile(settings.ProfilePath);
         if (savedReview == null && calibrationReview != null && fingerprint == reviewedProfileFingerprint)
@@ -945,11 +1032,14 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         reviewedProfileFingerprint = fingerprint;
         reviewCalibration.IsEnabled = calibrationReview != null;
         calibrationInfo.Text = string.IsNullOrWhiteSpace(settings.ProfilePath) ? "No camera profile selected" :
-            "Camera profile: " + settings.ProfilePath;
+            "Profile · " + Path.GetFileName(settings.ProfilePath);
         if (calibrationReview != null) calibrationInfo.Text += "\n" + calibrationReview.Summary;
         if (calibrationReview?.FitSummary != null) calibrationInfo.Text += "\n" + calibrationReview.FitSummary;
-        if (calibrationReview?.Report.Failure != null) calibrationInfo.Text += "\nLast calibration failed; open the review for details.";
+        if (settings.LastCalibrationFailure is { } last && last.Matches(settings))
+            calibrationInfo.Text += "\nCalibration failed. " + (calibrationReview != null ? "Review the checkerboard photos." : last.Reason);
         calibrationInfo.ToolTip = string.IsNullOrWhiteSpace(settings.ProfilePath) ? null : PortablePaths.Resolve(settings.ProfilePath);
+        const string profileHelp = "Choose camera-profile.json for this lens and oriented image size. The profile includes the calibrated field of view.";
+        StudioTheme.Help(loadProfile, calibrationInfo.ToolTip is string path ? profileHelp + "\n" + path : profileHelp);
     }
     private string? ProfileFingerprint()
     {
@@ -968,7 +1058,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     }
     private void PickImport() { var p = new OpenFileDialog { Title = "Choose horizontal irradiance: timestamp, BHI and DHI in W/m²", Filter = "Horizontal irradiance|*.xlsx;*.csv" }; if (p.ShowDialog(owner) == true) SelectWeatherFile(p.FileName); else RefreshWeatherSource(); }
     public void SelectWeatherFile(string path)
-    { WeatherSourceSelection.SelectFile(settings, path); Changed(); RefreshWeatherSource(); status.Text = "Imported source selected · check dates, site, time zone and source interval metadata"; detail.Text = path; }
+    { WeatherSourceSelection.SelectFile(settings, path); Changed(); RefreshWeatherSource(); status.Text = "Weather file selected"; detail.Text = path; }
     private void ShowWeatherOrigin(Evaluation result)
     {
         RefreshWeatherSource();
@@ -981,7 +1071,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { }
         lastWeatherResult.Text = $"Last result: {origin}. Source: {result.Raw.Source}. Dataset timestamp: {result.Raw.FetchedUtc.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
     }
-    private async Task Calibrate()
+    internal async Task Calibrate()
     {
         if (calibrating || updating || controller.DependentBusy) return;
         if (invalidFields.Count > 0) { status.Text = "Correct the highlighted fields first"; return; }
@@ -990,43 +1080,71 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
         MarkPreviousResults(); SetUpdateState(UpdateState.Updating, "Calibrating checkerboard photographs…");
         ClearSunPath("Sun path waiting for the new calibration");
         InvalidateOrientation("Cardinal directions waiting for the new calibration");
-        var snapshot = settings with { }; status.Text = "Calibrating checkerboard photographs…";
+        settings.FirstRun = false;
+        var snapshot = settings with { };
+        long selectionAtStart = profileSelectionRevision;
+        bool IsCurrentAttempt() => selectionAtStart == profileSelectionRevision &&
+            string.Equals(settings.CalibrationFolder, snapshot.CalibrationFolder, StringComparison.OrdinalIgnoreCase) &&
+            settings.Columns == snapshot.Columns && settings.Rows == snapshot.Rows && settings.SquareMm == snapshot.SquareMm;
+        status.Text = "Calibrating checkerboard photographs…";
         try
         {
-            var result = await services.Calibrate(snapshot); if (closing) return;
-            calibrationReview = CalibrationReview.TryLoad(Path.GetDirectoryName(result.Path)!);
-            reviewCalibration.IsEnabled = calibrationReview != null;
-            if (settings.CalibrationFolder != snapshot.CalibrationFolder || settings.Columns != snapshot.Columns || settings.Rows != snapshot.Rows || settings.SquareMm != snapshot.SquareMm)
-            { status.Text = "Calibration saved for the previous board inputs"; detail.Text = result.Path; ShowCalibrationReview(); return; }
-            settings.ProfilePath = PortablePaths.Store(result.Path); settings.CoverageAngle = 0; LoadFields(); status.Text = "Calibration saved"; detail.Text = result.Path; Changed(); ShowCalibrationReview();
-        }
-        catch (CalibrationReviewException ex)
-        {
+            (CalibrationProfile Profile, string Path, string Details) result;
+            try { result = await services.Calibrate(snapshot); }
+            catch (OperationCanceledException)
+            {
+                if (!closing && IsCurrentAttempt()) SetUpdateState(UpdateState.Stopped, "Calibration stopped.");
+                return;
+            }
+            catch (CalibrationReviewException ex)
+            {
+                if (closing) return;
+                if (IsCurrentAttempt()) RecordCalibrationFailure(ex);
+                else { status.Text = "Calibration failed for the previous setup"; detail.Text = ex.Message; }
+                return;
+            }
             if (closing) return;
-            calibrationReview = CalibrationReview.TryLoad(ex.DiagnosticsDirectory); reviewCalibration.IsEnabled = calibrationReview != null;
-            reviewedProfile = settings.ProfilePath;
-            reviewedProfileFingerprint = ProfileFingerprint();
-            RefreshCalibrationReview();
-            ShowError(ex); ShowCalibrationReview();
+            if (!IsCurrentAttempt())
+            { status.Text = "Calibration saved for the previous setup"; detail.Text = result.Path; return; }
+            SelectProfile(result.Path);
+            status.Text = "Calibration saved"; detail.Text = result.Path; ShowCalibrationReview();
         }
-        catch (Exception ex) { ShowError(ex); }
+        catch (Exception ex) { if (!closing) ShowError(ex); }
         finally { calibrating = false; if (!closing) { if (updateState == UpdateState.Updating) RefreshInputState(); else RefreshButtons(); } }
+    }
+    private void RecordCalibrationFailure(CalibrationReviewException error)
+    {
+        var review = CalibrationReview.TryLoad(error.DiagnosticsDirectory);
+        settings.LastCalibrationFailure = new(PortablePaths.Store(settings.CalibrationFolder), settings.Columns,
+            settings.Rows, settings.SquareMm, error.Message, review == null ? null : PortablePaths.Store(review.Directory),
+            review?.EvidenceFingerprint);
+        // The earlier profile still exists on disk. It must be selected explicitly to use it again.
+        settings.ProfilePath = "";
+        settings.CoverageAngle = 0;
+        RefreshCalibrationReview();
+        Changed(); RefreshFieldOfView(); ShowError(error); ShowCalibrationReview();
     }
     public Task LoadExample()
     {
         pending?.Cancel();
+        profileSelectionRevision++;
         TimeZoneSelection.ApplySystemZone(settings, systemZone());
         settings = PortablePaths.Example() with { FirstRun = false, Zone = settings.Zone, UseSystemTimeZone = settings.UseSystemTimeZone, ShowSunPath = settings.ShowSunPath, ShowCardinalDirections = settings.ShowCardinalDirections };
-        LoadFields(); Changed();
+        LoadFields(); Changed(); RefreshFieldOfView();
         return Task.CompletedTask;
     }
     private void ShowHelp()
     {
-        var text = "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles.\n\n2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading.\n\n3. Set camera pose, panel angles, site, dates and time zone. Dates include the complete end day. Positive camera tilt points toward image top before additional roll; bottom south = bearing 180°.\n\n4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the isotropic option in Historical Data. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional.\n\nEach explicit update maintains one current Debug Data set beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files, fingerprints and the current status. Only a complete calculation is marked Complete; calibration or orientation alone is Partial. Unavailable stages are marked skipped. Edits remove affected files from the latest run, hide stale overlays and disable export. Camera rotation preserves the mask and numerical solar positions; panel edits preserve upstream files. Source-file changes are checked without recalculating. Close any locked diagnostic workbook and retry Update. Valid files are kept unchanged. Replacements are staged before publication. Verified old run folders are migrated after protecting selected inputs under Data/Inputs. Close the other SolarShade instance if this dataset is already in use.\n\nExport data opens a selection window. Irradiance (.xlsx) is selected by default. Choose an existing destination folder, then Export data creates a new uniquely named subfolder containing irradiance.xlsx. The workbook covers the full selected period with six columns: timeseries (including UTC offsets), direct on the panel, diffuse on the panel (labeled Isotropic or Hay–Davies), shading factor direct, shading factor diffuse, and final total irradiance. Direct and diffuse are before shading in W/m²; factors are transmission from 0 to 1; final total includes shading in W/m². When an unshaded component is zero, its shading factor is blank. Cancel closes the window without writing files. Export requires a complete shaded dataset; a baseline alone is insufficient. If inputs change during export, retry after Update results. Example/Irradiance holds the bundled input workbook; Example/Debug Data/reference-run holds a fixed library-generated reference run. Your current dataset uses the top-level Debug Data folder; the bundled reference stays unchanged.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches, extracted model weights and durable Profiles/Inputs. Keep these durable inputs when moving or backing up the application. Your own inputs may be anywhere. Data location:\n" + AppData.Root + "\n\nSolar Irradiance estimates historical direct + sky-diffuse irradiance. Once its complete shaded dataset is current, open PV Autonomy to enter a daily consumption profile, panel area and efficiencies, battery capacity and initial charge. Evaluate system computes hourly battery charge and unmet load for this study. First model use is slower; later panel edits reuse expensive work.";
-        text += "\n\nCoordinates and orientation: Enter decimal degrees, for example latitude 43.56, longitude 1.48. South and west coordinates are negative. True north is geographic north; magnetic-compass correction is not automatic. Bearings increase clockwise: N 0°, E 90°, S 180°, W 270°. Bottom bearing sets the image direction before additional roll. With roll 0 degrees, it is the direction at the image bottom. With an upward camera, bottom south and roll 0°, east appears left and west right because you are looking up.";
-        text += "\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.";
-        text += "\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Original masks stay available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. The internal Debug Data includes mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Keep Data/Masks and Data/AcceptedResults when moving the application.";
-        HelpWindow.Open(ref helpWindow, owner, "Using SolarShade · preview 0.2.0", text, panel =>
+        HelpWindow.OpenGuide(ref helpWindow, owner, $"Using SolarShade · preview {Program.PreviewVersion}",
+        [
+            ("Camera calibration", "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles."),
+            ("Sky photos and masks", "2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading. Scroll over the photo or use + and − to zoom, drag to pan, and choose Fit to see the whole frame. Expand gives the photo the width of both previews. The solid green line marks the calibrated limit around the lens axis. A dashed line marks the usable boundary when the detected disk or image edges limit coverage.\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Original masks stay available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. The internal Debug Data includes mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Keep Data/Masks and Data/AcceptedResults when moving the application."),
+            ("Phone, panel and site orientation", "Lay the panel flat, front up. Its top heading runs from its center toward the marked edge that you raise for tilt. On the phone, use the lens end as the top. Measure both headings clockwise from true north, with east 90°, south 180° and west 270°. Enter tilt from horizontal, 0° flat to 90° vertical. The top heading is always the bearing you would measure with the equipment laid flat. At vertical the raised edge points straight up, and the retained heading still determines the direction the front faces.\n\nThe calculated lens and panel front azimuths follow the outward axes, clockwise from geographic south. South is 0°, west +90°, north ±180° and east −90°. A south-facing 28° panel has a north top heading (0°) and a south front azimuth (0°). When flat, the front points up and has no azimuth. Turning the panel still rotates its marked top. Turning the phone rotates its photograph and overlays. With image top north, east appears on the left.\n\nCopy panel pose to phone aligns the phone’s lens end with the marked panel top and copies its tilt and heading once, including at 0° tilt. A saved camera with roll keeps its original image orientation. The pose readout identifies older placements that need the explicit uphill placement control before editing.\n\nEnter site coordinates in decimal degrees, for example latitude 43.56, longitude 1.48. Southern latitudes and western longitudes are negative. Solar azimuth is clockwise from true north. Study dates include the complete end day."),
+            ("Weather, imports and calculation", "4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the isotropic option in Weather data. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional."),
+            ("Data exports", "Export data opens a selection window. Irradiance (.xlsx) is selected by default. Choose an existing destination folder, then Export data creates a new uniquely named subfolder containing irradiance.xlsx. The workbook covers the full selected period with six columns: timeseries (including UTC offsets), direct on the panel, diffuse on the panel (labeled Isotropic or Hay–Davies), shading factor direct, shading factor diffuse, and final total irradiance. Direct and diffuse are before shading in W/m²; factors are transmission from 0 to 1; final total includes shading in W/m². When an unshaded component is zero, its shading factor is blank. A full scenario export also includes Summary.pdf and SunPathReport.pdf, with the sky mask, solar path and compass. Cancel closes the window without writing files. Export requires a complete shaded dataset; a baseline alone is insufficient. If inputs change during export, retry after Update results. Example/Irradiance holds the bundled input workbook; Example/Debug Data/reference-run holds a fixed library-generated reference run. Your current dataset uses the top-level Debug Data folder; the bundled reference stays unchanged."),
+            ("Diagnostics and saved files", "Each explicit update maintains one current Debug Data set beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files, fingerprints and the current status. Only a complete calculation is marked Complete; calibration or orientation alone is Partial. Unavailable stages are marked skipped. Edits remove affected files from the latest run, hide stale overlays and disable export. Camera rotation preserves the mask and numerical solar positions; panel edits preserve upstream files. Source-file changes are checked without recalculating. Close any locked diagnostic workbook and retry Update. Valid files are kept unchanged. Replacements are staged before publication. Verified old run folders are migrated after protecting selected inputs under Data/Inputs. Close the other SolarShade instance if this dataset is already in use.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches, extracted model weights and durable Profiles/Inputs. Keep these durable inputs when moving or backing up the application. Your own inputs may be anywhere. Data location:\n" + AppData.Root + ""),
+            ("PV Autonomy", "Solar Irradiance estimates historical direct + sky-diffuse irradiance. Once its complete shaded dataset is current, open PV Autonomy to enter a daily consumption profile, panel area and efficiencies, battery capacity and initial charge. Evaluate system computes hourly battery charge and unmet load for this study. First model use is slower; later panel edits reuse expensive work."),
+        ], panel =>
             panel.Children.Add(Button("Third-party notices", () =>
             {
                 using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Notices")!;
@@ -1050,7 +1168,7 @@ public sealed class IrradianceWorkspace : UserControl, IDisposable
     public string FieldOfViewTextForTest => fieldOfViewInfo.Text;
     public CalibrationReview? CalibrationReviewForTest => calibrationReview;
     public Task<(CalibrationProfile Profile, string Path, string Details)> CalibrateForTest(UserSettings inputs) => services.Calibrate(inputs);
-    public void SetProfileForTest(string path) { settings.ProfilePath = PortablePaths.Store(path); settings.CoverageAngle = 0; LoadFields(); Changed(); }
+    public void SetProfileForTest(string path) => SelectProfile(path);
     public void SelectSkyPhotoForTest(string path) => SelectSkyPhoto(path);
     public MaskVariant ImportMaskForTest(string path, string label, bool inverted = false, bool centeredDisk = true) => ImportExistingMask(path, label, inverted, centeredDisk);
     public void SelectMaskForTest(string? id) => maskChoice.SelectedItem = maskChoice.Items.Cast<MaskChoice>().Single(c => c.Id == id);

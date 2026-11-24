@@ -35,8 +35,16 @@ public sealed class WorkspaceTests
         var window = new MainWindow(applicationServices: service);
         try
         {
+            Assert.Equal(new[] { "Orientation map", "Solar Irradiance", "PV Autonomy" },
+                window.Workspaces.Items.OfType<TabItem>().Select(tab => (string)tab.Header));
             Assert.Equal("Solar Irradiance", window.Workspaces.Active!.Title);
             Assert.False(window.IrradianceController.Source.IsReady);
+            Assert.True(window.Workspaces.Select("orientation"));
+            Assert.IsType<OrientationWorkspace>(window.Workspaces.Active!.View);
+            Assert.Null(window.Workspaces.Active.Actions);
+            Assert.False(window.Workspaces.Select("pv"));
+            Assert.Equal(0, fixture.Runs);
+            Assert.True(window.Workspaces.Select("irradiance"));
             window.Calculate(); await Until(() => !window.UpdatingForTest);
             var source = window.IrradianceController.Source.Snapshot!;
             Assert.NotNull(source); Assert.True(window.IrradianceController.IsCurrent(source));
@@ -44,7 +52,7 @@ public sealed class WorkspaceTests
             Assert.NotEqual(89, source.Settings.PanelTilt);
             window.Workspaces.Register(new("test", "Test dependent", new TestView()));
             int count = service.PreparationCount;
-            window.Workspaces.Select("test"); window.Workspaces.Select("irradiance");
+            window.Workspaces.Select("test"); window.Workspaces.Select("orientation"); window.Workspaces.Select("irradiance");
             Assert.Same(source, window.IrradianceController.Source.Snapshot);
             Assert.Equal(count, service.PreparationCount);
             window.EditFieldForTest("PanelTilt", "40");

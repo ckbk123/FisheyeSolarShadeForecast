@@ -95,7 +95,7 @@ public static partial class TranspositionModule
                 { WriteRows = (writer, token) => WriteDetails(result, writer, skip, chunkSize, token) });
         }
         ScientificWorkbook.Write(outputXlsx, sheets,
-            $"Actual returned transposition values. Model {result.Model}; tilt {result.Panel.TiltDegrees}; azimuth {result.Panel.AzimuthDegrees}. Source: {result.Timeline.Dataset.Source}. Constant daylight DNI inferred over whole source interval; constant source DHI. Selected interval energy uses actual duration. No ground reflection. {result.Timeline.Convention}", ct);
+            $"Actual returned transposition values. Model {result.Model}; Panel.TiltDegrees = {result.Panel.TiltDegrees}; Panel.AzimuthDegrees = {result.Panel.AzimuthDegrees}. {PanelOrientation.SolverConvention} Source: {result.Timeline.Dataset.Source}. Constant daylight DNI inferred over whole source interval; constant source DHI. Selected interval energy uses actual duration. No ground reflection. {result.Timeline.Convention}", ct);
         return result with { OutputPath = Path.GetFullPath(outputXlsx) };
     }
 

@@ -1,19 +1,27 @@
 # Running SolarShade
 
-Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.2.0 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
+Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.3.5 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
+
+Hover over a study control or focus it and press **F1** to read its explanation. Press **Escape** to dismiss keyboard help. For the full reference, open **Help**. You can keep the guide beside the study while you edit inputs or change workspaces.
+
+## Orientation map
+
+The leftmost tab is a 3D reference for the sun, panel and phone. Orbit the scene or choose a top or side view. Start with the south-facing 28° example, then select the flat example and rotate the panel or phone top. The arrows drawn on the devices identify their marked tops. The values you explore belong only to this map. Solar Irradiance opens by default and has its own study inputs. The map runs offline in Microsoft Edge WebView2. If that runtime is unavailable, use the browser option in the tab to open the bundled map locally.
 
 ## Workflow
+
+**CALIBRATION FAILED** marks the sky preview and checkerboard review when the checkerboard run fails. Open **Review checkerboard photos** for the cause, then retry **Calibrate** or choose a saved camera profile. **PHOTO REJECTED** in a successful review applies only to the selected checkerboard image. **PROFILE UNUSABLE** on the sky preview means SolarShade could not apply the selected profile to this image. The FOV readout explains why.
 
 1. Select checkerboard photos, set inner-corner columns/rows and one square's side in millimetres, then **Calibrate**. The checkerboard review lists detected/failed photos and shows the selected photo with its detected inner corners marked. It stays separate from the main study so both windows remain usable. **Review checkerboard photos** reopens it. The library saves native `calibration.yml`, reusable `camera-profile.json`, per-photo `checkerboard-detections.json`/`detections` previews, validation and solver diagnostics in `Debug Data/01-calibration`. A durable copy is retained in `Data/Profiles`; subsequent updates cannot delete the selected profile. Failed calibrations retain their photo feedback under `Data/CalibrationReviews` without publishing a camera profile. The review shows the saved location and can open its diagnostics folder. Older saved profiles can show their existing observed/fitted corner overlays; failed-photo counts from those older runs are unavailable.
 2. Use **Choose sky photo…** to select a photograph directly, or select its folder and active photo. Choose a segmentation model, or use **Import existing mask…** for an already segmented PNG without AI. The physical lens setup and oriented image dimensions must match calibration. **Load camera profile…** selects `camera-profile.json`, which includes the camera parameters and validated incident-angle coverage. Calibrate saves this reusable file in `Data/Profiles`. For a native OmniCalib YAML calibration, select its matching `camera-profile.json`; fitted coverage is provisional. Existing saved YAML selections remain supported with their saved coverage.
 3. Set camera pose, site/elevation, time zone and dates. Dates include the complete end day. The editable example defaults are not GPS measurements.
-4. Choose NASA POWER, Open-Meteo ERA5 or **Import XLSX / CSV** in **Weather data source**, then **Update results**. Imported files are shown by name; choosing a provider leaves import mode. Loading the example or editing inputs does not start calculations or generate debug files.
+4. Use the weather source switch to choose a service or a local file. Select NASA POWER or Open-Meteo ERA5 in service mode. In import mode, choose **Choose XLSX / CSV file**. Click **Update results** when the inputs are ready.
 5. Adjust inputs freely, then click **Update results** again. The app reuses matching weather, masks, solar geometry and visibility work and rereads changed imports. **Download weather again & update** bypasses the provider weather cache while reusing unchanged camera and mask work. It is unavailable for imported files; use **Update results** to reread those. The source controls show the last result's recorded cache/source origin and dataset timestamp. Legacy imports record their read time, which is not a remote weather retrieval timestamp.
-6. **Export data** is enabled only after a successful complete shaded calculation matching the current interface inputs. It opens an export dialog with **Irradiance (.xlsx)** checked. Choose a destination folder, then click **Export** to create a new scenario folder containing **irradiance.xlsx** and an integrity receipt (`export.json`). Clearing the checkbox disables Export; Cancel closes the dialog without creating files. Baseline-only or skipped-stage results cannot be exported.
+6. **Export data** becomes available after a complete shaded calculation for the current inputs. Keep **Irradiance (.xlsx)** checked, choose a destination folder and confirm with **Export data**. The app creates a new scenario folder containing **irradiance.xlsx** and an integrity receipt (`export.json`).
 
 The irradiance workbook contains every result interval, in order, with exactly six columns: timeseries, unshaded direct irradiance on the panel, unshaded diffuse irradiance on the panel, direct shading factor, diffuse shading factor, and final shaded total irradiance. Irradiance is in W/m². The diffuse header identifies **Isotropic** or **Hay–Davies** from the completed calculation. Factors are shaded ÷ unshaded irradiance (1 = open, 0 = blocked), with blank cells when the corresponding unshaded component is zero. The Hay–Davies diffuse factor includes both isotropic and circumsolar shading. Timestamps retain their source labels and UTC offsets; the workbook metadata records the time zone, timestamp convention and study period. Export preserves the original interval cadence and numeric precision without recalculation or graph filtering.
 
-The bottom-left indicator combines color and text: **red** means inputs need attention or an update failed; **yellow** means an update is needed, running, or stopped; **green** means complete results are up to date. Green appears after success, never merely after clicking Update. Invalid or missing inputs disable Update; a processing failure can be retried. Stop cancels publication, although active native work may need to finish before another update can start. An edit made during processing supersedes that result.
+The bottom-left indicator gives the calculation state in text and color. **Red** marks invalid inputs or a failed update. **Amber** marks a required, running or stopped update. **Teal** marks a complete, current result. Invalid or missing inputs disable Update. A processing failure can be retried. Stop cancels publication, although active native work may need to finish before another update can start. An edit made during processing supersedes that result.
 
 Typing a relevant new value immediately disables export, even before leaving the field. Previous graphs and summaries are dimmed and labeled when stale. Graph navigation, overlay visibility and future checkerboard setup do not invalidate calculated results. Changes in the automatic Windows time zone require another explicit update.
 
@@ -23,13 +31,11 @@ Debug Data holds one current set, including the full scientific diagnostics. Exp
 
 Both curves show irradiance received by the selected panel before/after obstruction shading, in W/m². Summary cards integrate the actual represented durations in kWh/m². Electrical PV power, ground reflection and rear-side irradiance are outside this calculation.
 
-The input workflow is grouped under **01 Images & Calibration**, **02 Camera Pose**, **03 Site Location**, **04 Historical Data**, and **05 Panel Installation**. Site Location contains the coordinates, elevation and time zone. Historical Data contains the study dates, weather source/import controls, and **Use isotropic diffuse instead of Hay–Davies**. The other Advanced settings controls are no longer shown; existing saved calculation settings are retained. All five sections, including panel tilt and azimuth, belong to one scrolling input list. The highlighted **UPDATE RESULTS** block stays fixed at the bottom left while inputs or results scroll. Its bold status and **Update results**, **Stop**, and **Download weather again & update** buttons keep the calculation controls easy to find.
+The input list contains **Images & calibration**, **Camera pose**, **Site location**, **Weather data** and **Panel installation**. The **Calculation** block at bottom left keeps the update status, **Update results**, **Stop** and **Download weather again & update** in reach while you scroll.
 
 ## PV Autonomy
 
 On small displays, workspace scrollbars keep graphs, photo previews and controls reachable. The input list and daily consumption list also have their own scrollbars. Moving keyboard focus to an input brings it into view.
-
-Help opens a separate reference window, so you can keep reading while editing the study or switching workspaces. Clicking Help again brings back the existing guide. Close it with its title-bar button or Escape.
 
 The application has two independent tabs: **Solar Irradiance** and **PV Autonomy**. Complete an explicit irradiance update first. The PV tab unlocks only for a current, complete shaded dataset covering the selected study dates. If source inputs or files change, PV evaluation/export is blocked until the source is updated. A previously accepted PV result can return when the exact irradiance source and PV settings match; other combinations require **Evaluate system**.
 
@@ -41,9 +47,32 @@ Click **Evaluate system**. The shared chart shows load demand and available PV e
 
 **Export PV results** copies verified CSV, JSON and XLSX files plus a scoped manifest to a new scenario folder. JSON includes the full irradiance input, system settings and substeps. Irradiance and PV exports remain independent. PV settings persist in `Data/pv-settings.json`; a matching accepted PV result can also be restored from `Data/AcceptedResults`. Optional managed outputs occupy `Debug Data/07-battery` under the same storage lease as irradiance; altering them blocks PV export without damaging the irradiance study.
 
+## Phone and panel angles
+
+Choose a physical top edge on the panel. On the phone, use the lens end that corresponds to the top of the oriented photograph. Imagine the device lying flat, lens or panel front pointing up. **Top heading** is the compass bearing from the center toward that edge, clockwise from true north. North is 0°, east 90°, south 180° and west 270°. Set the **tilt from horizontal** by raising that edge. At 90° the marked edge is directly above the center in the illustrated placement. The heading still records which way the top points when you lower the device flat.
+
+Boitier’s convention defines **panel front azimuth** and **lens azimuth** using the horizontal projection of the outward panel normal and lens axis. Their zero is geographic south, increasing clockwise to west +90°, north ±180° and east −90°. Solar Irradiance displays these derived angles beside the inputs. A flat device has a top heading and an undefined facing azimuth.
+
+| Physical placement with phone and panel tops aligned | Top heading on both devices | Tilt | Panel front and lens azimuth |
+| --- | --- | --- | --- |
+| Both lie flat with tops east | 90° (E) | 0° | Undefined |
+| Raise those east edges | 90° (E) | 28° | +90° (W) |
+| Both face south with tops uphill | 0° (N) | 28° | 0° (S) |
+| Both face east with tops uphill | 270° (W) | 28° | −90° (E) |
+
+**Copy panel pose to phone** aligns the two top headings and tilts once, including when the panel is flat. Subsequent edits are independent. Turning a flat panel rotates its physical edges. Turning a flat phone also rotates the photograph relative to the compass and sun path. With north at image top in an upward-looking photograph, east appears on the left. Solar azimuth uses true north as zero.
+
+Existing studies retain their stored camera and panel geometry. An older flat panel's initial top heading comes from its saved panel bearing. If that edge was never recorded in the field, choose the heading that matches the installation. Saved camera roll and nonstandard phone placements remain identifiable in the study.
+
+For the LAAS Site 2 example, a panel tilted 6.8° with a front azimuth of −26° has a top heading of 334°. The flat phone’s assumed north image top corresponds to a separate phone top heading of 0°.
+
 ## Cardinal-direction preview
 
 **Show cardinal directions** places magenta N/E/S/W labels and short ticks over the original colour photograph. The shading library projects the four constant compass bearings through the same calibration and camera pose used for sun paths and shading. The ticks identify the visible ends of these bearing lines, not necessarily the horizon: the horizon can be outside the calibrated lens coverage. Labels remain upright.
+
+Expand the sky photo to inspect the compass. Scroll over a feature to zoom around it, drag the magnified image to pan, and choose **Fit** to see the whole photograph. The green outline and the compass move with the image.
+
+The green calibrated FOV line joins directions at the selected maximum incident angle from the lens axis. The lens profile maps that angle to a radius around its calibrated optical center. In the bundled example the limit is **66.43° from the axis**, or **132.86° across**. Each study uses its selected calibration and any coverage override. When the photo cuts off part of the calibrated field, the detected lens disk and image edges also limit coverage. The usable circular FOV is the largest complete cone that fits in every direction.
 
 The preview depends on image geometry, effective calibration, heading, tilt and roll. Relevant edits clear stale markers; Update results generates their replacement. During an update the preview is available before irradiance retrieval. Weather, dates, time zone, panel settings and the visibility toggle do not regenerate its geometry. It cannot establish whether the entered camera heading matches the real photograph.
 
@@ -83,7 +112,9 @@ The chart holds each interval mean over its actual start/end bounds, including t
 
 **Import existing mask…** accepts an opaque, 8-bit black-and-white PNG at the oriented photo's exact pixel dimensions. White means open sky and black means obstruction by default; choose the explicit inversion option when the source uses the opposite meaning. Gray edges and colored pixels are rejected. The lens disk is detected from the photograph, never from the mask's white region. Choose **Centered full disk** only for a centered full-disk photograph. Pixels outside that disk become black. Import saves a named immutable copy and selects it in **Mask for calculation** without loading a model or running AI; the external import file is no longer required. AI model, resolution and disk controls are unavailable while an imported mask is selected. Select **AI mask** to use segmentation again.
 
-After importing a mask, or after **Update results** has produced an AI mask, click **Edit mask** at the lower corner of its preview. A separate modal window keeps the main study controls fixed while you paint. Choose **Black · obstruction** or **White · open sky**, set brush diameter in original-image pixels, and use the mask-opacity slider to see the photo through the mask while painting. The zoom slider, mouse wheel, Fit image, right-drag pan, undo/redo and Reset affect the editor view or strokes only. The saved PNG remains exactly black/white at the original image dimensions; painting outside the detected lens disk is blocked.
+After importing a mask, or after **Update results** has produced an AI mask, click **Edit mask** at the lower corner of its preview. Choose **Black · obstruction** or **White · open sky**, set the brush diameter in original-image pixels, and use mask opacity to see through to the photograph. You can paint anywhere in the rectangular photo, including beyond the green FOV guide and the edge of the detected lens disk. Those strokes survive saving, reopening and exporting. The guides stay separate from the binary mask. Shading uses only the observed field for the active calibration and lens disk. Use the zoom slider or wheel, **Fit image**, right-drag pan, undo/redo and Reset while editing.
+
+The calibration and photo boundaries determine which rays are observed. At the outline itself, a valid ray can land between pixels, so shading interpolates the neighboring values from the saved mask.
 
 **Save as new mask** creates a named, immutable variant. **Cancel** leaves the current calculation unchanged. The **Mask for calculation** dropdown below the preview selects the AI mask, an imported mask or a compatible saved edit. Each photo remembers its last selection. An imported mask can be edited immediately, without an AI ancestor. `Data/Masks/<photo-hash>/Imported` retains normalized imported source pixels; `Data/Masks/<photo-hash>/AI` retains original AI source pixels even if ordinary compute caches are cleaned. Saved variants and their labels are under `Data/Masks/<photo-hash>`. A new selection needs **Update results** unless an exact prior accepted result is available; then the app verifies and restores it without recalculation. Matching PV results also return when their settings match.
 

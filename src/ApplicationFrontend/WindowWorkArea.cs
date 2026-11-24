@@ -31,6 +31,7 @@ public static class WindowWorkArea
     /// <summary>Keep application dialogs on the owner's monitor and within its usable size.</summary>
     public static void FitToOwner(Window dialog, Window owner)
     {
+        StudioTheme.Inherit(dialog, owner);
         static double Extent(double actual, double requested, double fallback) => double.IsFinite(actual) && actual > 0 ? actual
             : double.IsFinite(requested) && requested > 0 ? requested : fallback;
         dialog.Owner = owner; dialog.ShowActivated = owner.ShowActivated;
