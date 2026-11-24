@@ -11,7 +11,7 @@
     { id: "flat", name: "Flat · tops point east", topHeading: 90, tilt: 0 },
     { id: "vertical", name: "Vertical panel · 90°", topHeading: 0, tilt: 90 }
   ];
-  const options = {active: "panel", angles: true, labels: true, placed: true};
+  const options = {active: "panel", angles: true, labels: true};
   const colors = {panel: "var(--panel)", phone: "var(--phone)", sun: "var(--sun)"};
   const compass = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
   const cardinal = bearing => compass[Math.round(G.wrap360(bearing) / 45) % 8];
@@ -36,8 +36,7 @@
     scenarioId = id;
     const panel = {topHeading: preset.topHeading, tilt: preset.tilt};
     state = {panel, phone: G.copyPanelPose(panel), sun: {azimuth: 135, elevation: 42}};
-    options.placed = true;
-    options.active = id === "flat" ? "phone" : "panel";
+    options.active = id === "south" || id === "flat" ? "phone" : "panel";
     $("preset").value = id;
     $("custom-scenario").hidden = true;
     scene.resetView();
@@ -51,24 +50,26 @@
 
   const compassLimits = ["0° N", "360° N"];
   const tiltLimits = ["0° flat", "90° vertical"];
-  const field = (id, name, min, max, value, limits, wraps = false) =>
-    ({id, name, min, max, value, limits, wraps});
+  const field = (id, name, min, max, value, limits, help, wraps = false) =>
+    ({id, name, min, max, value, limits, help, wraps});
+  const tiltHelp = "Angle above horizontal. Flat is 0°.";
+  const headingHelp = "Direction of the top edge when laid flat, clockwise from true north.";
 
   function controls(v) {
     const panel = state.panel, phone = state.phone, sun = state.sun;
     if (options.active === "panel") return [
-      field("panelTilt", "Panel tilt from horizontal, °", 0, 90, panel.tilt, tiltLimits),
-      field("panelTopHeading", "Panel top heading, ° clockwise from true north", 0, 360, panel.topHeading, compassLimits, true)
+      field("panelTilt", "Panel tilt", 0, 90, panel.tilt, tiltLimits, tiltHelp),
+      field("panelTopHeading", "Panel top heading", 0, 360, panel.topHeading, compassLimits, headingHelp, true)
     ];
     if (options.active === "sun") return [
-      field("sunAz", "Solar azimuth, ° clockwise from true north", 0, 360,
-        v.sunBearing == null ? null : sun.azimuth, compassLimits, true),
-      field("elevation", "Solar elevation from horizontal, °", -90, 90, sun.elevation, ["−90° nadir", "+90° zenith"]),
-      field("zenith", "Solar zenith from vertical up, °", 0, 180, v.zenith, ["0° zenith", "180° nadir"])
+      field("sunAz", "Solar azimuth", 0, 360,
+        v.sunBearing == null ? null : sun.azimuth, compassLimits, "Compass bearing of the sun, clockwise from true north.", true),
+      field("elevation", "Solar elevation", -90, 90, sun.elevation, ["−90° nadir", "+90° zenith"], "Angle above the horizon."),
+      field("zenith", "Solar zenith", 0, 180, v.zenith, ["0° zenith", "180° nadir"], "Angle down from directly overhead.")
     ];
     return [
-      field("phoneTilt", "Phone tilt from horizontal, °", 0, 90, phone.tilt, tiltLimits),
-      field("phoneTopHeading", "Phone top heading, ° clockwise from true north", 0, 360, phone.topHeading, compassLimits, true)
+      field("phoneTilt", "Phone tilt", 0, 90, phone.tilt, tiltLimits, tiltHelp),
+      field("phoneTopHeading", "Phone top heading", 0, 360, phone.topHeading, compassLimits, headingHelp, true)
     ];
   }
 
@@ -101,8 +102,6 @@
       case "zenith": sun.elevation = 90 - value; break;
       default: return;
     }
-    if (options.placed && (panel.tilt !== phone.tilt || panel.topHeading !== phone.topHeading))
-      options.placed = false;
     markCustom();
     render(id, value);
   }
@@ -116,6 +115,9 @@
       '<input class="range" type="range" step="0.1" id="range-' + f.id + '" aria-label="' + f.name + ' slider">' +
       '<div class="limits"><span>' + f.limits[0] + '</span><span>' + f.limits[1] + '</span></div>';
     const range = group.querySelector(".range"), input = group.querySelector("input[type=number]");
+    group.title = f.help;
+    range.setAttribute("aria-description", "In degrees. " + f.help);
+    input.setAttribute("aria-description", "In degrees. " + f.help);
     range.min = f.min;
     range.max = f.max;
     if (!f.wraps) { input.min = f.min; input.max = f.max; }
@@ -194,7 +196,6 @@
   }));
   $("copy-panel").addEventListener("click", () => {
     state.phone = G.copyPanelPose(state.panel);
-    options.placed = true;
     markCustom();
     render();
   });

@@ -9,6 +9,7 @@ namespace SolarShade.Desktop;
 /// <summary>An isolated illustration. The browser is created only when this tab is first displayed.</summary>
 public sealed class OrientationWorkspace : UserControl, IDisposable
 {
+    private Task<CoreWebView2Environment>? environmentTask;
     private WebView2? browser;
     private bool started, disposed;
     private static string CacheRoot => Path.Combine(
@@ -20,18 +21,32 @@ public sealed class OrientationWorkspace : UserControl, IDisposable
         IsVisibleChanged += (_, _) => StartIfVisible();
     }
 
+    private Task<CoreWebView2Environment> GetEnvironment() =>
+        environmentTask ??= CoreWebView2Environment.CreateAsync(userDataFolder: Path.Combine(CacheRoot, "Browser"));
+
+    // Hovering the tab gives the runtime a head start without creating a hidden browser.
+    internal async Task Prepare()
+    {
+        if (disposed || started) return;
+        try { await GetEnvironment(); }
+        catch { environmentTask = null; } // Opening the tab retries and shows the usual fallback if necessary.
+    }
+
     private async void StartIfVisible()
     {
         if (started || disposed || !IsLoaded || !IsVisible) return;
         started = true;
         try
         {
-            Content = new TextBlock { Text = "Opening orientation map…", Margin = new(24) };
-            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: Path.Combine(CacheRoot, "Browser"));
-            if (disposed) return;
-            var view = new WebView2();
+            var loading = new TextBlock { Text = "Opening orientation map…", Margin = new(12) };
+            var view = new WebView2 { Visibility = Visibility.Hidden };
             browser = view;
-            Content = view;
+            var surface = new Grid();
+            surface.Children.Add(loading);
+            surface.Children.Add(view);
+            Content = surface;
+            var environment = await GetEnvironment();
+            if (disposed) return;
             await view.EnsureCoreWebView2Async(environment);
             if (disposed) return;
             var core = view.CoreWebView2;
@@ -44,10 +59,10 @@ public sealed class OrientationWorkspace : UserControl, IDisposable
             core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All, CoreWebView2WebResourceRequestSourceKinds.All);
             core.WebResourceRequested += (_, e) =>
             {
-                var content = OrientationMapAssets.Open(e.Request.Uri, out string type);
+                var content = OrientationMapAssets.IsPage(e.Request.Uri) ? OrientationMapAssets.OpenEmbeddedPage() : null;
                 e.Response = content == null
                     ? environment.CreateWebResourceResponse(null, 404, "Not Found", "")
-                    : environment.CreateWebResourceResponse(content, 200, "OK", $"Content-Type: {type}; charset=utf-8");
+                    : environment.CreateWebResourceResponse(content, 200, "OK", "Content-Type: text/html; charset=utf-8\r\nCache-Control: no-store");
             };
             core.ProcessFailed += (_, e) =>
             {
@@ -56,7 +71,13 @@ public sealed class OrientationWorkspace : UserControl, IDisposable
             };
             core.NavigationCompleted += (_, e) =>
             {
-                if (!e.IsSuccess && e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled)
+                if (disposed) return;
+                if (e.IsSuccess)
+                {
+                    view.Visibility = Visibility.Visible;
+                    surface.Children.Remove(loading);
+                }
+                else if (e.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled)
                     Dispatcher.BeginInvoke(() => ShowFallback("The embedded viewer could not load the map."));
             };
             core.Navigate(OrientationMapAssets.PageUrl);

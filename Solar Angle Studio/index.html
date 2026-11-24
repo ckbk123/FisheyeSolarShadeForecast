@@ -7,10 +7,6 @@
   <title>Orientation map</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='9' fill='%23172738'/%3E%3Ccircle cx='27' cy='12' r='5' fill='%23ffc76b'/%3E%3Cpath d='m7 25 15-7 11 5-15 8Z' fill='%23ffc76b'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="studio.css">
-  <script defer src="geometry.js"></script>
-  <script defer src="scene.js"></script>
-  <script defer src="inspection.js"></script>
-  <script defer src="studio.js"></script>
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" class="sprite" aria-hidden="true">
@@ -35,7 +31,7 @@
 
   <main>
     <div class="page-heading">
-      <div><h1>Orientation map</h1><p>Explore the angles in an example scene. Changes apply only to this illustration.</p></div>
+      <div><h1>Orientation map</h1><p>Explore example angles.</p></div>
       <div class="heading-actions">
         <button class="guide-button" id="open-guide"><svg class="icon"><use href="#i-guide"/></svg>Angle guide</button>
         <div class="preset-control"><label for="preset">Example</label><div class="preset-row"><div class="select-shell"><select id="preset"></select><svg class="icon"><use href="#i-chevron"/></svg></div><button class="icon-button" id="reset-preset" title="Restore example angles" aria-label="Restore example angles"><svg class="icon"><use href="#i-reset"/></svg></button></div></div>
@@ -83,8 +79,12 @@
       <p>The phone image shows an ideal 180° fisheye. A calibrated study uses the lens and field of view of the photograph.</p>
       <h3>Sun</h3><p>Solar azimuth is clockwise from true north. Elevation starts at the horizon, and zenith angle starts at straight up. Their sum is 90°. Azimuth is undefined when the sun is directly overhead or directly below. The gold line points toward the sun. Incoming sunlight travels in the opposite direction.</p>
       <p>The example sun position is set manually. The irradiance calculation determines solar position from site, date and time.</p>
-      <h3>Explore the scene</h3><p>Choose Panel, Phone or Sun to see its angles. Use the arrows on a focused scene to orbit, + or − to zoom and Home to reset. Top view places north up and east right. Copy panel pose to phone aligns both illustrated top edges and both tilts once, including when flat.</p>
+      <h3>Explore the scene</h3><p>Choose Panel, Phone or Sun to see its angles. Use the arrows on a focused scene to orbit, + or − to zoom and Home to reset. Top view places north up and east right. Copy panel pose to phone aligns both illustrated top edges and tilts. Matching faces stay side by side in the same plane.</p>
     </div></dialog>
   <noscript>Enable JavaScript to use the 3D angle controls.</noscript>
+  <script defer src="geometry.js"></script>
+  <script defer src="scene.js"></script>
+  <script defer src="inspection.js"></script>
+  <script defer src="studio.js"></script>
 </body>
 </html>
