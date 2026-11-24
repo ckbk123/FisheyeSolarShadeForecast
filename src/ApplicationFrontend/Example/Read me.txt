@@ -4,9 +4,11 @@ Extract the complete package and open APPLICATION.exe. First launch loads
 this example. Click Update results to calculate; no weather download is required.
 Load example restores its input settings and preserves your time-zone preference.
 
-The example panel faces north at 30 degrees from horizontal. Its equipment
-azimuth is 180 degrees on the south-zero convention. The camera looks straight
-up, so its optical azimuth is undefined. The image top points true north.
+The example uses the South-facing 28-degree pose from Orientation map.
+Phone tilt and panel tilt are both 28 degrees. Both top headings are 0 degrees
+(true north), with the phone lens end and marked panel top uphill. The lens
+and panel front face south, which gives both an equipment azimuth of 0 degrees.
+These angles illustrate the convention. The photo has no verified capture pose.
 
 Calib Images
   Twelve checkerboard photographs (1.jpg through 12.jpg) and saved calibration.yml.
@@ -23,10 +25,10 @@ Irradiance
   horizontal-irradiance.xlsx is the original buffered Open-Meteo hourly input,
   with 744 rows labelled in May 2025. Each label represents the PRECEDING hour.
   Its first three columns are timestamp, direct horizontal BHI and diffuse
-  horizontal DHI in W/m2. Surrounding intervals support date/time-zone boundaries.
+  horizontal DHI in W/m2. The imported timestamps set the chart period.
 
 Debug Data/reference-run
-  A fixed successful run generated with the historic north-zero engine inputs.
+  A fixed calculation for the bundled phone and panel setup.
   run.json records its exact settings, source identifiers, library versions,
   stage origins and artifact paths. Numbered folders contain native calibration
   YAML, binary sky-mask PNG, horizontal irradiance, solar geometry, unshaded
@@ -36,9 +38,8 @@ Debug Data/reference-run
   Read 06-shading/panel-results.json for its exact energy and loss summaries.
   These are recorded calculated outputs, not manually populated sample values.
 
-The default study covers 2-30 May 2025. Example settings illustrate the workflow
-and do not establish the photograph's actual location or orientation. The
-current UI time zone can differ from the fixed reference run. Read its run.json
+The site coordinates are illustrative. The selected time zone can differ from
+the fixed reference run. Read its run.json
 before comparing complete-period values. Unknown sky is treated as blocked;
 no ground reflection or electrical PV model is added.
 
@@ -59,5 +60,4 @@ files do not move automatically with the package.
 Import raw horizontal BHI/DHI rather than panel or factor workbooks. Native
 exported input files contain their own interval metadata. For a three-column
 file, explicitly choose its interval duration and start/end/centre labels.
-Hourly inputs stay hourly; 15-minute inputs stay 15-minute. Include enough
-source intervals for both selected date boundaries; missing periods are reported.
+Hourly inputs stay hourly. A 15-minute file keeps its 15-minute intervals.

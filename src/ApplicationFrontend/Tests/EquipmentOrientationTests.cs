@@ -13,6 +13,24 @@ public sealed class EquipmentOrientationTests
         return new(calibration, EquipmentOrientation.ToCameraPose(settings));
     }
 
+    [Fact]
+    public void BundledExampleShowsTheSouthFacingUphillPlacement()
+    {
+        var settings = PortablePaths.Example();
+        var angles = EquipmentOrientation.Describe(settings);
+        Assert.Equal(28, settings.PanelTilt);
+        Assert.Equal(28, settings.PhoneInclination);
+        Assert.Equal(0, settings.PanelTopHeading);
+        Assert.Equal(0, settings.PhoneTopHeading);
+        Assert.Equal(0, angles.PanelAzimuth);
+        Assert.Equal(0, angles.PhoneAzimuth);
+        Assert.Equal("Lens end uphill", angles.PhonePlacement);
+        var (right, down, lens) = EquipmentOrientation.ToCameraPose(settings).Axes();
+        var southFacingNormal = Direction.FromAngles(180, 28);
+        Assert.Equal(1, lens.Dot(southFacingNormal), 12);
+        Assert.True(down.Up < 0 && down.North < 0 && right.East < 0);
+    }
+
     [Theory]
     [InlineData(0, 180, 0)]
     [InlineData(90, 270, 90)]

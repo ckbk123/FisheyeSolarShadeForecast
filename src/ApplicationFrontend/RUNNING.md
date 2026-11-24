@@ -156,7 +156,7 @@ A compatible library change needs no frontend source rewrite. The self-contained
 - `Example/Sky Photo`: demonstration sky photograph.
 - `Example/Irradiance/horizontal-irradiance.xlsx`: original buffered hourly Open-Meteo input workbook.
 - `Example/Debug Data/reference-run`: fixed native library outputs from the verified example run, with its own `run.json`.
-- `Example/settings.json`: executable-relative default input paths. First launch and **Load example** load the inputs without calculating; click **Update results** when ready.
+- `Example/settings.json`: executable-relative input paths and the **South-facing · 28°** illustration from Orientation map. Phone and panel both have tilt 28° and top heading 0° (true north). Their outward axes point south with azimuth 0°. First launch and **Load example** load the inputs without calculating; click **Update results** when ready.
 - `Data`: settings, durable Profiles/Inputs/Masks, accepted-result vault, weather/current-value caches and extracted model weights.
 - Top-level `Debug Data`: the one current set of published diagnostic files.
 
