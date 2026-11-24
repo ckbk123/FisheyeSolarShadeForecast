@@ -7,11 +7,11 @@
     "Opacity": 0.5
   },
   "Timings": {
-    "ProjectionMilliseconds": 20.2237,
-    "SimplificationMilliseconds": 4.337999999999999,
-    "RenderMilliseconds": 23.9888,
-    "EncodeMilliseconds": 293.7785,
-    "TotalMilliseconds": 344.1578
+    "ProjectionMilliseconds": 21.5934,
+    "SimplificationMilliseconds": 5.1160999999999985,
+    "RenderMilliseconds": 23.569,
+    "EncodeMilliseconds": 328.2234,
+    "TotalMilliseconds": 380.5196
   },
   "SelectedSampleCount": 44640,
   "ProjectedSampleCount": 14061,
@@ -21,7 +21,7 @@
   "RenderedVertexCount": 1006,
   "DisplayTimeZoneId": "SE Asia Standard Time",
   "GeometryConvention": "Source interval labels and bounds preserved. Equal-weight midpoint quadrature; source interval and selected/clipped interval each have weights summing to one. Geometric NOAA/Meeus topocentric angles; apparent zenith uses the explicit standard-atmosphere NOAA refraction approximation. Azimuth clockwise from true north; zenith from vertical up. All rows, including diffuse-only and night, retain geometry.",
-  "DatasetFingerprint": "D1A2771F20CC1DB9B80F9F37F3DA83F3D574594841E95B6F6573D1344D5009CC",
+  "DatasetFingerprint": "55EE6E529D6A51B9FEFFE57727D230175A455EBF82A0E4E48CCDCE9CFCB1718E",
   "Color": "Golden yellow (#FFD200), straight-alpha PNG",
   "SelectedSamplesOnly": true,
   "RasterCoordinateQuantizationMaximumPixels": 0.0027621358640099515,
