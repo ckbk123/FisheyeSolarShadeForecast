@@ -1,8 +1,12 @@
 # Running SolarShade
 
-Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.3.1 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
+Launch `Deliverable/APPLICATION.exe` or extract the clean Preview 0.3.2 `Deliverable.zip` first. Keep `Example`, `Data` and `Debug Data` alongside the executable. All four segmentation models are embedded; no Python, Excel installation or model download is required.
 
 Hover over a study control or focus it and press **F1** to read its explanation. Press **Escape** to dismiss keyboard help. For the full reference, open **Help**. You can keep the guide beside the study while you edit inputs or change workspaces.
+
+## Orientation map
+
+The leftmost tab is a 3D reference for the sun, panel and phone. Orbit the scene or choose a top or side view. Start with the south-facing 28° example, then try a flat phone and rotate its image-top bearing. The values you explore belong only to this map. Solar Irradiance opens by default and has its own study inputs. The map runs offline in Microsoft Edge WebView2. If that runtime is unavailable, use the browser option in the tab to open the bundled map locally.
 
 ## Workflow
 
@@ -25,7 +29,7 @@ Debug Data holds one current set, including the full scientific diagnostics. Exp
 
 Both curves show irradiance received by the selected panel before/after obstruction shading, in W/m². Summary cards integrate the actual represented durations in kWh/m². Electrical PV power, ground reflection and rear-side irradiance are outside this calculation.
 
-The input list contains **Images & calibration**, **Camera pose**, **Site location**, **Historical data** and **Panel installation**. The **Calculation** block at bottom left keeps the update status, **Update results**, **Stop** and **Download weather again & update** in reach while you scroll.
+The input list contains **Images & calibration**, **Camera pose**, **Site location**, **Weather data** and **Panel installation**. The **Calculation** block at bottom left keeps the update status, **Update results**, **Stop** and **Download weather again & update** in reach while you scroll.
 
 ## PV Autonomy
 

@@ -41,11 +41,14 @@ public sealed class MainWindow : Window
         actions.Margin = new(8, 4, 14, 4); actions.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(actions, 1); header.Children.Add(actions);
         bool? stackedHeader = null;
+        FrameworkElement? visibleActions = null;
+        void FitWordmark() => title.Visibility = header.ActualWidth < 600 && visibleActions != null
+            ? Visibility.Collapsed : Visibility.Visible;
         header.SizeChanged += (_, _) =>
         {
             bool narrow = header.ActualWidth < 850;
             // The native title bar still identifies the app; reserve short, narrow windows for actions.
-            title.Visibility = header.ActualWidth < 600 ? Visibility.Collapsed : Visibility.Visible;
+            FitWordmark();
             if (narrow == stackedHeader) return;
             stackedHeader = narrow;
             Grid.SetColumn(actions, narrow ? 0 : 1); Grid.SetRow(actions, narrow ? 1 : 0);
@@ -53,8 +56,10 @@ public sealed class MainWindow : Window
             header.ColumnDefinitions[1].Width = narrow ? new(0) : GridLength.Auto;
         };
         root.Children.Add(host);
+        host.Register(new("orientation", "Orientation map", new OrientationWorkspace()));
         Irradiance = new(this, new(applicationServices ?? new()), systemZoneProvider, loadExampleOnFirstRun);
         host.Register(new("irradiance", "Solar Irradiance", Irradiance, Irradiance.Actions));
+        host.Select("irradiance");
         var pvService = new PvEvaluationService(IrradianceController);
         PvAutonomy = new(this, IrradianceController, new(IrradianceController, pvService), Irradiance.RecheckSourcesAsync, () => host.Select("irradiance"));
         host.Register(new("pv", "PV Autonomy", PvAutonomy, PvAutonomy.Actions));
@@ -64,12 +69,12 @@ public sealed class MainWindow : Window
         }
         IrradianceController.SourceChanged += (_, _) => RefreshAvailability(); RefreshAvailability();
         // Keep each toolbar attached after its first visit so switching tabs can reuse its visual tree.
-        FrameworkElement? visibleActions = null;
         void ShowActions(FrameworkElement? next)
         {
             if (ReferenceEquals(visibleActions, next)) return;
             if (visibleActions != null) visibleActions.Visibility = Visibility.Collapsed;
             visibleActions = next;
+            FitWordmark();
             if (next == null) return;
             if (!actions.Children.Contains(next)) actions.Children.Add(next);
             next.Visibility = Visibility.Visible;

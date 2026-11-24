@@ -2,9 +2,9 @@
 
 Windows desktop application and C# scientific libraries for estimating solar irradiance and fisheye-image shading. The authoritative repository is [ckbk123/FisheyeSolarShadeForecast](https://github.com/ckbk123/FisheyeSolarShadeForecast).
 
-## Current application — 23 November 2026
+## Current application — 24 November 2026
 
-**Preview 0.3.1** brings the Angle Studio wordmark, typography and colors to the portable Windows x64 app. Hover over a field or focus it and press **F1** for its explanation. **Help** opens the full guide in a separate window.
+**Preview 0.3.2** adds **Orientation map**, an offline 3D reference to the left of Solar Irradiance. Explore the phone, panel and sun with the same angle labels used in the study. Map controls change only the illustration. Hover over a field or focus it and press **F1** for its explanation. **Help** opens the full guide in a separate window.
 
 Solar Irradiance estimates shading from a chosen sky photo. You can import a prepared binary mask, paint and select saved mask variants, and export the results as a six-column irradiance workbook. Full scientific diagnostics are in Debug Data. Returning to a saved photo, mask and input combination restores its verified result. Phone and panel inputs measure azimuth clockwise from geographic south and tilt from horizontal. A flat phone uses a separate image-top bearing from true north. PV Autonomy evaluates a repeating daily load against the accepted shaded result and exports CSV, JSON and XLSX files. See [application usage](src/ApplicationFrontend/RUNNING.md), [architecture](docs/APPLICATION_ARCHITECTURE.md), the [mask-editor plan](docs/MASK_EDITOR_IMPLEMENTATION_PLAN.md), and the [Preview 0.1.1 source and export review](docs/SOURCE_AND_EXPORT_REVIEW_2026-10-04.md).
 
@@ -31,7 +31,7 @@ See [baseline scope and versioning workflow](docs/BASELINE.md) for the original 
 
 The **PV–battery backend and PV Autonomy workspace** are in `src/PvBatterySimulation` and `src/ApplicationFrontend/Workspaces/PvAutonomy`. They consume the accepted shaded panel irradiance and system/load settings to return hourly battery SoC, unmet load and curtailment. The workspace is explicitly evaluated after Solar Irradiance is current; its result and export remain separate from the irradiance snapshot. See [model, API and validation](src/PvBatterySimulation/README.md) and [application usage](src/ApplicationFrontend/RUNNING.md).
 
-The local Preview 0.3.1 application is in **`Deliverable/APPLICATION.exe`**, with a matching clean **`Deliverable.zip`** for sharing. These generated outputs are not Git-tracked releases. Keep the executable alongside its Example, Data and Debug Data folders; all four segmentation models and the runtime are bundled. Start with **Load example** or select your own inputs, then click **Update results**. See [application usage, imports, validation and packaging](src/ApplicationFrontend/RUNNING.md). Source and integration tests are under `src/ApplicationFrontend` and the library project folders.
+The local Preview 0.3.2 application is in **`Deliverable/APPLICATION.exe`**, with a matching clean **`Deliverable.zip`** for sharing. These generated outputs are not Git-tracked releases. Keep the executable alongside its Example, Data and Debug Data folders; all four segmentation models and the runtime are bundled. Start with **Load example** or select your own inputs, then click **Update results**. See [application usage, imports, validation and packaging](src/ApplicationFrontend/RUNNING.md). Source and integration tests are under `src/ApplicationFrontend` and the library project folders.
 
 The solar-position and fisheye shading library is in **`src/SolarPositionAndShading`**. It exports timestamp/zenith/azimuth XLSX data, computes direct and constant-isotropic diffuse shading from the existing mask/calibration contracts, and writes a separate shading workbook. See [API, defaults and integration](src/SolarPositionAndShading/README.md), [validation and performance](src/SolarPositionAndShading/VALIDATION.md), and [the 0.25° solar-radius overlay](src/SolarPositionAndShading/Validator/results/noon-20260531-radius-0.25-detail.png).
 
