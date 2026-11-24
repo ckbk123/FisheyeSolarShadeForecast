@@ -14,6 +14,8 @@ The yellow band belongs on the **north** side of the sky in the bundled May 2025
 | Panel and phone tilt | Start flat at 0° and raise the marked top | Both tops rise 28° |
 | Panel-front and lens azimuth | Measure the horizontal direction of the outward normal from south. West is +90°, east is −90°, and north is ±180°. A flat device has no outward azimuth. | Both normals face south, 0° in the equipment convention and 180° as a true bearing |
 
+Boitier specifies the outward azimuth, the tilt from horizontal, and the lens end higher than the bottom. SolarShade adds a **top heading** so a flat device still has an orientation. Its two-angle map assumes the phone top points directly uphill, with both top corners at the same height. A sideways-rolled phone can also have its lens end higher than its bottom. A saved photo with that third angle retains its roll in the projection, and the app identifies the extra roll in the pose controls.
+
 The app projects sunlight into the **phone** frame and calculates panel incidence using the **panel** normal. In the example both devices have the same pose. With a skyward lens, north at the top puts east on the left. The tilted lens points 28° south of overhead. On the oriented 3000 × 4000 photograph, the lens center is at (1530.5, 1997.8), true zenith is at (1530.5, 1602.1), and the May 15 noon Sun is at (1530.5, 1492.3). Pixel rows increase downward.
 
 ## Independent checks
