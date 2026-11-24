@@ -31,6 +31,7 @@ public sealed class EquipmentAngleExportTests
         Assert.Equal(90, angles.GetProperty("PhoneTopHeadingClockwiseFromTrueNorthDegrees").GetDouble());
         Assert.Equal(90, angles.GetProperty("PanelTopHeadingClockwiseFromTrueNorthDegrees").GetDouble());
         Assert.True(angles.GetProperty("IsVincentPhonePose").GetBoolean());
+        Assert.True(angles.GetProperty("MatchesTwoAnglePhonePose").GetBoolean());
 
         using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "export.json")));
         Assert.True(JsonElement.DeepEquals(angles, receipt.RootElement.GetProperty("EquipmentAngles")));
@@ -67,5 +68,22 @@ public sealed class EquipmentAngleExportTests
         Assert.Equal(120, downward.LensZenithFromUpDegrees);
         Assert.Contains("outside", downward.DescribePhone());
         Assert.Null(EquipmentAngleReport.From(settings with { CameraTilt = double.NaN }));
+    }
+
+    [Theory]
+    [InlineData(-28, 0, true)]
+    [InlineData(-28, 45, false)]
+    [InlineData(28, -180, true)]
+    [InlineData(0, 45, true)]
+    public void OlderReportsDeriveTwoAngleStatusFromTheirRecordedPose(double tilt, double roll, bool matches)
+    {
+        var settings = new UserSettings { BottomAzimuth = 180, CameraTilt = tilt, CameraRoll = roll };
+        var report = EquipmentAngleReport.From(settings)!;
+        var previous = JsonSerializer.SerializeToNode(report)!.AsObject();
+        Assert.True(previous.Remove(nameof(EquipmentAngleReport.MatchesTwoAnglePhonePose)));
+        var restored = previous.Deserialize<EquipmentAngleReport>()!;
+        Assert.Equal(matches, restored.MatchesTwoAnglePhonePose);
+        Assert.True(restored.IsVincentPhonePose);
+        Assert.Equal(!matches, restored.DescribeImage().Contains("sideways roll"));
     }
 }

@@ -62,7 +62,7 @@ Boitier’s convention defines **panel front azimuth** and **lens azimuth** usin
 
 **Copy panel pose to phone** aligns the two top headings and tilts once, including when the panel is flat. Subsequent edits are independent. Turning a flat panel rotates its physical edges. Turning a flat phone also rotates the photograph relative to the compass and sun path. With north at image top in an upward-looking photograph, east appears on the left. Solar azimuth uses true north as zero.
 
-Existing studies retain their stored camera and panel geometry. An older flat panel's initial top heading comes from its saved panel bearing. If that edge was never recorded in the field, choose the heading that matches the installation. Saved camera roll and nonstandard phone placements remain identifiable in the study.
+Existing studies retain their stored camera and panel geometry. An older flat panel's initial top heading comes from its saved panel bearing. If that edge was never recorded in the field, choose the heading that matches the installation. A tilted phone can have its lens end uphill and still be rolled sideways. **Saved camera roll** identifies that third angle. **Use two-angle pose** keeps the lens direction and tilt and rotates image top directly uphill, as illustrated in Orientation map. Use this only if it matches the photograph.
 
 For the LAAS Site 2 example, a panel tilted 6.8° with a front azimuth of −26° has a top heading of 334°. The flat phone’s assumed north image top corresponds to a separate phone top heading of 0°.
 

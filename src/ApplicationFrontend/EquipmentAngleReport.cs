@@ -16,6 +16,8 @@ public sealed record EquipmentAngleReport(
 {
     public double PhoneTopHeadingClockwiseFromTrueNorthDegrees { get; init; }
     public double PanelTopHeadingClockwiseFromTrueNorthDegrees { get; init; }
+    public bool MatchesTwoAnglePhonePose =>
+        EquipmentOrientation.MatchesTwoAnglePhonePose(IsVincentPhonePose, LensZenithFromUpDegrees, SourceProjectionRollDegrees);
     public string Convention => "Equipment azimuth follows the outward lens or front normal clockwise from geographic south (west +90°, east −90°). Flat planes have undefined azimuth. Top headings are clockwise from true north with the equipment laid flat.";
 
     internal static EquipmentAngleReport? From(UserSettings settings)
@@ -48,8 +50,11 @@ public sealed record EquipmentAngleReport(
         return $"Phone top {Degrees(PhoneTopHeadingClockwiseFromTrueNorthDegrees)} (flat, true N) | lens azimuth {Degrees(PhoneLensAzimuthClockwiseFromSouthDegrees)} (S = 0°) | {tilt}";
     }
 
-    internal string DescribeImage() =>
-        $"Projected image top {Degrees(ImageTopBearingClockwiseFromTrueNorthDegrees)} (true N) | source camera roll {Degrees(SourceProjectionRollDegrees)} | {PhonePlacement}";
+    internal string DescribeImage()
+    {
+        string placement = IsVincentPhonePose && !MatchesTwoAnglePhonePose ? "Uphill with sideways roll" : PhonePlacement;
+        return $"Projected image top {Degrees(ImageTopBearingClockwiseFromTrueNorthDegrees)} (true N) | source camera roll {Degrees(SourceProjectionRollDegrees)} | {placement}";
+    }
 
     internal string DescribePanel() =>
         $"Panel top {Degrees(PanelTopHeadingClockwiseFromTrueNorthDegrees)} (flat, true N) | front azimuth {Degrees(PanelFrontAzimuthClockwiseFromSouthDegrees)} (S = 0°) | tilt {Degrees(PanelTiltFromHorizontalDegrees)} from horizontal";

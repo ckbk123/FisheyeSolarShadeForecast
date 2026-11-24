@@ -151,6 +151,27 @@ public sealed class EquipmentOrientationTests
         Assert.Equal(1, oldAxis.Dot(EquipmentOrientation.ToCameraPose(settings).Axes().Z), 12);
     }
 
+    [Theory]
+    [InlineData(0, 45, true)]
+    [InlineData(-28, -360, true)]
+    [InlineData(28, 180, true)]
+    [InlineData(90, -180, true)]
+    [InlineData(-28, 45, false)]
+    [InlineData(28, 225, false)]
+    [InlineData(-90, 90, false)]
+    [InlineData(28, 0, false)]
+    public void TwoAngleStatusAgreesWithAllThreePhysicalCameraAxes(double tilt, double roll, bool matches)
+    {
+        var saved = new UserSettings { BottomAzimuth = 180, CameraTilt = tilt, CameraRoll = roll };
+        var mapped = new UserSettings { PhoneTopHeading = saved.PhoneTopHeading, PhoneInclination = saved.PhoneInclination };
+        var actual = EquipmentOrientation.ToCameraPose(saved).Axes();
+        var expected = EquipmentOrientation.ToCameraPose(mapped).Axes();
+        bool sameFrame = actual.X.Dot(expected.X) > 1 - 1e-12 &&
+            actual.Y.Dot(expected.Y) > 1 - 1e-12 && actual.Z.Dot(expected.Z) > 1 - 1e-12;
+        Assert.Equal(matches, sameFrame);
+        Assert.Equal(sameFrame, EquipmentOrientation.Describe(saved).MatchesTwoAnglePhonePose);
+    }
+
     [Fact]
     public void MountingOnHorizontalPanelCopiesItsHeadingEvenForAnOriginallyVerticalImageEdge()
     {

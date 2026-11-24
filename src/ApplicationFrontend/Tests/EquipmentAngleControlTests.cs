@@ -175,6 +175,41 @@ public sealed class EquipmentAngleControlTests
         finally { window.Close(); await window.InputsSettled; }
     });
 
+    [Fact]
+    public void UphillPhotoWithSidewaysRollStaysRolledUntilAlignedExplicitly() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        AppData.SaveSettings(fixture.Settings with { BottomAzimuth = 180, CameraTilt = -28, CameraRoll = 45 });
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(loadExampleOnFirstRun: false, applicationServices: service);
+        try
+        {
+            var controls = Descendants(window.Irradiance).ToList();
+            var heading = controls.OfType<TextBox>().Single(b => Equals(b.Tag, "PhoneTopHeading"));
+            var notice = controls.OfType<TextBlock>().Single(b => b.Text == "Saved camera roll 45°");
+            var align = controls.OfType<Button>().Single(b => Equals(b.Content, "Use two-angle pose"));
+            Assert.Equal(Visibility.Visible, notice.Visibility);
+            Assert.Equal(Visibility.Visible, align.Visibility);
+            Assert.True(heading.IsEnabled);
+            Assert.Equal("315", heading.Text);
+            window.Calculate(); await Until(() => !window.UpdatingForTest);
+            var original = window.Completed!.Settings;
+            Assert.Equal(45, original.CameraRoll);
+            var axis = EquipmentOrientation.ToCameraPose(original).Axes().Z;
+
+            align.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var settings = window.IrradianceController.Settings;
+            Assert.Equal("0", heading.Text);
+            Assert.Equal(-28, settings.CameraTilt);
+            Assert.Equal(0, settings.CameraRoll);
+            Assert.Equal(1, axis.Dot(EquipmentOrientation.ToCameraPose(settings).Axes().Z), 12);
+            Assert.Equal(Visibility.Collapsed, notice.Visibility);
+            Assert.Equal(Visibility.Collapsed, align.Visibility);
+            Assert.False(window.ExportEnabledForTest);
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
         yield return root;
