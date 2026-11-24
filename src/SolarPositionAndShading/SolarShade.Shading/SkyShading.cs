@@ -67,11 +67,13 @@ public sealed partial class SkyShadingModule
     private readonly byte[] tiles;
     private readonly int tileWidth;
     private readonly double footprintBound, fullDiskMinZ, horizonMargin;
+    private readonly Func<int, int, bool>? isObservedExtensionPixel;
+    private readonly double measuredMinZ, fullyMeasuredDiskMinZ;
     private readonly Direction capSum;
     public VisibilityEstimate Diffuse { get; }
 
     public SkyShadingModule(SkyMask mask, CalibrationResult calibration, CameraPose? pose = null,
-        ShadingOptions? options = null, ImageDisk? imageDisk = null)
+        ShadingOptions? options = null, ImageDisk? imageDisk = null, Func<int, int, bool>? isObservedExtensionPixel = null)
     {
         this.options = options ?? new();
         var o = this.options;
@@ -82,6 +84,13 @@ public sealed partial class SkyShadingModule
             mask.Width != calibration.ImageWidth || mask.Height != calibration.ImageHeight)
             throw new ArgumentException("Mask and calibration must have identical EXIF-oriented dimensions.");
         projection = new(calibration, pose, imageDisk);
+        if (calibration.LinearExtensionStartDegrees is double measured && isObservedExtensionPixel != null)
+        {
+            this.isObservedExtensionPixel = isObservedExtensionPixel;
+            measuredMinZ = Math.Cos(measured * Math.PI / 180);
+            fullyMeasuredDiskMinZ = measured < o.SolarAngularRadiusDegrees ? 2 :
+                Math.Cos((measured - o.SolarAngularRadiusDegrees) * Math.PI / 180);
+        }
         width = mask.Width; height = mask.Height;
         pixels = (byte[])mask.Pixels.Clone();
         tileWidth = (width+15)/16;
@@ -188,6 +197,7 @@ public sealed partial class SkyShadingModule
         if (s.Up <= -horizonMargin) return (0,0,0);
         var (u,v) = Basis(s);
         if(options.UseUniformRegionShortcut && s.Up>horizonMargin && s.Dot(projection.OpticalAxis)>=fullDiskMinZ &&
+            (isObservedExtensionPixel == null || s.Dot(projection.OpticalAxis) >= fullyMeasuredDiskMinZ) &&
             TryProject(s,out var px,out var py) && UniformFootprint(px,py,out var sky))
         {
             var flux=capSum.Up*s.Up+capSum.East*u.Up+capSum.North*v.Up;
@@ -199,7 +209,11 @@ public sealed partial class SkyShadingModule
             var ray = p.Up*s+p.East*u+p.North*v;
             var weight = Math.Max(0, ray.Up); // horizontal irradiance projection and horizon clipping
             total += weight;
-            if (weight > 0 && TryProject(ray, out var x, out var y)) { known += weight; visible += weight*Sky(x,y); }
+            if (weight > 0)
+            {
+                var sample = SampleDirection(ray);
+                if (sample.Known) { known += weight; visible += weight * sample.Sky; }
+            }
         }
         return (visible,known,total);
     }
@@ -262,7 +276,8 @@ public sealed partial class SkyShadingModule
         {
             double u = (i+0.5)/options.DiffuseSamples, r = Math.Sqrt(u), z = Math.Sqrt(1-u);
             var (s,c) = Math.SinCos(i*Math.PI*(3-Math.Sqrt(5)));
-            if (TryProject(new(r*s,r*c,z),out var x,out var y)) { known++; visible += Sky(x,y); }
+            var sample = SampleDirection(new(r*s,r*c,z));
+            if (sample.Known) { known++; visible += sample.Sky; }
         }
         return Estimate(visible,known,options.DiffuseSamples);
     }

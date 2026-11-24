@@ -9,8 +9,18 @@ public readonly record struct DiskMoments(Direction Visible, Direction Known, Di
 
 public sealed partial class SkyShadingModule
 {
-    internal (double Sky, bool Known) SampleDirection(Direction ray) =>
-        TryProject(ray, out var x, out var y) ? (Sky(x, y), true) : (0, false);
+    internal (double Sky, bool Known) SampleDirection(Direction ray)
+    {
+        if (!TryProject(ray, out var x, out var y)) return (0, false);
+        if (isObservedExtensionPixel != null && ray.Dot(projection.OpticalAxis) < measuredMinZ)
+        {
+            // Read the same native mask sample tested by the ring scan. Bilinear mixing here
+            // would leak manufactured padding into nearby observed pixels.
+            int ix = (int)Math.Round(x), iy = (int)Math.Round(y);
+            return isObservedExtensionPixel(ix, iy) ? (pixels[iy * width + ix] / 255d, true) : (0, false);
+        }
+        return (Sky(x, y), true);
+    }
 
     internal DiskMoments PanelMoments(Direction sun)
     {
@@ -58,11 +68,11 @@ public sealed class PanelSkyScene
     private readonly ConcurrentDictionary<Direction, DiskMoments> moments = new();
     public int CachedSolarDirections => moments.Count;
     public PanelSkyScene(SkyMask mask, CalibrationResult calibration, CameraPose pose, ImageDisk disk,
-        int diskSamples = 64, int domeSamples = 32768)
+        int diskSamples = 64, int domeSamples = 32768, Func<int, int, bool>? isObservedExtensionPixel = null)
     {
         if (domeSamples is < 64 or > 4000000) throw new ArgumentOutOfRangeException(nameof(domeSamples));
         projector = new(mask, calibration, pose, new ShadingOptions
-            { SolarAngularRadiusDegrees = .25, DiskSamples = diskSamples, DiffuseSamples = 64 }, disk);
+            { SolarAngularRadiusDegrees = .25, DiskSamples = diskSamples, DiffuseSamples = 64 }, disk, isObservedExtensionPixel);
         dome = new (Direction, double, bool)[domeSamples];
         double golden = Math.PI * (3 - Math.Sqrt(5));
         for (int i = 0; i < dome.Length; i++)

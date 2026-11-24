@@ -132,7 +132,7 @@ public static class SunPathOverlayGenerator
         ct.ThrowIfCancellationRequested();
         return new(png, projection.Width, projection.Height, vertices.AsReadOnly(),
             new(projectionMilliseconds, simplifyMilliseconds, renderMilliseconds, encodeMilliseconds, total.Elapsed.TotalMilliseconds),
-            selectedCount, projectedCount, paths.Count, displayZone.Id, timeline.Convention, options)
+            selectedCount, projectedCount, paths.Count, displayZone.Id, timeline.Convention + projection.ExtensionNote, options)
         { DatasetFingerprint = fingerprint, NightSampleCount = nightCount, UnprojectedSampleCount = unprojectedCount };
     }
 

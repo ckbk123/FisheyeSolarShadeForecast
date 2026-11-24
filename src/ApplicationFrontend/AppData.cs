@@ -46,6 +46,8 @@ public sealed partial record UserSettings
     public SkyModel Model { get; set; } = SkyModel.EfficientNetB5;
     public int Resolution { get; set; } = 1024;
     public double CoverageAngle { get; set; } // zero: use saved profile value
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaskEdgeThresholdPercent { get; set; }
     public bool CenteredDisk { get; set; }
     public int Substeps { get; set; } = 60;
     public bool Isotropic { get; set; }

@@ -26,7 +26,7 @@ public static class SunPathOverlayExporter
             result.DisplayTimeZoneId, result.GeometryConvention, result.DatasetFingerprint,
             Color = "Golden yellow (#FFD200), straight-alpha PNG", SelectedSamplesOnly = true,
             RasterCoordinateQuantizationMaximumPixels = Math.Sqrt(2) / 512,
-            Breaks = "Display-local date, source interval gaps, missing selected samples, night, and invalid/outside calibrated projection.",
+            Breaks = "Display-local date, source interval gaps, missing selected samples, night, and directions outside the effective projection.",
             Reference = "Source interval ID plus zero-based selected sample index refers to the existing solar timeline and its integration-sample diagnostic exports.",
             LineMeaning = "Display annotation only, not physical solar-disk size.",
             Artifacts = new[] { Path.GetFileName(image), Path.GetFileName(workbook) }

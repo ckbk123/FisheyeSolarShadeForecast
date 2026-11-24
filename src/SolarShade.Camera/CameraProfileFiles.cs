@@ -15,6 +15,9 @@ public sealed record CalibrationProfile(CalibrationResult Calibration, string So
 
 public static class CameraProfileFiles
 {
+    private const string TangentStart = "solarshade_linear_extension_start_degrees";
+    private const string EffectiveLimit = "solarshade_maximum_incident_angle_degrees";
+    private const string CoverageRadius = "solarshade_coverage_disk_radius_pixels";
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
 
     public static CalibrationProfile Load(string path, int width = 0, int height = 0, double? coverageOverride = null)
@@ -45,18 +48,28 @@ public static class CameraProfileFiles
                 width = (int)size[0]; height = (int)size[1];
             }
             if (width < 2 || height < 2) throw new InvalidDataException("Legacy calibration YAML needs the oriented image dimensions.");
-            if (coverageOverride is null or <= 0)
+            double? tangentStart = map.TryGetValue(TangentStart, out var start) ? Convert.ToDouble(start, CultureInfo.InvariantCulture) : null;
+            double? fileLimit = map.TryGetValue(EffectiveLimit, out var cap) ? Convert.ToDouble(cap, CultureInfo.InvariantCulture) : null;
+            if (tangentStart.HasValue != fileLimit.HasValue) throw new InvalidDataException("The projection extension needs both a measured start and an effective limit.");
+            double? coverage = fileLimit ?? coverageOverride;
+            if (coverage is null or <= 0)
                 throw new ArgumentException("Supply the explicitly validated maximum incident angle when loading YAML.", nameof(coverageOverride));
             var principal = Numbers("principal_point");
             var polynomial = Numbers("poly_incident_angle_to_radius");
             if (principal.Length != 2) throw new InvalidDataException("Principal point needs two values.");
             double radius = Math.Min(Math.Min(principal[0], width - 1 - principal[0]), Math.Min(principal[1], height - 1 - principal[1]));
+            if (tangentStart.HasValue && map.TryGetValue(CoverageRadius, out var savedRadius))
+                radius = Convert.ToDouble(savedRadius, CultureInfo.InvariantCulture);
             profile = new(new(2, CameraModelKind.OmniCalibIncidentAnglePolynomial, width, height, principal, polynomial,
-                coverageOverride.Value, radius, null, 0, [], File.GetLastWriteTimeUtc(path),
-                "Native OmniCalib YAML; caller-provided angular coverage"), path, "Caller-provided maximum incident angle; not inferred from lens advertising or polynomial extrapolation.") { NativeYaml = yaml };
+                coverage.Value, radius, null, 0, [], File.GetLastWriteTimeUtc(path),
+                tangentStart.HasValue ? "Native OmniCalib YAML with SolarShade linear extension" : "Native OmniCalib YAML; caller-provided angular coverage")
+                { LinearExtensionStartDegrees = tangentStart }, path,
+                tangentStart.HasValue ? "Saved effective limit with a linear continuation of the measured radial map." :
+                "Caller-provided maximum incident angle; not inferred from lens advertising or polynomial extrapolation.") { NativeYaml = yaml };
         }
         if (coverageOverride is > 0)
-            profile = profile with { Calibration = profile.Calibration with { MaximumIncidentAngleDegrees = coverageOverride.Value },
+            profile = profile with { Calibration = profile.Calibration with { MaximumIncidentAngleDegrees = coverageOverride.Value,
+                LinearExtensionStartDegrees = coverageOverride <= profile.Calibration.LinearExtensionStartDegrees ? null : profile.Calibration.LinearExtensionStartDegrees },
                 CoverageNote = "Caller override of maximum incident angle. " + profile.CoverageNote };
         Validate(profile.Calibration, width, height);
         return profile;
@@ -74,6 +87,11 @@ public static class CameraProfileFiles
             !double.IsFinite(calibration.MaximumIncidentAngleDegrees) || calibration.MaximumIncidentAngleDegrees is <= 0 or > 180 ||
             !double.IsFinite(calibration.ImageCircleRadiusPixels) || calibration.ImageCircleRadiusPixels <= 0)
             throw new InvalidDataException("Invalid effective camera calibration.");
+        if (calibration.LinearExtensionStartDegrees.HasValue)
+        {
+            try { _ = new CalibrationRadialMap(calibration); }
+            catch (ArgumentException e) { throw new InvalidDataException("Invalid tangent extension in camera calibration.", e); }
+        }
     }
 
     /// <summary>Exports the same effective profile consumed by projection, retaining full native YAML when available.</summary>
@@ -90,6 +108,18 @@ public static class CameraProfileFiles
             "principal_point: " + Numbers(c.PrincipalPoint) + "\n" +
             "poly_incident_angle_to_radius: " + Numbers(c.IncidentAngleToRadiusPolynomial) + "\n" +
             $"image_size: [{c.ImageWidth}, {c.ImageHeight}]\n";
+        if (c.LinearExtensionStartDegrees.HasValue || yaml.Contains(TangentStart, StringComparison.Ordinal))
+        {
+            var fields = new DeserializerBuilder().Build().Deserialize<Dictionary<string, object>>(yaml);
+            if (c.LinearExtensionStartDegrees is double anchor)
+            {
+                fields[TangentStart] = anchor;
+                fields[EffectiveLimit] = c.MaximumIncidentAngleDegrees;
+                fields[CoverageRadius] = c.ImageCircleRadiusPixels;
+            }
+            else { fields.Remove(TangentStart); fields.Remove(EffectiveLimit); fields.Remove(CoverageRadius); }
+            yaml = new SerializerBuilder().Build().Serialize(fields);
+        }
         WriteAtomic(yamlPath, yaml, cancellationToken);
         WriteAtomic(jsonPath, JsonSerializer.Serialize(profile, Json), cancellationToken);
         return Array.AsReadOnly(new[] { yamlPath, jsonPath });

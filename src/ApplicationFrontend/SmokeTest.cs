@@ -88,6 +88,7 @@ public static class SmokeTest
                 if (!window.CardinalsVisibleForTest || !ReferenceEquals(first.Cardinals, window.CardinalsForTest))
                     throw new InvalidOperationException("Cardinal display toggle replaced or lost the cached overlay.");
                 await VerifySkyPhoto(window, originalPhoto, first, output);
+                if (startsExample) await VerifyMaskEdge(window, first, output);
                 long toggleRevision = window.RevisionForTest;
                 window.SetSunPathVisibleForTest(false);
                 if (window.SunPathVisibleForTest || AppData.ReadSettings()?.ShowSunPath != false)
@@ -326,6 +327,51 @@ public static class SmokeTest
             throw new InvalidOperationException("Inspecting the photo changed the accepted study.");
         AppData.Write(Path.Combine(output, "sky-preview-result.json"), new { Passed = true,
             NativePhotoZoomed = true, PanAndFit = true, CardinalAndFovVisible = true, FieldOfView = window.Irradiance.FieldOfViewTextForTest });
+    }
+
+    private static async Task VerifyMaskEdge(MainWindow window, Evaluation study, string output)
+    {
+        long revision = window.RevisionForTest;
+        var state = window.UpdateStateForTest;
+        var open = Find<Button>(window, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "EstimateMaskEdge");
+        if (!open.IsEnabled) throw new InvalidOperationException("The example's mask edge experiment is unavailable.");
+        open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var dialog = window.OwnedWindows.OfType<MaskEdgeWindow>().Single();
+        try
+        {
+            await Until(() => dialog.IsLoaded, 10); await dialog.Analysis;
+            var threshold = Find<ComboBox>(dialog, _ => true);
+            var result = Find<TextBlock>(dialog, t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "MaskEdgeResult");
+            var sky = Find<TextBlock>(dialog, t => System.Windows.Automation.AutomationProperties.GetAutomationId(t) == "MaskEdgeOuterSky");
+            if (!sky.Text.StartsWith("Open sky sampled beyond calibration") || !Equals(threshold.SelectedItem, 100) ||
+                !result.Text.StartsWith("180° scan cap"))
+                throw new InvalidOperationException("The example's fully black ring depends on clipped pixels. " + result.Text);
+            Capture(dialog, Path.Combine(output, "mask-edge-example-100.png"));
+            threshold.SelectedItem = 95;
+            if (!result.Text.StartsWith("180° scan cap"))
+                throw new InvalidOperationException("The example's sampled mask cannot verify a dark band through 180°. " + result.Text);
+            Capture(dialog, Path.Combine(output, "mask-edge-example-95.png"));
+        }
+        finally { dialog.Close(); }
+        using var comparison = new AppServices(Path.Combine(output, "mask-edge-debug"));
+        var extended = await comparison.Evaluate(study.Settings with { MaskEdgeThresholdPercent = 100 },
+            false, _ => { }, null, CancellationToken.None);
+        if (extended.MaskEdge is not { BlackPercent: 100, EffectiveFullDegrees: 180 } applied ||
+            Math.Abs(applied.MeasuredFullDegrees - 132.86) > .01 ||
+            !study.Run.Rows.Select(r => r.IntervalId).SequenceEqual(extended.Run.Rows.Select(r => r.IntervalId)) ||
+            Math.Abs(study.Run.BeforeEnergy - extended.Run.BeforeEnergy) > 1e-8 ||
+            study.Run.AfterEnergy is not double before || extended.Run.AfterEnergy is not double after || after <= before)
+            throw new InvalidOperationException("The example's capped mask calculation did not preserve the baseline and add irradiation from visible outer sky.");
+        AppData.Write(Path.Combine(output, "mask-edge-comparison.json"), new
+        {
+            Rows = study.Run.Rows.Count, applied.MeasuredFullDegrees, applied.EffectiveFullDegrees, applied.BlackPercent,
+            Measured = new { study.Run.BeforeEnergy, study.Run.AfterEnergy, study.Run.SkyCoverage },
+            Extended = new { extended.Run.BeforeEnergy, extended.Run.AfterEnergy, extended.Run.SkyCoverage },
+            AddedKWhPerSquareMetre = after - before, applied.ObservedTerminalBand, applied.Explanation
+        });
+        if (window.Completed != study || window.RevisionForTest != revision ||
+            window.UpdateStateForTest != state || !window.ExportEnabledForTest)
+            throw new InvalidOperationException("The mask edge experiment changed the accepted study.");
     }
 
     private static async Task VerifyPv(MainWindow window, string output)

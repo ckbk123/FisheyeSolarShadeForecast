@@ -56,6 +56,40 @@ public sealed class PanelCorrectionTests
         Assert.All(missing.Rows, r => Assert.Null(r.AfterTotal)); Assert.Null(missing.AfterEnergy); Assert.Null(missing.LossPercent);
     }
 
+    [Fact]
+    public void ATangentProjectedOuterSunContributesOnlyThroughOpenMaskPixels()
+    {
+        const double dni = 600, zenith = 75, tilt = 30, azimuth = 90;
+        double radians = Math.PI / 180;
+        var data = IrradianceDatasets.FromSamples([new(Noon, dni * Math.Cos(zenith * radians), 0)],
+            TimeSpan.FromHours(1), TimestampLabel.Start, "fixture", "UTC", "start");
+        var sample = new SolarGeometrySample(Noon, zenith, zenith, azimuth, 1);
+        var timeline = new SolarTimeline(data, [new(data.Intervals[0], sample, [sample], [sample])], "Synthetic solar angles");
+        var transposed = TranspositionModule.ComputePrepared(timeline, new(tilt, azimuth));
+        var measured = new CalibrationResult(2, CameraModelKind.OmniCalibIncidentAnglePolynomial,
+            501, 501, [250, 250], [0, 160, -58], 60, 250, null, 0, [], DateTimeOffset.UnixEpoch, "Synthetic");
+        var effective = CalibrationRadialMap.ExtendTo(measured, 90);
+        double join = 60 * radians, r = 160 * join - 58 * join * join + (160 - 116 * join) * (zenith - 60) * radians;
+        var mask = new SkyMask(501, 501, new byte[501 * 501]);
+        PanelRun Apply(CalibrationResult profile) => ShadingCorrectionModule.ApplyToPanel(transposed,
+            new PanelSkyScene(mask, profile, new(), new(250, 250, 250), domeSamples: 128));
+        var blocked = Apply(effective);
+        // A small clear patch around the independent tangent prediction. The unconstrained polynomial misses it.
+        for (int y = 248; y <= 252; y++)
+        for (int x = (int)Math.Ceiling(250 - r - 2); x <= Math.Floor(250 - r + 2); x++)
+            mask.Pixels[y * 501 + x] = 255;
+        var open = Apply(effective);
+        var unknown = Apply(measured);
+        double expected = dni * Math.Cos((zenith - tilt) * radians);
+        Assert.Equal(expected, open.Rows[0].BeforeDirect, 9);
+        Assert.Equal(expected, open.Rows[0].AfterDirect!.Value, 9);
+        Assert.Equal(0, blocked.Rows[0].AfterDirect); Assert.Equal(1, blocked.Visibility[0].Direct.Known, 10);
+        Assert.Equal(0, unknown.Rows[0].AfterDirect); Assert.Equal(0, unknown.Visibility[0].Direct.Known);
+        var path = SunPathOverlayGenerator.Generate(timeline, new CalibratedSkyProjection(effective), TimeZoneInfo.Utc);
+        var vertex = Assert.Single(path.Vertices);
+        Assert.Equal(250 - r, vertex.PixelX, 10); Assert.Equal(250, vertex.PixelY, 10);
+    }
+
     [Fact] public void HalfSkyUsesReceiverOrientationAndReusesSolarMoments()
     {
         var scene = Scene(true, true);
