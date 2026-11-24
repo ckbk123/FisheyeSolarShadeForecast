@@ -80,7 +80,8 @@ internal static class SummaryPdf
         y += 61;
         Section("01 / Site and irradiance");
         Row("Location / height", $"{N(s.Latitude)}°, {N(s.Longitude)}°  |  {N(s.Elevation)} m");
-        Row("Calendar / zone", $"{s.Start:yyyy-MM-dd} to {s.End:yyyy-MM-dd}  |  {s.Zone} ({(s.UseSystemTimeZone ? "system at update" : "manual")})", 2);
+        var period = snapshot.StudyPeriod ?? StudyPeriod.Calendar(s);
+        Row("Study period / zone", $"{period.Describe(TimeZoneSelection.Resolve(s.Zone))}  |  {s.Zone} ({(s.UseSystemTimeZone ? "system at update" : "manual")})", 2);
         Row("Data source", Value(r, "Source"), 2);
         Row("Cadence / labels", (r.GetProperty("NativeCadence").ValueKind == JsonValueKind.Null ? "Variable / explicit intervals" : Value(r, "NativeCadence")) + " | " + Value(r, "TimestampConvention"), 2);
         string fetched = snapshot.Inputs.TryGetValue("source-dataset", out var source) ? Value(source, "FetchedUtc") : "Not recorded";

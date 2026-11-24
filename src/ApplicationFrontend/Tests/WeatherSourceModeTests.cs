@@ -74,16 +74,21 @@ public sealed class WeatherSourceModeTests
             var controls = Descendants(owner.Irradiance).ToArray();
             var mode = Assert.Single(controls.OfType<ToggleButton>(), c => AutomationProperties.GetAutomationId(c) == "WeatherSourceMode");
             var provider = Assert.Single(controls.OfType<ComboBox>(), c => AutomationProperties.GetName(c) == "Weather data source");
-            var choose = Assert.Single(controls.OfType<Button>(), c => Equals(c.Content, "Choose XLSX / CSV file"));
+            var choose = Assert.Single(controls.OfType<Button>(), c => Equals(c.Content, "Upload weather file…"));
+            var template = Assert.Single(controls.OfType<Button>(), c => Equals(c.Content, "Download template…"));
+            Assert.Same(choose.Parent, template.Parent);
+            var importControls = (FrameworkElement)((FrameworkElement)choose.Parent).Parent;
+            foreach (string property in new[] { "Start", "End" })
+                Assert.Same(provider.Parent, controls.OfType<TextBox>().Single(t => Equals(t.Tag, property)).Parent);
             var update = Assert.Single(controls.OfType<Button>(), c => AutomationProperties.GetAutomationId(c) == "UpdateResults");
             var refresh = Assert.Single(controls.OfType<Button>(), c => AutomationProperties.GetAutomationId(c) == "RefreshData");
             Assert.True(mode.IsChecked); Assert.Equal("Use Data Services", mode.Content); Assert.Equal(2, provider.Items.Count);
             Assert.Equal(Visibility.Visible, ((FrameworkElement)provider.Parent).Visibility);
-            Assert.Equal(Visibility.Collapsed, ((FrameworkElement)choose.Parent).Visibility);
+            Assert.Equal(Visibility.Collapsed, importControls.Visibility);
             mode.IsChecked = false; await owner.InputsSettled;
             Assert.Equal("Import Own Excel", mode.Content); Assert.False(update.IsEnabled); Assert.False(refresh.IsEnabled);
             Assert.Equal(Visibility.Collapsed, ((FrameworkElement)provider.Parent).Visibility);
-            Assert.Equal(Visibility.Visible, ((FrameworkElement)choose.Parent).Visibility);
+            Assert.Equal(Visibility.Visible, importControls.Visibility);
             owner.Calculate(); await owner.InputsSettled;
             Assert.Null(owner.Completed); Assert.Equal(0, fixture.Runs); Assert.Empty(owner.IrradianceController.Settings.ImportPath);
             Assert.False(AppData.ReadSettings()!.UseDataServices);

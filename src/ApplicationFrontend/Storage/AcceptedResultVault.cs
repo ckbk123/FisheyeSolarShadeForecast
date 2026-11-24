@@ -19,17 +19,19 @@ internal static class AcceptedResultVault
     internal static string Key(UserSettings s)
     {
         var sources = InputDependencies.Capture(s);
+        bool services = WeatherSourceSelection.UsesServices(s);
         return AppData.Key(new
         {
             Software = AppServices.SoftwareFingerprint,
-            UseDataServices = WeatherSourceSelection.UsesServices(s),
+            UseDataServices = services,
             Photo = sources.Image.Content, Profile = sources.Profile.Content, Weather = sources.Weather.Content,
             Mask = sources.EditedMask.Content, MaskMetadata = sources.EditedMetadata.Content, s.SelectedMaskId,
             MaskAncestor = sources.MaskAncestor.Content,
             s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle,
             s.BottomAzimuth, s.CameraTilt, s.CameraRoll, s.PanelTilt, s.PanelAzimuth,
-            s.Latitude, s.Longitude, s.Elevation, s.Start, s.End, s.Zone,
-            s.Provider, s.ImportWindow, s.ImportIntervalMinutes, s.Substeps, s.Isotropic
+            s.Latitude, s.Longitude, s.Elevation, Start = services ? s.Start : (DateTime?)null,
+            End = services ? s.End : (DateTime?)null, s.Zone,
+            Provider = services ? s.Provider : (int?)null, s.ImportWindow, s.ImportIntervalMinutes, s.Substeps, s.Isotropic
         });
     }
     private static string Folder(string key) => Path.Combine(AppData.PathFor("AcceptedResults"), key);

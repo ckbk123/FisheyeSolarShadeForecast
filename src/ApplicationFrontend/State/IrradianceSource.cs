@@ -19,9 +19,8 @@ public sealed class IrradianceSnapshot
     {
         Evaluation = evaluation; settings = evaluation.Settings with { };
         Run = evaluation.Run with { Rows = Array.AsReadOnly(evaluation.Run.Rows.ToArray()) };
-        var zone = TimeZoneSelection.Resolve(settings.Zone);
-        Start = IrradianceDatasets.Boundary(settings.Start.Date, zone);
-        End = IrradianceDatasets.Boundary(settings.End.Date.AddDays(1), zone);
+        Start = Run.Rows[0].Start;
+        End = Run.Rows[^1].End;
         Id = evaluation.ManagedDebugRun!.Id;
         ContentFingerprint = AppData.Key(new { Run.Rows, Run.Model, Run.Panel, Start, End, TimeZoneId });
     }
@@ -47,18 +46,16 @@ public static class IrradianceReadiness
     {
         try
         {
-            ValidatePanel(evaluation.Run, evaluation.Settings);
+            ValidatePanel(evaluation.Run, StudyPeriod.FromSource(evaluation.Settings, evaluation.Raw));
             if (evaluation.Mask == null) return new(null, "A complete shaded result requires a sky mask.");
             return new(new(evaluation), "");
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidDataException or TimeZoneNotFoundException or InvalidTimeZoneException)
         { return new(null, ex.Message); }
     }
-    internal static void ValidatePanel(PanelRun run, UserSettings settings)
+    internal static void ValidatePanel(PanelRun run, StudyPeriod period)
     {
-        var zone = TimeZoneSelection.Resolve(settings.Zone);
-        var first = IrradianceDatasets.Boundary(settings.Start.Date, zone);
-        var end = IrradianceDatasets.Boundary(settings.End.Date.AddDays(1), zone);
+        var (first, end) = period;
         if (run.Rows.Count == 0 || run.Rows[0]?.Start != first || run.Rows[^1]?.End != end)
             throw new InvalidDataException("Shaded irradiance must cover the entire selected study period.");
         var ids = new HashSet<string>(StringComparer.Ordinal);
