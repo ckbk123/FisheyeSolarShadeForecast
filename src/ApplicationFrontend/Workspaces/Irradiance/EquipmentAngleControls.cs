@@ -7,10 +7,9 @@ namespace SolarShade.Desktop;
 
 public sealed partial class IrradianceWorkspace
 {
-    private const string HeadingCompass = "N 0°  ·  E 90°  ·  S 180°  ·  W 270°";
+    private const string PhoneHeadingHelp = "With the phone flat, measure clockwise from true north toward the lens end (0–360°). See Orientation map.";
+    private const string PanelHeadingHelp = "With the panel flat and face up, measure clockwise from true north toward its top edge (0–360°). See Orientation map.";
     private readonly Dictionary<string, Slider> angleSliders = new();
-    private readonly TextBlock phonePoseInfo = Label("", 12);
-    private readonly TextBlock panelPoseInfo = Label("", 11);
     private Button useUphillPlacement = null!;
     private Button placePhoneOnPanel = null!;
     private UserSettings? phoneTiltEditOrigin;
@@ -18,13 +17,9 @@ public sealed partial class IrradianceWorkspace
     private void AddPhoneControls(Panel parent)
     {
         Section(parent, "Camera pose");
-        parent.Children.Add(Label(HeadingCompass, 11));
-        AddAngleField(parent, "Phone tilt from horizontal, °", nameof(UserSettings.PhoneInclination),
-            "Raise the lens end uphill. At 0° the phone is flat with the lens pointing up. At 90° the lens points toward the horizon.");
-        AddAngleField(parent, "Phone top heading, ° clockwise from true north", nameof(UserSettings.PhoneTopHeading),
-            "Lay the phone flat with the lens up. Measure the compass direction from the phone’s center toward its lens end. Keep this heading as you raise that end, even to vertical. A flat phone with its image top north shows east on the left.");
-        StudioTheme.Help(phonePoseInfo, "The horizontal projection of the outward lens axis gives its azimuth. South is 0°, west +90°, north ±180° and east −90°. With the lens pointing straight up its azimuth is undefined.");
-        parent.Children.Add(phonePoseInfo);
+        AddAngleField(parent, "Phone tilt", nameof(UserSettings.PhoneInclination),
+            "Raise the lens end from 0° (flat) to 90° (vertical). See Orientation map.");
+        AddAngleField(parent, "Phone top heading", nameof(UserSettings.PhoneTopHeading), PhoneHeadingHelp);
         useUphillPlacement = Button("Use lens-end-uphill placement", () =>
         {
             EquipmentOrientation.UseUphillPlacement(settings);
@@ -36,20 +31,16 @@ public sealed partial class IrradianceWorkspace
             EquipmentOrientation.PlacePhoneOnPanel(settings);
             ApplyPhonePlacement();
         });
-        StudioTheme.Help(placePhoneOnPanel, "Copy the panel’s tilt and top heading to the phone once. Place the phone lens-out with its lens end toward the marked panel top. The tops also align when both devices are flat.");
+        StudioTheme.Help(placePhoneOnPanel, "Copy the panel’s current tilt and top heading to the phone.");
         parent.Children.Add(placePhoneOnPanel);
     }
 
     private void AddPanelControls(Panel parent)
     {
         Section(parent, "Panel installation");
-        parent.Children.Add(Label(HeadingCompass, 11));
-        AddAngleField(parent, "Panel tilt from horizontal, °", nameof(UserSettings.PanelTilt),
-            "Measure the angle between the panel surface and horizontal. Enter 0° for a flat panel or 90° for a vertical panel.", 0, 90);
-        AddAngleField(parent, "Panel top heading, ° clockwise from true north", nameof(UserSettings.PanelTopHeading),
-            "With the solar-cell face up and the panel flat, measure from the center toward the marked top edge. Raise that edge for tilt and keep the same heading all the way to vertical. A south-facing tilted panel has a north top heading (0°).", 0, 360);
-        StudioTheme.Help(panelPoseInfo, "The horizontal projection of the outward solar-cell normal gives its azimuth. South is 0°, west +90°, north ±180° and east −90°. On a flat panel the front points straight up and its azimuth is undefined.");
-        parent.Children.Add(panelPoseInfo);
+        AddAngleField(parent, "Panel tilt", nameof(UserSettings.PanelTilt),
+            "Raise the top edge from 0° (flat) to 90° (vertical). See Orientation map.", 0, 90);
+        AddAngleField(parent, "Panel top heading", nameof(UserSettings.PanelTopHeading), PanelHeadingHelp, 0, 360);
     }
 
     private void AddAngleField(Panel parent, string label, string property, string help, double? minimum = null, double? maximum = null)
@@ -121,15 +112,17 @@ public sealed partial class IrradianceWorkspace
                     : "Use lens-end-uphill placement to set the image top uphill.";
                 if (pose.PhoneTilt == 180)
                     reset += $" At nadir the facing azimuth is undefined. The new horizon pose will face {EquipmentOrientation.FromNorth(settings.BottomAzimuth):0.##}° from south.";
-                phonePoseInfo.Text = $"{lens}\nSaved pose · {pose.PhonePlacement}. Its original orientation is in use. {reset}";
+                StudioTheme.Help(useUphillPlacement, $"Saved pose · {pose.PhonePlacement}. {reset}");
             }
-            else
-                phonePoseInfo.Text = settings.CameraRoll != 0 && pose.ImageTopBearing is { } top
-                    ? $"{lens}\nProjected image top {top:0.##}° from true north · saved roll {settings.CameraRoll:0.##}°"
-                    : lens;
-            panelPoseInfo.Text = validPanelBearing
+            if (settings.CameraRoll != 0 && pose.ImageTopBearing is { } top)
+                lens += $"\nProjected image top {top:0.##}° from true north · saved roll {settings.CameraRoll:0.##}°";
+            StudioTheme.Help(fields[nameof(UserSettings.PhoneTopHeading)], $"{PhoneHeadingHelp}\n{lens}");
+            string panelAzimuth = validPanelBearing
                 ? AzimuthReadout("Panel front azimuth", pose.PanelAzimuth, pose.PanelTilt == 0)
                 : "Enter the panel top heading.";
+            string panelHelp = $"{PanelHeadingHelp}\n{panelAzimuth}";
+            StudioTheme.Help(fields[nameof(UserSettings.PanelTopHeading)], panelHelp);
+            StudioTheme.Help(angleSliders[nameof(UserSettings.PanelTopHeading)], panelHelp);
         }
         finally { loading = wasLoading; }
 
