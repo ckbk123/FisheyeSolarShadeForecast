@@ -10,7 +10,7 @@ public class IntervalDatasetTests
         string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid()+".xlsx");
         try
         {
-            var data = IrradianceDatasets.FromSamples([new(Noon, 500.123456789, 100.987654321),new(Noon.AddMinutes(minutes), 10, 20)],
+            var data = IrradianceDatasets.FromSamples([new(Noon, 500.123456789, 100.987654321) { GlobalHorizontal = 601.1 },new(Noon.AddMinutes(minutes), 10, 20)],
                 TimeSpan.FromMinutes(minutes), TimestampLabel.End, "fixture", "UTC", "interval end") with { Latitude=10.8, Longitude=106.7 };
             data = IrradianceDatasets.Select(data, Noon.AddMinutes(-minutes/2.0), Noon.AddMinutes(minutes));
             var exported = IrradianceDatasetFiles.Export(data, path);

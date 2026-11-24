@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Xml.Linq;
 using SolarShade.Desktop;
+using SolarShade.Irradiance;
 using SolarShade.ShadingCorrection;
 using Xunit;
 using static ManualUpdateTests;
@@ -99,6 +100,92 @@ public sealed class IrradianceDataExportTests
         string parent = Path.Combine(fixture.Root, "exports");
         Assert.Throws<ArgumentException>(() => AppServices.Export(result, parent, new DataExportOptions(false)));
         Assert.False(Directory.Exists(parent));
+    }
+
+    [Theory]
+    [InlineData(false, TimestampLabel.End)]
+    [InlineData(true, TimestampLabel.Start)]
+    public async Task SourceBoundsAlignNasaAndOpenMeteoRegardlessOfTheirLabelsAndStudyClipping(bool includePanel, TimestampLabel label)
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var firstEnd = new DateTimeOffset(2025, 5, 14, 18, 0, 0, TimeSpan.Zero).ToOffset(TimeSpan.FromHours(2));
+        var intervals = Enumerable.Range(0, 28).Select(i =>
+        {
+            var end = firstEnd.AddHours(i);
+            double diffuse = end.Hour is >= 4 and <= 17 ? 100 : 0;
+            var start = end.AddHours(-1);
+            return new IrradianceInterval($"weather-{i}", label == TimestampLabel.End ? end : start, start, end, start, end, 0, diffuse)
+            { GlobalHorizontal = i == 2 ? null : diffuse > 0 ? diffuse + i * 0.01 : 0 };
+        }).ToArray();
+        string source = label == TimestampLabel.End ? "OpenMeteo" : "NasaPower";
+        var weather = new IrradianceDataset(intervals, source, "UTC", $"Synthetic {label}-labeled hourly mean",
+            label, TimeSpan.FromHours(1));
+        string input = Path.Combine(fixture.Root, "source.xlsx");
+        IrradianceDatasetFiles.Export(weather, input);
+        var settings = fixture.Settings with { ImportPath = input, Zone = "India Standard Time" };
+        var result = await Calculate(service, settings);
+        // The selected local day clips both boundary hours; the last source label falls on the following local day.
+        Assert.Equal(25, result.Run.Rows.Count);
+        Assert.Equal(TimeSpan.FromMinutes(30), result.Run.Rows[0].End - result.Run.Rows[0].Start);
+        Assert.Equal(TimeSpan.FromMinutes(30), result.Run.Rows[^1].End - result.Run.Rows[^1].Start);
+        var fields = IrradianceFields.GlobalHorizontal | (includePanel ? IrradianceFields.ShadedTotal : IrradianceFields.None);
+        var modified = result with { Raw = result.Raw with { Intervals = [], Source = "untrusted" } };
+        string output = AppServices.Export(modified, fixture.Root, new(Fields: fields, SourceIntervalBounds: true));
+        using var workbook = ZipFile.OpenRead(Path.Combine(output, "irradiance.xlsx"));
+        var table = Part(workbook, "xl/worksheets/sheet1.xml").Descendants(Spreadsheet + "row").ToArray();
+        Assert.Equal(result.Run.Rows.Count + 1, table.Length);
+        var headers = table[0].Descendants(Spreadsheet + "t").Select(t => t.Value).ToArray();
+        Assert.Equal(includePanel ? ["Timeseries", "Source interval start", "Source interval end", "Final total (W/m²)", "Source GHI (W/m²)"] :
+            new[] { "Timeseries", "Source interval start", "Source interval end", "Source GHI (W/m²)" }, headers);
+        for (int i = 0; i < result.Run.Rows.Count; i++)
+        {
+            var original = intervals[i + 1];
+            Assert.Equal(original.Timestamp.ToString("O", CultureInfo.InvariantCulture), Cell(table[i + 1], 'A'));
+            Assert.Equal(original.SourceStart.ToString("O", CultureInfo.InvariantCulture), Cell(table[i + 1], 'B'));
+            Assert.Equal(original.SourceEnd.ToString("O", CultureInfo.InvariantCulture), Cell(table[i + 1], 'C'));
+            Assert.Equal(original.GlobalHorizontal, Number(table[i + 1], includePanel ? 'E' : 'D'));
+        }
+        var metadata = Part(workbook, "xl/worksheets/sheet2.xml").Root!.Value;
+        Assert.Contains(weather.Source, metadata); Assert.Contains(weather.TimestampConvention, metadata);
+        Assert.Contains(label.ToString(), metadata);
+        using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "export.json")));
+        Assert.Equal(weather.Source, receipt.RootElement.GetProperty("WeatherSource").GetString());
+        Assert.Equal(AppData.FileKey(Path.Combine(fixture.Debug, "03-irradiance/horizontal-irradiance.xlsx")),
+            receipt.RootElement.GetProperty("WeatherArtifactSha256").GetString());
+        // A results workbook with GHI in column B cannot supply the BHI required by weather import.
+        string mixed = AppServices.Export(modified, fixture.Root, new(Fields: IrradianceFields.GlobalHorizontal | IrradianceFields.DirectHorizontal));
+        Assert.Throws<InvalidDataException>(() => IrradianceDatasetFiles.Import(Path.Combine(mixed, "irradiance.xlsx"),
+            TimeZoneInfo.Utc, TimeSpan.FromHours(1), label));
+
+        // Equal lengths and timestamps alone would accept a different interval identity.
+        var mismatched = weather with { Intervals = intervals.Select(r => r with { Id = r.Id + "-other" }).ToArray() };
+        using var panel = JsonDocument.Parse(File.ReadAllText(Path.Combine(fixture.Debug, "06-shading/panel-results.json")));
+        string bad = Path.Combine(fixture.Root, "mismatch.xlsx");
+        Assert.Throws<InvalidOperationException>(() => IrradianceDataExport.WriteWorkbook(bad, panel.RootElement,
+            result.ManagedDebugRun!.ExportState(), new(Fields: fields), mismatched));
+        Assert.False(File.Exists(bad));
+    }
+
+    [Fact]
+    public async Task HistoricalComponentsRemainExportableAndDoNotMasqueradeAsOriginalGhi()
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var result = await Calculate(service, fixture.Settings);
+        var failure = Assert.Throws<InvalidOperationException>(() => AppServices.Export(result, fixture.Root,
+            new(Fields: IrradianceFields.GlobalHorizontal)));
+        Assert.Contains("no original GHI", failure.Message);
+        Assert.Empty(Directory.GetDirectories(fixture.Root, "scenario-*"));
+        Assert.Empty(Directory.GetDirectories(fixture.Root, ".solarshade-export-*"));
+        string output = AppServices.Export(result, fixture.Root,
+            new(Fields: IrradianceFields.DirectHorizontal | IrradianceFields.DiffuseHorizontal));
+        using var workbook = ZipFile.OpenRead(Path.Combine(output, "irradiance.xlsx"));
+        var table = Part(workbook, "xl/worksheets/sheet1.xml").Descendants(Spreadsheet + "row").ToArray();
+        Assert.Equal(new[] { "Timeseries", "Direct horizontal (W/m²)", "Diffuse horizontal (W/m²)" },
+            table[0].Descendants(Spreadsheet + "t").Select(t => t.Value));
+        Assert.All(table.Skip(1), row => { Assert.Equal(0, Number(row, 'B')); Assert.Equal(100, Number(row, 'C')); });
+        var imported = IrradianceDatasetFiles.Import(Path.Combine(output, "irradiance.xlsx"), TimeZoneInfo.Utc,
+            TimeSpan.FromHours(1), TimestampLabel.Start);
+        Assert.All(imported.Intervals, row => { Assert.Equal(0, row.DirectHorizontal); Assert.Equal(100, row.DiffuseHorizontal); });
     }
 
     [Theory]

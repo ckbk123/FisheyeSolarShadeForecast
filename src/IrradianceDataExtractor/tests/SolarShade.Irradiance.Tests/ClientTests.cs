@@ -26,6 +26,7 @@ public sealed class ClientTests
     private static object Meteo(HttpRequestMessage message, string? defect = null)
     {
         var q = Query(message.RequestUri!); Assert.Equal("GMT", q["timezone"]); Assert.Equal("unixtime", q["timeformat"]);
+        Assert.Contains("shortwave_radiation", q["hourly"].Split(','));
         var a = DateTimeOffset.Parse(q["start_date"] + "T00:00:00Z", CultureInfo.InvariantCulture);
         var z = DateTimeOffset.Parse(q["end_date"] + "T23:00:00Z", CultureInfo.InvariantCulture);
         var times = Enumerable.Range(0, (int)(z - a).TotalHours + 1).Select(i => a.AddHours(i).ToUnixTimeSeconds()).ToList();
@@ -35,8 +36,9 @@ public sealed class ClientTests
         var direct = times.Select(_ => (double?)123.456789).ToArray();
         if (defect == "null") direct[12] = null;
         if (defect == "negative") direct[12] = -999;
-        return new { utc_offset_seconds = 0, hourly_units = new { direct_radiation = defect == "units" ? "kWh/m²" : "W/m²", diffuse_radiation = "W/m²" },
-            hourly = new { time = times, direct_radiation = direct, diffuse_radiation = times.Select(_ => 45.6).ToArray() } };
+        var global = times.Select((_, i) => i == 0 ? (double?)null : 169.1).ToArray();
+        return new { utc_offset_seconds = 0, hourly_units = new { direct_radiation = defect == "units" ? "kWh/m²" : "W/m²", diffuse_radiation = "W/m²", shortwave_radiation = "W/m²" },
+            hourly = new { time = times, direct_radiation = direct, diffuse_radiation = times.Select(_ => 45.6).ToArray(), shortwave_radiation = global } };
     }
 
     [Fact] public async Task PublicFunctionReturnsOneAndWritesThreeColumns()
@@ -47,6 +49,9 @@ public sealed class ClientTests
         {
             Assert.Equal(1, await client.PullAsync(new(2025, 5, 1), new(2025, 5, 2), 106.7, 10.8, IrradianceService.OpenMeteo, path));
             var data = await client.FetchAsync(Request()); WorkbookValidator.Validate(path, data.Samples, TimeZoneInfo.Utc);
+            Assert.Null(data.Samples[0].GlobalHorizontal);
+            Assert.Equal(169.1, data.Samples[1].GlobalHorizontal);
+            Assert.Contains("era5", data.TimestampConvention);
         }
         finally { File.Delete(path); }
     }
@@ -118,9 +123,9 @@ public sealed class ClientTests
                 var b = DateTime.ParseExact(q["end"], "yyyyMMdd", CultureInfo.InvariantCulture).AddDays(1);
                 var times = Enumerable.Range(0, (int)(b - a).TotalHours).Select(i => a.AddHours(i).ToString("yyyyMMddHH", CultureInfo.InvariantCulture)).ToArray();
                 return Response(new { header = new { time_standard = "UTC" }, parameters = new Dictionary<string, object>
-                    { ["ALLSKY_SFC_SW_DIRH"] = new { units = "Wh/m^2" }, ["ALLSKY_SFC_SW_DIFF"] = new { units = "Wh/m^2" } },
+                    { ["ALLSKY_SFC_SW_DIRH"] = new { units = "Wh/m^2" }, ["ALLSKY_SFC_SW_DIFF"] = new { units = "Wh/m^2" }, ["ALLSKY_SFC_SW_DWN"] = new { units = "Wh/m^2" } },
                     properties = new { parameter = new Dictionary<string, object> { ["ALLSKY_SFC_SW_DIRH"] = times.ToDictionary(x => x, _ => 100.0),
-                        ["ALLSKY_SFC_SW_DIFF"] = times.ToDictionary(x => x, _ => 40.0) } } });
+                        ["ALLSKY_SFC_SW_DIFF"] = times.ToDictionary(x => x, _ => 40.0), ["ALLSKY_SFC_SW_DWN"] = times.ToDictionary(x => x, _ => 139.99) } } });
             });
             using var http = new HttpClient(handler);
             var result = await new IrradianceClient(Options(zone), http).PullDetailedAsync(new(date, date.AddDays(1), 1.5, 43.5, service), path);
@@ -172,14 +177,16 @@ public sealed class ClientTests
         using var handler = new Handler((r, _) =>
         {
             Assert.Equal("UTC", Query(r.RequestUri!)["time-standard"]);
-            Assert.Equal("ALLSKY_SFC_SW_DIRH,ALLSKY_SFC_SW_DIFF", Query(r.RequestUri!)["parameters"]);
+            Assert.Equal("ALLSKY_SFC_SW_DIRH,ALLSKY_SFC_SW_DIFF,ALLSKY_SFC_SW_DWN", Query(r.RequestUri!)["parameters"]);
             return Response(new { header = new { time_standard = "UTC" }, parameters = new Dictionary<string, object>
-                { ["ALLSKY_SFC_SW_DIRH"] = new { units = "Wh/m^2" }, ["ALLSKY_SFC_SW_DIFF"] = new { units = "Wh/m^2" } },
+                { ["ALLSKY_SFC_SW_DIRH"] = new { units = "Wh/m^2" }, ["ALLSKY_SFC_SW_DIFF"] = new { units = "Wh/m^2" }, ["ALLSKY_SFC_SW_DWN"] = new { units = "Wh/m^2" } },
                 properties = new { parameter = new Dictionary<string, object> { ["ALLSKY_SFC_SW_DIRH"] = times.ToDictionary(x => x, _ => 100.0),
-                    ["ALLSKY_SFC_SW_DIFF"] = times.ToDictionary(x => x, _ => 40.0) } } });
+                    ["ALLSKY_SFC_SW_DIFF"] = times.ToDictionary(x => x, _ => 40.0), ["ALLSKY_SFC_SW_DWN"] = times.ToDictionary(x => x, x => x == times[0] ? -999.0 : 139.99) } } });
         });
         using var http = new HttpClient(handler); var result = await new IrradianceClient(Options(), http).FetchAsync(Request(IrradianceService.NasaPower));
         Assert.True(result.Succeeded, result.Message); Assert.Equal(100, result.Samples[0].DirectHorizontal);
+        Assert.Null(result.Samples[0].GlobalHorizontal);
+        Assert.Equal(139.99, result.Samples[1].GlobalHorizontal);
     }
 
     [Theory][InlineData(1)][InlineData(2)]

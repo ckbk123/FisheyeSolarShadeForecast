@@ -9,7 +9,12 @@ public sealed record IrradianceRequest(DateOnly StartDate, DateOnly EndDate,
 
 /// <summary>Native provider time label, expressed as a UTC instant; both components are horizontal W/m².</summary>
 public readonly record struct IrradianceSample(DateTimeOffset TimestampUtc,
-    double DirectHorizontal, double DiffuseHorizontal);
+    double DirectHorizontal, double DiffuseHorizontal)
+{
+    /// <summary>Independently reported global horizontal mean in W/m², when supplied by the source.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? GlobalHorizontal { get; init; }
+}
 
 public sealed record HardwareCapabilities(int LogicalProcessors, long AvailableMemoryBytes,
     bool VectorAcceleration, int RecommendedConcurrency)

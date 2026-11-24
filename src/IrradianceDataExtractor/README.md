@@ -1,6 +1,6 @@
 # Irradiance data extractor
 
-Independent C# library for historical **direct horizontal (BHI)** and **diffuse horizontal (DHI)** irradiance. The module does not depend on camera calibration or image processing. Targets .NET 8, is consumable by the existing .NET 10 application, and requires no Excel installation or production NuGet packages.
+Independent C# library for historical **direct horizontal (BHI)** and **diffuse horizontal (DHI)** irradiance. NASA POWER and Open-Meteo downloads also retain published **global horizontal irradiance (GHI)** in the dataset and its native workbook. Older component-only files have an empty source GHI. The module does not depend on camera calibration or image processing. Targets .NET 8, is consumable by the existing .NET 10 application, and requires no Excel installation or production NuGet packages.
 
 To convert these horizontal values for panel tilt/azimuth, use the separate [unshaded transposition module](../IrradianceTransposition/README.md), with Hay–Davies or Perez–Driesse and the existing solar-position module. Raw downloads retain their original horizontal meaning.
 

@@ -15,23 +15,21 @@ public sealed class ExportDataWindowTests
     [Theory]
     [InlineData(false, "Hay–Davies")]
     [InlineData(true, "Isotropic")]
-    public void IrradianceStartsSelectedAndDescribesTheSavedDiffuseModel(bool isotropic, string model) => Sta(() =>
+    public void PanelFieldsStartSelectedAndWeatherShowsOriginalGhiAvailability(bool isotropic, string model) => Sta(() =>
     {
-        var dialog = new ExportDataWindow(isotropic);
+        var dialog = new ExportDataWindow(isotropic, hasSourceGhi: isotropic);
         try
         {
-            var irradiance = Find<CheckBox>(dialog, "ExportIrradiance");
-            Assert.True(irradiance.IsChecked);
+            var fields = Descendants(dialog).OfType<CheckBox>().ToArray();
+            Assert.Equal(9, fields.Length);
+            Assert.Equal(5, fields.Count(c => c.IsChecked == true));
+            Assert.Contains(model, Find<CheckBox>(dialog, "ExportPanelDiffuse").Content.ToString());
+            Assert.Contains("zero", AutomationProperties.GetHelpText(Find<CheckBox>(dialog, "ExportDiffuseFactor")));
+            var ghi = Find<CheckBox>(dialog, "ExportGlobalHorizontal");
+            Assert.False(ghi.IsChecked); Assert.Equal(isotropic, ghi.IsEnabled);
+            Assert.Equal(AutomationProperties.GetHelpText(ghi), ghi.ToolTip);
+            Assert.Contains("by source interval start", AutomationProperties.GetHelpText(Find<CheckBox>(dialog, "ExportSourceIntervalBounds")));
             Assert.False(Find<Button>(dialog, "ConfirmExportData").IsEnabled);
-            Assert.Contains(Descendants(dialog).OfType<TextBlock>(), t => t.Text.Contains(model));
-            var description = AutomationProperties.GetHelpText(irradiance);
-            Assert.Equal(description, irradiance.ToolTip);
-            Assert.Contains("6 columns", description);
-            Assert.Contains($"diffuse ({model})", description);
-            Assert.Contains("Timeseries, direct", description);
-            Assert.Contains("shading factor direct, shading factor diffuse, and final total irradiance", description);
-            Assert.Contains("W/m²", description); Assert.Contains("0 to 1", description);
-            Assert.Contains("zero", description); Assert.Contains("blank", description);
             Assert.Null(dialog.SelectedOptions); Assert.Null(dialog.DestinationDirectory);
         }
         finally { dialog.Close(); }
@@ -46,15 +44,16 @@ public sealed class ExportDataWindowTests
         {
             var destination = Find<TextBox>(dialog, "ExportDestination");
             var export = Find<Button>(dialog, "ConfirmExportData");
-            var irradiance = Find<CheckBox>(dialog, "ExportIrradiance");
             destination.Text = "."; Assert.False(export.IsEnabled);
             destination.Text = Path.Combine(folder, "missing"); Assert.False(export.IsEnabled);
             string file = Path.Combine(folder, "file.txt"); File.WriteAllText(file, "not a folder");
             destination.Text = file; Assert.False(export.IsEnabled);
             destination.Text = folder; Assert.True(export.IsEnabled);
-            irradiance.IsChecked = false; Assert.False(export.IsEnabled);
+            foreach (var field in Descendants(dialog).OfType<CheckBox>()) field.IsChecked = false;
+            Find<CheckBox>(dialog, "ExportSourceIntervalBounds").IsChecked = true;
+            Assert.False(export.IsEnabled);
             Assert.Contains("Select at least one", Find<TextBlock>(dialog, "ExportValidation").Text);
-            irradiance.IsChecked = true; Assert.True(export.IsEnabled);
+            Find<CheckBox>(dialog, "ExportDirectHorizontal").IsChecked = true; Assert.True(export.IsEnabled);
             destination.Text = " "; Assert.False(export.IsEnabled);
             Assert.Null(dialog.SelectedOptions); Assert.Null(dialog.DestinationDirectory);
             Assert.Single(Directory.GetFileSystemEntries(folder));
@@ -91,10 +90,13 @@ public sealed class ExportDataWindowTests
     [InlineData(true)]
     public void ModalOnlyReturnsASelectionWhenExportIsConfirmedAndNeverWritesFiles(bool confirm) => Sta(() =>
     {
-        string folder = NewFolder(); var dialog = new ExportDataWindow(true) { ShowActivated = false };
+        string folder = NewFolder(); var dialog = new ExportDataWindow(true, hasSourceGhi: true) { ShowActivated = false };
         try
         {
             Find<TextBox>(dialog, "ExportDestination").Text = folder;
+            foreach (var field in Descendants(dialog).OfType<CheckBox>()) field.IsChecked = false;
+            Find<CheckBox>(dialog, "ExportGlobalHorizontal").IsChecked = true;
+            Find<CheckBox>(dialog, "ExportSourceIntervalBounds").IsChecked = true;
             dialog.ContentRendered += (_, _) => dialog.Dispatcher.BeginInvoke(() =>
             {
                 var button = confirm ? Find<Button>(dialog, "ConfirmExportData") :
@@ -105,6 +107,8 @@ public sealed class ExportDataWindowTests
             if (confirm)
             {
                 Assert.True(dialog.SelectedOptions?.Irradiance);
+                Assert.Equal(IrradianceFields.GlobalHorizontal, dialog.SelectedOptions!.Fields);
+                Assert.True(dialog.SelectedOptions.SourceIntervalBounds);
                 Assert.Equal(Path.GetFullPath(folder), dialog.DestinationDirectory);
             }
             else
@@ -144,7 +148,10 @@ public sealed class ExportDataWindowTests
                 try
                 {
                     Find<TextBox>(dialog, "ExportDestination").Text = destination;
-                    Assert.True(Find<CheckBox>(dialog, "ExportIrradiance").IsChecked);
+                    Assert.True(Find<CheckBox>(dialog, "ExportShadedTotal").IsChecked);
+                    Assert.False(Find<CheckBox>(dialog, "ExportGlobalHorizontal").IsEnabled);
+                    foreach (var field in Descendants(dialog).OfType<CheckBox>()) field.IsChecked = false;
+                    Find<CheckBox>(dialog, "ExportDirectHorizontal").IsChecked = true;
                     SaveDialogPreview(dialog, confirm);
                     var button = confirm ? Find<Button>(dialog, "ConfirmExportData") :
                         Assert.Single(Descendants(dialog).OfType<Button>(), b => b.IsCancel);
@@ -170,6 +177,12 @@ public sealed class ExportDataWindowTests
                 await Until(() => Directory.GetFiles(destination, "irradiance.xlsx", SearchOption.AllDirectories).Length == 1 && owner.ExportEnabledForTest);
                 string workbook = Assert.Single(Directory.GetFiles(destination, "irradiance.xlsx", SearchOption.AllDirectories));
                 Assert.True(new FileInfo(workbook).Length > 0);
+                using var book = System.IO.Compression.ZipFile.OpenRead(workbook);
+                using var values = book.GetEntry("xl/worksheets/sheet1.xml")!.Open();
+                var sheet = System.Xml.Linq.XDocument.Load(values);
+                var headers = sheet.Descendants().First(e => e.Name.LocalName == "row").Descendants()
+                    .Where(e => e.Name.LocalName == "t").Select(e => e.Value).ToArray();
+                Assert.Equal(new[] { "Timeseries", "Direct horizontal (W/m²)" }, headers);
                 Assert.Single(Directory.GetDirectories(destination));
                 Assert.Contains(Descendants(owner.Irradiance).OfType<TextBlock>(), t => t.Text == "Exported irradiance.xlsx");
             }

@@ -33,6 +33,19 @@ The target is the computer's **civil time zone**, including historical daylight-
 
 ## Data quality and the shading application
 
+### Hourly GHI check
+
+SolarShade Preview 0.3.6 retains the published global horizontal irradiance (GHI) alongside the horizontal beam and diffuse components. NASA POWER supplies `ALLSKY_SFC_SW_DWN` as Wh/m² over each one-hour interval. Its numerical value is the hourly mean in W/m². Open-Meteo supplies ERA5 `shortwave_radiation` directly as a preceding-hour mean in W/m². NASA timestamps the start of the hour and Open-Meteo timestamps the end. Compare records on the same **interval start**. Joining on the native labels pairs adjacent hours. [NASA time-range definition](https://power.larc.nasa.gov/docs/faqs/other/#time-range) · [Open-Meteo hourly variables](https://open-meteo.com/en/docs/historical-weather-api#hourly_parameter_definition)
+
+On 24 November 2026, we compared live API responses with the application extractor and its saved horizontal workbook. The selected local days yielded 94 provider records across both sources, including a 23-hour daylight-saving day. All three hourly values and the physical interval bounds matched their respective responses for every record. All 286 records returned by the padded study requests retained their values and source time labels after saving and reopening.
+
+| Local day and requested coordinates | Hours | Open-Meteo ERA5 GHI (kWh/m²) | NASA POWER GHI (kWh/m²) | Largest hourly difference (W/m²) |
+| --- | ---: | ---: | ---: | ---: |
+| Ho Chi Minh City, 15 May 2025 (10.80° N, 106.70° E) | 24 | 6.06100 | 5.10543 | 236.05 |
+| Toulouse, 30 March 2025 (43.60° N, 1.44° E) | 23 | 5.75700 | 5.91799 | 49.00 |
+
+Each daily total integrates published GHI over the selected hours. In the Vietnam sample NASA’s published GHI differed from the sum of its two published components by up to 3.08 W/m². SolarShade preserves that difference. The two providers also disagreed on coincident hours, and their daily ordering reversed between these examples. Determining accuracy at the camera site requires a colocated irradiance measurement.
+
 Satellite retrievals and reanalysis are estimates for grid cells, not measurements at the exact camera position. NASA's solar archive includes satellite radiation products; ERA5 combines observations with an atmospheric model. Several selectable routes share ERA5, so agreement between Open-Meteo, Oikolab and CDS is **not independent confirmation**. [NASA solar methodology](https://power.larc.nasa.gov/docs/methodology/energy-fluxes/), [CDS dataset description](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels-timeseries?tab=overview).
 
 Engineering judgment: retain the irradiance provider as a replaceable input to the shading estimator. Compare candidate datasets to local pyranometer/reference measurements before selecting a scientific default. Model resolution, clouds, aerosols, terrain and retrieval algorithms affect both components. No universal accuracy ranking or Vietnam-specific error estimate is supported by the present transport validation.

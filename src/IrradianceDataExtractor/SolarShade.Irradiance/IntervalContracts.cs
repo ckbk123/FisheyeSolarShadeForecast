@@ -9,6 +9,8 @@ public sealed record IrradianceInterval(string Id, DateTimeOffset Timestamp,
     double DirectHorizontal, double DiffuseHorizontal)
 {
     public double Hours => (End - Start).TotalHours;
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? GlobalHorizontal { get; init; }
 }
 
 public sealed record IrradianceDataset(IReadOnlyList<IrradianceInterval> Intervals, string Source,
@@ -59,7 +61,8 @@ public static class IrradianceDatasets
         {
             var start = s.TimestampUtc.AddTicks(offset);
             return new IrradianceInterval(s.TimestampUtc.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                s.TimestampUtc, start, start + cadence, start, start + cadence, s.DirectHorizontal, s.DiffuseHorizontal);
+                s.TimestampUtc, start, start + cadence, start, start + cadence, s.DirectHorizontal, s.DiffuseHorizontal)
+                { GlobalHorizontal = s.GlobalHorizontal };
         }).ToArray();
         var data = new IrradianceDataset(Array.AsReadOnly(rows), source, timeZoneId, convention, label, cadence);
         Validate(data); return data;
@@ -89,7 +92,8 @@ public static class IrradianceDatasets
         foreach (var row in data.Intervals)
         {
             if (string.IsNullOrWhiteSpace(row.Id) || !ids.Add(row.Id)) throw new InvalidDataException("Duplicate or empty source interval ID.");
-            if (!double.IsFinite(row.DirectHorizontal) || !double.IsFinite(row.DiffuseHorizontal) || row.DirectHorizontal < 0 || row.DiffuseHorizontal < 0)
+            if (!double.IsFinite(row.DirectHorizontal) || !double.IsFinite(row.DiffuseHorizontal) || row.DirectHorizontal < 0 || row.DiffuseHorizontal < 0 ||
+                row.GlobalHorizontal is double ghi && (!double.IsFinite(ghi) || ghi < 0))
                 throw new InvalidDataException($"Invalid horizontal irradiance at {row.Timestamp:O}.");
             if (row.SourceEnd <= row.SourceStart || row.Start < row.SourceStart || row.End > row.SourceEnd || row.End <= row.Start)
                 throw new InvalidDataException($"Invalid source/selected bounds at {row.Timestamp:O}.");
