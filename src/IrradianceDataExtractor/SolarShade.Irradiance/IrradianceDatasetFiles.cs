@@ -2,7 +2,8 @@ namespace SolarShade.Irradiance;
 
 public static partial class IrradianceDatasetFiles
 {
-    private static readonly string[] Headers = ["Timestamp", "Direct horizontal (W/m²)", "Diffuse horizontal (W/m²)", "Interval ID", "Source start", "Source end", "Selected start", "Selected end", "Timestamp label", "Native cadence minutes", "Value kind", "Units", "Source", "Time zone", "Timestamp convention", "Fetched UTC", "Latitude", "Longitude"];
+    private const string GlobalHeader = "Source GHI (W/m²)";
+    private static readonly string[] Headers = ["Timestamp", "Direct horizontal (W/m²)", "Diffuse horizontal (W/m²)", "Interval ID", "Source start", "Source end", "Selected start", "Selected end", "Timestamp label", "Native cadence minutes", "Value kind", "Units", "Source", "Time zone", "Timestamp convention", "Fetched UTC", "Latitude", "Longitude", GlobalHeader];
 
     /// <summary>Exports the returned values and their authoritative interval metadata; no recalculation or provider calls.</summary>
     public static IrradianceDataset Export(IrradianceDataset data, string outputXlsx, CancellationToken ct = default)
@@ -11,7 +12,7 @@ public static partial class IrradianceDatasetFiles
         ScientificWorkbook.Write(outputXlsx, "Horizontal irradiance", Headers, data.Intervals.Select(r => new object?[]
         { r.Timestamp, r.DirectHorizontal, r.DiffuseHorizontal, r.Id, r.SourceStart, r.SourceEnd, r.Start, r.End,
             data.Label.ToString(), data.NativeCadence?.TotalMinutes, data.ValueKind.ToString(), data.Units,
-            data.Source, data.TimeZoneId, data.TimestampConvention, data.FetchedUtc, data.Latitude, data.Longitude }),
+            data.Source, data.TimeZoneId, data.TimestampConvention, data.FetchedUtc, data.Latitude, data.Longitude, r.GlobalHorizontal }),
             "Authoritative source interval means. Numeric irradiance W/m². Selected bounds may clip source bounds; source values retain original averaging semantics. " + data.TimestampConvention, ct);
         return data with { OutputPath = Path.GetFullPath(outputXlsx) };
     }
@@ -29,6 +30,7 @@ public static partial class IrradianceDatasetFiles
         if (new[] { "wh/", "wh /", "j/", "j /", "accumulated", "instantaneous" }.Any(header.Contains))
             throw new InvalidDataException("Import requires interval means in W/m²; accumulated energy and instantaneous observations need an explicit conversion.");
         bool native = rows[0].Length >= 16 && rows[0].Take(16).SequenceEqual(Headers.Take(16));
+        bool hasGlobal = native && rows[0].ElementAtOrDefault(18) == GlobalHeader;
         if (!native && rows[0].Any(h => h is "Interval ID" or "Source start" or "Selected start" or "Value kind"))
             throw new InvalidDataException("Incomplete or changed native interval metadata. Preserve its complete exported schema.");
         var samples = new List<IrradianceSample>(); var intervals = new List<IrradianceInterval>();
@@ -53,8 +55,11 @@ public static partial class IrradianceDatasetFiles
                 current.Latitude != template.Latitude || current.Longitude != template.Longitude || current.FetchedUtc != template.FetchedUtc))
                 throw new InvalidDataException($"Row {i+1}: inconsistent dataset metadata.");
             template ??= current;
+            double? global = null;
+            if (hasGlobal && !string.IsNullOrWhiteSpace(cells.ElementAtOrDefault(18)))
+                global = double.Parse(cells[18], System.Globalization.NumberStyles.Float, Inv);
             intervals.Add(new(cells[3], timestamp, NativeTime(cells[4]), NativeTime(cells[5]),
-                NativeTime(cells[6]), NativeTime(cells[7]), bhi, dhi));
+                NativeTime(cells[6]), NativeTime(cells[7]), bhi, dhi) { GlobalHorizontal = global });
         }
         var data = native ? (template ?? throw new InvalidDataException("No input rows.")) with { Intervals = Array.AsReadOnly(intervals.ToArray()) }
             : IrradianceDatasets.FromSamples(samples, fallbackCadence, fallbackLabel, "Imported: " + Path.GetFileName(path), zone.Id,

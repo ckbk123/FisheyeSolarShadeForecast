@@ -120,7 +120,8 @@ public sealed partial class IrradianceClient
         for (int i = 0; i < rows.Length; i++)
         {
             if (!double.IsFinite(rows[i].DirectHorizontal) || !double.IsFinite(rows[i].DiffuseHorizontal) ||
-                rows[i].DirectHorizontal < 0 || rows[i].DiffuseHorizontal < 0)
+                rows[i].DirectHorizontal < 0 || rows[i].DiffuseHorizontal < 0 ||
+                rows[i].GlobalHorizontal is double ghi && (!double.IsFinite(ghi) || ghi < 0))
                 throw new InvalidDataException($"Missing or invalid irradiance at {rows[i].TimestampUtc:O}.");
             if (i > 0 && rows[i].TimestampUtc - rows[i - 1].TimestampUtc != TimeSpan.FromHours(1))
                 throw new InvalidDataException($"Duplicate timestamp or missing hour at {rows[i].TimestampUtc:O}.");
@@ -191,10 +192,10 @@ public sealed partial class IrradianceClient
         if (service == IrradianceService.CopernicusCds && string.IsNullOrWhiteSpace(options.CdsPersonalAccessToken))
             throw new ArgumentException("Copernicus CDS requires a free personal access token and prior dataset licence acceptance (CdsPersonalAccessToken).");
     }
-    private static string Convention(IrradianceService service) => service switch
+    private string Convention(IrradianceService service) => service switch
     {
-        IrradianceService.NasaPower => "Native NASA POWER hourly UTC label; Wh/m² over one hour divided by 1 h gives W/m². No phase shift.",
-        IrradianceService.OpenMeteo => "Native UTC label: preceding-hour mean W/m²; timestamp is interval end.",
+        IrradianceService.NasaPower => "NASA POWER UTC label at interval start. Hourly Wh/m² divided by 1 h gives mean W/m². Source GHI is ALLSKY_SFC_SW_DWN.",
+        IrradianceService.OpenMeteo => $"Open-Meteo {options.OpenMeteoModel} UTC label at interval end. Values are preceding-hour means in W/m². Source GHI is shortwave_radiation.",
         IrradianceService.Cams => "UTC integration interval end; hourly Wh/m² divided by 1 h gives W/m².",
         IrradianceService.Nsrdb => "Native NSRDB UTC label, hourly W/m²; direct horizontal = GHI - DHI.",
         IrradianceService.Oikolab => "Native Oikolab Unix UTC timestamp; horizontal W/m², provider interval convention retained.",

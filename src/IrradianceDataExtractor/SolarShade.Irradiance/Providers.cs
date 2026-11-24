@@ -27,11 +27,11 @@ public sealed partial class IrradianceClient
         string url = request.Service switch
         {
             IrradianceService.NasaPower => Url("https://power.larc.nasa.gov/api/temporal/hourly/point",
-                ("parameters", "ALLSKY_SFC_SW_DIRH,ALLSKY_SFC_SW_DIFF"), ("community", "RE"), ("longitude", lon),
+                ("parameters", "ALLSKY_SFC_SW_DIRH,ALLSKY_SFC_SW_DIFF,ALLSKY_SFC_SW_DWN"), ("community", "RE"), ("longitude", lon),
                 ("latitude", lat), ("start", start.ToString("yyyyMMdd", Invariant)), ("end", end.ToString("yyyyMMdd", Invariant)),
                 ("format", "JSON"), ("time-standard", "UTC")),
             IrradianceService.OpenMeteo => Url("https://archive-api.open-meteo.com/v1/archive", ("latitude", lat),
-                ("longitude", lon), ("start_date", from), ("end_date", to), ("hourly", "direct_radiation,diffuse_radiation"),
+                ("longitude", lon), ("start_date", from), ("end_date", to), ("hourly", "direct_radiation,diffuse_radiation,shortwave_radiation"),
                 ("timezone", "GMT"), ("timeformat", "unixtime"), ("models", options.OpenMeteoModel)),
             IrradianceService.Oikolab => Url("https://api.oikolab.com/weather", ("param", "surface_direct_solar_radiation"),
                 ("param", "surface_diffuse_solar_radiation"), ("lat", lat), ("lon", lon), ("start", from + "T00:00:00"),
@@ -47,22 +47,25 @@ public sealed partial class IrradianceClient
             case IrradianceService.NasaPower:
                 if (root.GetProperty("header").GetProperty("time_standard").GetString() != "UTC")
                     throw new InvalidDataException("NASA did not return UTC.");
-                foreach (var name in new[] { "ALLSKY_SFC_SW_DIRH", "ALLSKY_SFC_SW_DIFF" })
+                foreach (var name in new[] { "ALLSKY_SFC_SW_DIRH", "ALLSKY_SFC_SW_DIFF", "ALLSKY_SFC_SW_DWN" })
                     RequireUnit(root.GetProperty("parameters").GetProperty(name).GetProperty("units").GetString(), "Wh/m^2");
                 var data = root.GetProperty("properties").GetProperty("parameter");
                 var diffuse = data.GetProperty("ALLSKY_SFC_SW_DIFF");
                 var direct = data.GetProperty("ALLSKY_SFC_SW_DIRH");
-                if (direct.EnumerateObject().Count() != diffuse.EnumerateObject().Count())
+                var global = data.GetProperty("ALLSKY_SFC_SW_DWN");
+                var fill = root.GetProperty("header").TryGetProperty("fill_value", out var fillField) ? fillField.GetDouble() : -999;
+                if (direct.EnumerateObject().Count() != diffuse.EnumerateObject().Count() || direct.EnumerateObject().Count() != global.EnumerateObject().Count())
                     throw new InvalidDataException("NASA component timestamps do not match.");
                 foreach (var point in direct.EnumerateObject())
-                    rows.Add(new(ParseUtc(point.Name, "yyyyMMddHH"), Number(point.Value), Number(diffuse.GetProperty(point.Name))));
+                    rows.Add(new(ParseUtc(point.Name, "yyyyMMddHH"), Number(point.Value), Number(diffuse.GetProperty(point.Name)))
+                        { GlobalHorizontal = ReadGlobal(global.GetProperty(point.Name), fill) });
                 break;
             case IrradianceService.OpenMeteo:
                 if (root.GetProperty("utc_offset_seconds").GetInt32() != 0) throw new InvalidDataException("Expected UTC response.");
-                foreach (var name in new[] { "direct_radiation", "diffuse_radiation" })
+                foreach (var name in new[] { "direct_radiation", "diffuse_radiation", "shortwave_radiation" })
                     RequireUnit(root.GetProperty("hourly_units").GetProperty(name).GetString(), "W/m²");
                 var h = root.GetProperty("hourly");
-                rows = ParseArrays(h.GetProperty("time"), h.GetProperty("direct_radiation"), h.GetProperty("diffuse_radiation"));
+                rows = ParseArrays(h.GetProperty("time"), h.GetProperty("direct_radiation"), h.GetProperty("diffuse_radiation"), h.GetProperty("shortwave_radiation"));
                 break;
             case IrradianceService.Oikolab:
                 using (var inner = JsonDocument.Parse(root.GetProperty("data").GetString()!))
@@ -85,14 +88,21 @@ public sealed partial class IrradianceClient
     private static void RequireUnit(string? actual, string expected)
     { if (actual != expected) throw new InvalidDataException($"Unexpected units '{actual}'; expected '{expected}'."); }
 
-    private static List<IrradianceSample> ParseArrays(JsonElement times, JsonElement direct, JsonElement diffuse)
+    private static double? ReadGlobal(JsonElement field, double? fill = null)
     {
-        if (times.GetArrayLength() != direct.GetArrayLength() || times.GetArrayLength() != diffuse.GetArrayLength())
+        if (field.ValueKind == JsonValueKind.Null) return null;
+        double value = field.GetDouble();
+        return value == fill ? null : value;
+    }
+
+    private static List<IrradianceSample> ParseArrays(JsonElement times, JsonElement direct, JsonElement diffuse, JsonElement global)
+    {
+        if (times.GetArrayLength() != direct.GetArrayLength() || times.GetArrayLength() != diffuse.GetArrayLength() || times.GetArrayLength() != global.GetArrayLength())
             throw new InvalidDataException("Provider arrays have unequal lengths.");
         var rows = new List<IrradianceSample>(times.GetArrayLength());
         for (int i = 0; i < times.GetArrayLength(); i++)
             rows.Add(new(DateTimeOffset.FromUnixTimeSeconds(times[i].GetInt64()),
-                Number(direct[i]), Number(diffuse[i])));
+                Number(direct[i]), Number(diffuse[i])) { GlobalHorizontal = ReadGlobal(global[i]) });
         return rows;
     }
 
