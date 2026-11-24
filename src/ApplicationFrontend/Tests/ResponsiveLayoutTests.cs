@@ -13,6 +13,44 @@ using static ManualUpdateTests;
 public sealed class ResponsiveLayoutTests
 {
     [Theory]
+    [InlineData(1280, "irradiance")]
+    [InlineData(480, "irradiance")]
+    [InlineData(640, "orientation")]
+    public void HeaderCentersVisibleContentInItsBand(double width, string workspace) => Sta(async () =>
+    {
+        using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(loadExampleOnFirstRun: false, applicationServices: service);
+        try
+        {
+            window.Show(); window.Width = width;
+            Assert.True(window.Workspaces.Select(workspace)); window.UpdateLayout();
+            var header = (FrameworkElement)((DockPanel)window.Content).Children[0];
+            var title = Descendants<TextBlock>(header).Single(t => t.Text == "SolarShade");
+            var logo = Descendants<Image>(header).Single();
+            var buttons = Descendants<Button>(header).Where(b => b.IsVisible).ToArray();
+            var visible = buttons.Cast<FrameworkElement>().ToList();
+            if (width >= 600 || workspace == "orientation")
+            {
+                Assert.True(title.IsVisible && logo.IsVisible);
+                visible.Add(title); visible.Add(logo);
+            }
+            if (workspace == "irradiance") Assert.NotEmpty(buttons);
+            foreach (var item in visible)
+            {
+                var bounds = item.TransformToAncestor(header).TransformBounds(new Rect(item.RenderSize));
+                Assert.InRange(Math.Abs(bounds.Top + bounds.Height / 2 - header.ActualHeight / 2), 0, 1.5);
+            }
+            if (buttons.Length > 0)
+            {
+                var last = buttons[^1];
+                var right = last.TransformToAncestor(header).TransformBounds(new Rect(last.RenderSize)).Right;
+                Assert.InRange(header.ActualWidth - right, 0, 25);
+            }
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
+    [Theory]
     [InlineData(1440, 960)]
     [InlineData(1280, 680)]
     [InlineData(1024, 544)]
