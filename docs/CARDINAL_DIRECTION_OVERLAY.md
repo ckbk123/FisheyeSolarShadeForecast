@@ -6,7 +6,7 @@
 
 The outer endpoint of each tick marks the furthest visible zenith angle on its constant true-azimuth meridian (N=0°, E=90°, S=180°, W=270°). A marker at zenith 90° is on the horizon. Other markers indicate a coverage boundary. Calibrated angular coverage, the detected disk and the image rectangle all constrain visibility.
 
-At the projected endpoint, a short straight tick points inward toward the calibrated optical center. This is a visual index. A constant-bearing meridian can curve across a tilted fisheye photo, so only the tick’s anchor gives the projected compass bearing. A tick stops at the optical center or at the edge of the available photo or disk. An anchor with less than one pixel of space for a tick is shown as a dot. These orientation marks can appear over obstructions.
+The tick is a compass glyph. Its outer end marks the projected bearing. From its inner end toward its anchor, it follows the horizontal world bearing projected onto the camera’s image-right and image-down axes. Opposite bearings have parallel ticks. On the south-facing example, east and west lie level even though both anchors are above the optical center. Rolling the camera rotates the ticks. A dot marks an end-on bearing or a location with less than one pixel of room inside coverage. Marks can appear over obstructions.
 
 The search uses bounded 0.025° increments and 40 boundary bisections. Very thin visible fragments can be unresolved; fragments shorter than one native pixel are reported unavailable. Missing directions are not fabricated. These numerical search limits do not establish physical calibration accuracy.
 

@@ -62,13 +62,13 @@ Boitier’s convention defines **panel front azimuth** and **lens azimuth** usin
 
 **Copy panel pose to phone** aligns the two top headings and tilts once, including when the panel is flat. Subsequent edits are independent. Turning a flat panel rotates its physical edges. Turning a flat phone also rotates the photograph relative to the compass and sun path. With north at image top in an upward-looking photograph, east appears on the left. Solar azimuth uses true north as zero.
 
-Existing studies retain their stored camera and panel geometry. An older flat panel's initial top heading comes from its saved panel bearing. If that edge was never recorded in the field, choose the heading that matches the installation. Saved camera roll and nonstandard phone placements remain identifiable in the study.
+Existing studies retain their stored camera and panel geometry. An older flat panel's initial top heading comes from its saved panel bearing. If that edge was never recorded in the field, choose the heading that matches the installation. A tilted phone can have its lens end uphill and still be rolled sideways. **Saved camera roll** identifies that third angle. **Use two-angle pose** keeps the lens direction and tilt and rotates image top directly uphill, as illustrated in Orientation map. Use this only if it matches the photograph.
 
 For the LAAS Site 2 example, a panel tilted 6.8° with a front azimuth of −26° has a top heading of 334°. The flat phone’s assumed north image top corresponds to a separate phone top heading of 0°.
 
 ## Cardinal-direction preview
 
-**Show cardinal directions** places magenta N/E/S/W labels over the original colour photograph. The outer endpoint of each short tick marks the compass bearing through the same calibration and camera pose used for sun paths and shading. It marks the horizon where visible or the edge of coverage otherwise. The tick points toward the calibrated optical center. A dot marks a bearing with less than one pixel of room for a tick. Labels remain upright.
+**Show cardinal directions** places magenta N/E/S/W labels over the original colour photograph. The outer endpoint of each tick marks the compass bearing through the same calibration and camera pose used for sun paths and shading. It marks the horizon where visible or the edge of coverage otherwise. The strokes show the compass axes in the oriented photo. Opposite bearings have parallel strokes. A dot marks an end-on bearing or a location with less than one pixel of room for a stroke. Labels remain upright.
 
 Expand the sky photo to inspect the compass. Scroll over a feature to zoom around it, drag the magnified image to pan, and choose **Fit** to see the whole photograph. The green outline and the compass move with the image.
 

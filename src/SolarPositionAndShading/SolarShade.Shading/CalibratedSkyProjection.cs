@@ -97,9 +97,12 @@ public sealed class CalibratedSkyProjection
         return ContainsImagePixel(x, y);
     }
 
-    internal bool ContainsImagePixel(double x, double y) =>
+    private bool ContainsImagePixel(double x, double y) =>
         x >= 0 && x <= Width-1 && y >= 0 && y <= Height-1 &&
         (x-disk.CenterX)*(x-disk.CenterX)+(y-disk.CenterY)*(y-disk.CenterY) <= disk.RadiusPixels*disk.RadiusPixels;
+
+    internal bool ContainsCalibratedPixel(double x, double y) => ContainsImagePixel(x, y) &&
+        double.Hypot(x - cx, y - cy) <= Polynomial(MaximumIncidentAngleRadians);
 
     /// <summary>
     /// Tests whether two successfully projected finite unit rays can be joined along their shortest spherical arc

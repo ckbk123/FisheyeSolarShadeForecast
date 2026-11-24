@@ -32,7 +32,8 @@ public static class CardinalDirectionOverlayGenerator
     private const double SearchStepDegrees = .025;
     public const string Convention = "EXIF-oriented native pixels; x right, y down; true azimuth clockwise from North. " +
         "N/E/S/W anchors mark the furthest resolved visible zenith on their upper-hemisphere constant-azimuth meridians. " +
-        "Each straight display tick extends from its anchor toward the calibrated principal point. A dot marks an anchor with less than one pixel of room. " +
+        "Each straight tick is a compass glyph along the horizontal world bearing projected onto the camera's right/down axes, with its outer end at the anchor. " +
+        "A dot marks an end-on bearing or an anchor with less than one pixel of room. " +
         "Endpoints obey calibrated incident angle, actual image disk, and image rectangle. " +
         "An endpoint at zenith 90 degrees is the horizon; other endpoints are coverage limits, not horizon locations. " +
         "Default upward camera: N top, E left, S bottom, W right. Labels remain upright. " +
@@ -59,6 +60,7 @@ public static class CardinalDirectionOverlayGenerator
         int thickness = Math.Max(1, (int)Math.Round(scale / 200));
         var markers = new List<CardinalDirectionOverlayMarker>(4);
         var labels = new List<Rect>();
+        var (right, down, _) = projection.Pose.Axes();
         foreach (var (name, azimuth) in new[] { ("N", 0d), ("E", 90d), ("S", 180d), ("W", 270d) })
         {
             ct.ThrowIfCancellationRequested();
@@ -98,7 +100,8 @@ public static class CardinalDirectionOverlayGenerator
                 previousRay = ray;
             }
             if (meridianSpan < 1) { markers.Add(Missing("Visible meridian fragment is too short for an unambiguous tick.")); continue; }
-            var points = RadialTick(projection, new(x, y), tickLength);
+            var horizonBearing = Direction.FromAngles(azimuth, 90);
+            var points = CompassTick(projection, new(x, y), -horizonBearing.Dot(right), -horizonBearing.Dot(down), tickLength);
             // Place the label beyond the tick. At a dot the resolved meridian supplies a label direction.
             var inner = points.Length == 2 ? points[1] : new(innerX, innerY);
             double dx = x - inner.X, dy = y - inner.Y, magnitude = double.Hypot(dx, dy);
@@ -148,23 +151,26 @@ public static class CardinalDirectionOverlayGenerator
                 projection.MaximumIncidentAngleRadians * 180 / Math.PI, projection.CoverageDisk));
     }
 
-    private static CardinalDirectionOverlayPoint[] RadialTick(CalibratedSkyProjection projection,
-        CardinalDirectionOverlayPoint anchor, double length)
+    private static CardinalDirectionOverlayPoint[] CompassTick(CalibratedSkyProjection projection,
+        CardinalDirectionOverlayPoint anchor, double dx, double dy, double length)
     {
-        double dx = projection.PrincipalPointX - anchor.X, dy = projection.PrincipalPointY - anchor.Y;
-        double radius = double.Hypot(dx, dy);
-        if (radius < 1) return [anchor];
-        dx /= radius;
-        dy /= radius;
-        length = Math.Min(radius, length);
-        if (!projection.ContainsImagePixel(anchor.X + dx * length, anchor.Y + dy * length))
+        // All anchors depend on lens coverage. The glyph direction depends only on the bearing and camera frame,
+        // so the two ends of a compass axis remain parallel even when their visible sky rays are above the horizon.
+        double magnitude = double.Hypot(dx, dy);
+        if (magnitude < 1e-12) return [anchor];
+        dx /= magnitude;
+        dy /= magnitude;
+        double radius = double.Hypot(anchor.X - projection.PrincipalPointX, anchor.Y - projection.PrincipalPointY);
+        length = Math.Min(length, radius);
+        bool InCoverage(double distance) => projection.ContainsCalibratedPixel(anchor.X + dx * distance, anchor.Y + dy * distance);
+        if (!InCoverage(length))
         {
-            // An offset disk or a cropped image can exclude the principal point. Their intersection is convex.
+            // The calibrated circle, detected disk and image rectangle have a convex intersection.
             double low = 0, high = length;
             for (int i = 0; i < 32; i++)
             {
                 double mid = (low + high) / 2;
-                if (projection.ContainsImagePixel(anchor.X + dx * mid, anchor.Y + dy * mid)) low = mid;
+                if (InCoverage(mid)) low = mid;
                 else high = mid;
             }
             length = low;
