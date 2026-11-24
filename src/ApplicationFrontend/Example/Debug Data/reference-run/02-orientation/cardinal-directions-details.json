@@ -52,8 +52,8 @@
       "BoundaryZenithDegrees": 63.07139734549585,
       "BoundaryX": 729.0628897148345,
       "BoundaryY": 1806.7186858386617,
-      "LabelX": 450,
-      "LabelY": 1893,
+      "LabelX": 471,
+      "LabelY": 1932,
       "Status": "Calibrated coverage boundary.",
       "TickPoints": [
         {
@@ -61,8 +61,8 @@
           "Y": 1806.7186858386617
         },
         {
-          "X": 845.7897377926465,
-          "Y": 1834.5546865898364
+          "X": 849.0628897148345,
+          "Y": 1806.7186858386617
         }
       ]
     },
@@ -94,8 +94,8 @@
       "BoundaryZenithDegrees": 63.07139734549585,
       "BoundaryX": 2332.0003599229767,
       "BoundaryY": 1806.7186858386617,
-      "LabelX": 2376,
-      "LabelY": 1886,
+      "LabelX": 2356,
+      "LabelY": 1932,
       "Status": "Calibrated coverage boundary.",
       "TickPoints": [
         {
@@ -103,8 +103,8 @@
           "Y": 1806.7186858386617
         },
         {
-          "X": 2215.2735118451646,
-          "Y": 1834.5546865898364
+          "X": 2212.0003599229767,
+          "Y": 1806.7186858386617
         }
       ]
     }
@@ -113,12 +113,12 @@
     "Opacity": 0.85
   },
   "Timings": {
-    "GeometryMilliseconds": 3.2511,
-    "RenderMilliseconds": 31.5555,
-    "EncodeMilliseconds": 303.8392,
-    "TotalMilliseconds": 338.6583
+    "GeometryMilliseconds": 3.9438,
+    "RenderMilliseconds": 28.1462,
+    "EncodeMilliseconds": 349.4743,
+    "TotalMilliseconds": 381.5775
   },
-  "GeometryConvention": "EXIF-oriented native pixels; x right, y down; true azimuth clockwise from North. N/E/S/W anchors mark the furthest resolved visible zenith on their upper-hemisphere constant-azimuth meridians. Each straight display tick extends from its anchor toward the calibrated principal point. A dot marks an anchor with less than one pixel of room. Endpoints obey calibrated incident angle, actual image disk, and image rectangle. An endpoint at zenith 90 degrees is the horizon; other endpoints are coverage limits, not horizon locations. Default upward camera: N top, E left, S bottom, W right. Labels remain upright. Meridian search spacing 0.025 degrees; boundary refinement 40 bisections. Subpixel raster precision 1/256 pixel.",
+  "GeometryConvention": "EXIF-oriented native pixels; x right, y down; true azimuth clockwise from North. N/E/S/W anchors mark the furthest resolved visible zenith on their upper-hemisphere constant-azimuth meridians. Each straight tick is a compass glyph along the horizontal world bearing projected onto the camera\u0027s right/down axes, with its outer end at the anchor. A dot marks an end-on bearing or an anchor with less than one pixel of room. Endpoints obey calibrated incident angle, actual image disk, and image rectangle. An endpoint at zenith 90 degrees is the horizon; other endpoints are coverage limits, not horizon locations. Default upward camera: N top, E left, S bottom, W right. Labels remain upright. Meridian search spacing 0.025 degrees; boundary refinement 40 bisections. Subpixel raster precision 1/256 pixel.",
   "PoseConvention": "Projection inputs: ImageTopAzimuthDegrees is the pre-roll image-top bearing clockwise from true north, TiltDegrees is the signed optical-axis rotation from up toward that bearing, and RollDegrees rotates the image around the lens.",
   "Color": "Magenta (#FF00B4), straight-alpha PNG",
   "AnnotationOnly": true,
