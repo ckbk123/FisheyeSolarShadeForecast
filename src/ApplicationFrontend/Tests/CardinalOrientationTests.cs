@@ -44,6 +44,9 @@ public sealed class CardinalOrientationTests : IDisposable
             overlay => { shown = overlay; callbacks.Add("cardinals"); });
         Assert.Equal(new[] { "photo", "cardinals" }, callbacks);
         Assert.NotNull(result.Mask); Assert.True(result.Cardinals!.HasMarkers); Assert.Same(shown, result.Cardinals);
+        Assert.True(result.Cardinals.LensCenterVisible);
+        Assert.Equal(new[] { 30, 60 }, result.Cardinals.Rings.Select(r => r.IncidentAngleDegrees));
+        Assert.True(result.Cardinals.MeridianDotCount > 0);
         Assert.Equal(0, service.PreparationCount);
         Assert.Equal(result.Cardinals.Png, File.ReadAllBytes(Path.Combine(result.DebugDirectory, "02-orientation", "cardinal-directions-overlay.png")));
         Assert.True(File.Exists(Path.Combine(result.DebugDirectory, "02-orientation", "cardinal-directions.xlsx")));

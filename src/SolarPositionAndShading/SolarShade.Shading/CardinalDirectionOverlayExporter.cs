@@ -19,13 +19,22 @@ public static class CardinalDirectionOverlayExporter
             m.BoundaryX, m.BoundaryY, m.LabelX, m.LabelY, m.Status});
         string description = $"{result.GeometryConvention} Native image {result.Width}x{result.Height}; " +
             $"projection image-top reference {result.Pose.ImageTopAzimuthDegrees} degrees clockwise from true north before roll, signed tilt {result.Pose.TiltDegrees} degrees from up toward that reference, image roll {result.Pose.RollDegrees} degrees around the lens. " +
-            "Transparent magenta display annotations; no solar or irradiance calculation.";
-        ScientificWorkbook.Write(workbook, [new("Cardinal directions", headers, rows)], description, ct);
+            "Cyan lens grid and magenta compass meridians in a straight-alpha PNG.";
+        string[] gridHeaders = ["Feature", "Incident angle (degrees)", "Radius (native pixels)", "X (native pixels)", "Y (native pixels)", "Visible"];
+        var gridRows = new List<object?[]>
+        {
+            new object?[] { "Lens center", 0, 0, result.Projection.PrincipalPointX, result.Projection.PrincipalPointY, result.LensCenterVisible },
+            new object?[] { "True zenith", null, null, result.Zenith?.X, result.Zenith?.Y, result.Zenith is not null }
+        };
+        gridRows.AddRange(result.Rings.Select(r => new object?[] { "Lens ring", r.IncidentAngleDegrees, r.RadiusPixels,
+            result.Projection.PrincipalPointX, result.Projection.PrincipalPointY, r.Visible }));
+        ScientificWorkbook.Write(workbook, [new("Cardinal directions", headers, rows), new("Lens grid", gridHeaders, gridRows)], description, ct);
         AtomicWrite(details, JsonSerializer.SerializeToUtf8Bytes(new
         {
-            result.Width, result.Height, result.Pose, result.Projection, result.Markers, result.Options, result.Timings, result.GeometryConvention,
+            result.Width, result.Height, result.Pose, result.Projection, result.Markers, result.LensCenterVisible, result.Zenith,
+            result.Rings, result.MeridianDotCount, result.Options, result.Timings, result.GeometryConvention,
             PoseConvention = "Projection inputs: ImageTopAzimuthDegrees is the pre-roll image-top bearing clockwise from true north, TiltDegrees is the signed optical-axis rotation from up toward that bearing, and RollDegrees rotates the image around the lens.",
-            Color = "Magenta (#FF00B4), straight-alpha PNG", AnnotationOnly = true,
+            Color = "Cyan (#00D9F5) lens center and rings; magenta (#FF00B4) compass meridians, labels and zenith; straight-alpha PNG", AnnotationOnly = true,
             Artifacts = new[] {Path.GetFileName(image), Path.GetFileName(workbook)}
         }, new JsonSerializerOptions {WriteIndented = true}), ct);
         return new[] {image, workbook, details};

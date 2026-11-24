@@ -134,6 +134,8 @@ public sealed class CalibratedSkyProjection
         return minimumZ >= minZ && minimumZ > -1 + 1e-14;
     }
 
+    internal double RadiusAtIncidentAngle(double radians) => Polynomial(radians);
+
     private double Polynomial(double theta)
     {
         double value = 0;

@@ -18,9 +18,9 @@ Boitier specifies the outward azimuth, the tilt from horizontal, and the lens en
 
 The app projects sunlight into the **phone** frame and calculates panel incidence using the **panel** normal. In the example both devices have the same pose. With a skyward lens, north at the top puts east on the left. The tilted lens points 28° south of overhead. On the oriented 3000 × 4000 photograph, the lens center is at (1530.5, 1997.8), true zenith is at (1530.5, 1602.1), and the May 15 noon Sun is at (1530.5, 1492.3). Pixel rows increase downward.
 
-## Compass marks on the photo
+## Compass marks in the 0.3.9 check
 
-The earlier preview pointed both ticks toward the lens center, giving each a 13.41° slope on this example. The corrected ticks follow the east–west axis of the entered pose. Both anchors stay on native image row 1806.72. A phone with a different heading or roll can legitimately show angled ticks. [Compass projection](CARDINAL_DIRECTION_OVERLAY.md)
+The earlier preview pointed both ticks toward the lens center, giving each a 13.41° slope on this example. Version 0.3.9 aligned the short ticks with the east–west axis of the entered pose. Both anchors stay on native image row 1806.72. Version 0.3.10 traces the full meridians, which can curve on the tilted photo, and marks true zenith and the calibrated lens center. [Current sky grid](CARDINAL_DIRECTION_OVERLAY.md)
 
 ![Corrected east and west marks at the same height on the example sky photograph](images/example-east-west-compass.png)
 

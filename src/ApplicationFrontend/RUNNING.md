@@ -66,9 +66,9 @@ Existing studies retain their stored camera and panel geometry. An older flat pa
 
 For the LAAS Site 2 example, a panel tilted 6.8° with a front azimuth of −26° has a top heading of 334°. The flat phone’s assumed north image top corresponds to a separate phone top heading of 0°.
 
-## Cardinal-direction preview
+## Sky grid on the photo
 
-**Show cardinal directions** places magenta N/E/S/W labels over the original colour photograph. The outer endpoint of each tick marks the compass bearing through the same calibration and camera pose used for sun paths and shading. It marks the horizon where visible or the edge of coverage otherwise. The strokes show the compass axes in the oriented photo. Opposite bearings have parallel strokes. A dot marks an end-on bearing or a location with less than one pixel of room for a stroke. Labels remain upright.
+**Show sky grid** marks the fitted lens center with a cyan cross. Cyan rings measure angles away from the lens axis in 30° steps. The green outline marks the calibrated field limit. Dotted magenta N–S and E–W lines trace the geographic meridians. Their crossing at the zenith dot shows straight overhead. Tilting the phone moves this crossing away from the lens center. Hover over **Show sky grid** for the fitted center in the original photo’s pixel coordinates.
 
 Expand the sky photo to inspect the compass. Scroll over a feature to zoom around it, drag the magnified image to pan, and choose **Fit** to see the whole photograph. The green outline and the compass move with the image.
 

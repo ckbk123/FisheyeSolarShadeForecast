@@ -70,8 +70,8 @@ public static class SmokeTest
                 if (!overlayFile.SequenceEqual(first.SunPath.Png)) throw new InvalidOperationException("The saved overlay differs from the displayed library result.");
                 if (!File.ReadAllBytes(Path.Combine(first.DebugDirectory!, "02-sky-mask", "sky-mask.png")).SequenceEqual(first.Mask!.Png))
                     throw new InvalidOperationException("The sun-path preview changed the binary mask artifact.");
-                if (first.Cardinals is not { HasMarkers: true } || !window.CardinalsVisibleForTest)
-                    throw new InvalidOperationException("Cardinal overlay missing from original sky photograph.");
+                if (first.Cardinals is not { HasGrid: true, HasMarkers: true, MeridianDotCount: > 0 } || !window.CardinalsVisibleForTest)
+                    throw new InvalidOperationException("Calibrated sky grid missing from original sky photograph.");
                 if (!File.ReadAllBytes(Path.Combine(first.DebugDirectory!, "02-orientation", "cardinal-directions-overlay.png")).SequenceEqual(first.Cardinals.Png))
                     throw new InvalidOperationException("Saved cardinal overlay differs from the displayed library image.");
                 foreach (string artifact in new[] { "cardinal-directions.xlsx", "cardinal-directions-details.json" })

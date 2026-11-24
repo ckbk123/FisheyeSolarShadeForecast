@@ -92,6 +92,93 @@ def verify_mask(stage):
         return image.width * image.height
 
 
+def verify_lens_grid(image, details, calibration, disk, rows, project):
+    """Check calibrated angles and independent geographic rays against the native grid."""
+    width, height = image.size
+    cx, cy = calibration["PrincipalPoint"]
+    limit = calibration["MaximumIncidentAngleDegrees"]
+    center_visible = 0 <= cx <= width-1 and 0 <= cy <= height-1
+    close(details["Projection"]["PrincipalPointX"], cx)
+    close(details["Projection"]["PrincipalPointY"], cy)
+    assert details["LensCenterVisible"] == center_visible
+    assert [row["Feature"] for row in rows] == ["Lens center", "True zenith"] + ["Lens ring"]*len(details["Rings"])
+
+    def check_position(row, x, y, visible):
+        assert str(row["Visible"]).lower() == str(visible).lower()
+        if x is None:
+            assert row["X (native pixels)"] is None and row["Y (native pixels)"] is None
+        else:
+            close(row["X (native pixels)"], x)
+            close(row["Y (native pixels)"], y)
+
+    def ink_near(x, y, cyan, tolerance=2):
+        for py in range(max(0, round(y)-tolerance), min(height, round(y)+tolerance+1)):
+            for px in range(max(0, round(x)-tolerance), min(width, round(x)+tolerance+1)):
+                r, g, b, alpha = image.getpixel((px, py))
+                if alpha and (min(g, b)-r > 60 if cyan else min(r, b)-g > 60):
+                    return True
+        return False
+
+    check_position(rows[0], cx, cy, center_visible)
+    zx, zy, zenith_visible = project(0, 0)
+    zenith = details["Zenith"]
+    assert (zenith is not None) == zenith_visible
+    check_position(rows[1], zx if zenith_visible else None, zy if zenith_visible else None, zenith_visible)
+    check_ink = details["Options"]["Opacity"] >= .05
+    if zenith_visible:
+        close(zenith["X"], zx)
+        close(zenith["Y"], zy)
+        if check_ink:
+            assert ink_near(zx, zy, cyan=False), "Missing zenith mark"
+    if center_visible and check_ink:
+        # The magenta zenith may cover the middle of the cyan cross on a level camera.
+        near = max(2, math.ceil(.015*min(width, height, 4*disk["Radius"])))
+        assert ink_near(cx, cy, cyan=True, tolerance=near) or (
+            zenith_visible and math.hypot(cx-zx, cy-zy) <= near and ink_near(cx, cy, cyan=False)), "Missing lens center"
+
+    angles = [a for a in range(30, 180, 30) if a <= limit + 1e-10]
+    assert [r["IncidentAngleDegrees"] for r in details["Rings"]] == angles
+    for ring, angle, row in zip(details["Rings"], angles, rows[2:]):
+        radius = sum(c * math.radians(angle)**i for i, c in enumerate(calibration["IncidentAngleToRadiusPolynomial"]))
+        close(ring["RadiusPixels"], radius)
+        close(row["Radius (native pixels)"], radius)
+        close(row["Incident angle (degrees)"], angle)
+        check_position(row, cx, cy, ring["Visible"])
+        # Sparse independent probes check visible arcs, allowing text, clipping and compass intersections.
+        probes = set()
+        for azimuth in range(0, 360, 2):
+            a = math.radians(azimuth)
+            x, y = cx + radius*math.cos(a), cy + radius*math.sin(a)
+            if 1 <= x < width-1 and 1 <= y < height-1 and math.hypot(x-disk["CenterX"], y-disk["CenterY"]) < disk["Radius"]-1:
+                probes.add((round(x), round(y)))
+        if len(probes) >= 24 and radius >= 10:
+            assert ring["Visible"]
+            if check_ink:
+                assert any(ink_near(x, y, cyan=True) for x, y in probes), ("Missing lens ring", angle)
+
+    # A single zenith dot or a cardinal label must not stand in for a whole trace.
+    clearance = max(4, .06*min(width, height, 4*disk["Radius"]))
+    marked = [(cx, cy)] + ([(zx, zy)] if zenith_visible else [])
+    for marker in details["Markers"]:
+        if marker["Visible"]:
+            marked.append((marker["BoundaryX"], marker["BoundaryY"]))
+        if marker["LabelX"] is not None:
+            marked.append((marker["LabelX"], marker["LabelY"]))
+    nx, ny, nadir_visible = project(0, 180)
+    if nadir_visible:
+        marked.append((nx, ny))
+    for azimuth in (0, 90, 180, 270):
+        probes = set()
+        for zenith_deg in range(181):
+            x, y, valid = project(azimuth, zenith_deg)
+            if valid and all(math.hypot(x-mx, y-my) > clearance for mx, my in marked):
+                probes.add((round(x), round(y)))
+        # Dots have gaps. Tiny/tangent fragments can fall between native sample positions.
+        if check_ink and len(probes) >= 24:
+            assert details["MeridianDotCount"] > 0
+            assert any(ink_near(x, y, cyan=False) for x, y in probes), ("Missing dotted meridian", azimuth)
+
+
 def verify_cardinal_overlay(run):
     """Independent camera-basis projection and native PNG/workbook read-back."""
     stage = run / "02-orientation"
@@ -129,18 +216,25 @@ def verify_cardinal_overlay(run):
         lateral = math.hypot(x, y)
         px = calibration["PrincipalPoint"][0] + (radius*x/lateral if lateral > 1e-14 else 0)
         py = calibration["PrincipalPoint"][1] + (radius*y/lateral if lateral > 1e-14 else 0)
-        valid = (math.degrees(theta) <= calibration["MaximumIncidentAngleDegrees"] + 1e-9 and
+        valid = (not (forward < 0 and lateral < 1e-12) and
+                 math.degrees(theta) <= calibration["MaximumIncidentAngleDegrees"] + 1e-9 and
                  -1e-7 <= px <= width-1+1e-7 and -1e-7 <= py <= height-1+1e-7 and
                  math.hypot(px-disk["CenterX"], py-disk["CenterY"]) <= disk["Radius"] + 1e-7)
         return px, py, valid
 
-    rows = first(stage / "cardinal-directions.xlsx")
+    workbook = dict(sheets(stage / "cardinal-directions.xlsx"))
+    rows = workbook["Cardinal directions"]
+    has_grid = "Rings" in details
     assert len(rows) == len(details["Markers"]) == 4
     with Image.open(stage / "cardinal-directions-overlay.png") as image:
         assert image.mode == "RGBA" and image.size == (width, height)
         red, green, blue, alpha = image.split()
-        assert red.getextrema() == (255, 255) and green.getextrema() == (0, 0) and blue.getextrema() == (180, 180)
-        assert alpha.getextrema()[0] == 0 and alpha.getextrema()[1] <= math.ceil(details["Options"]["Opacity"]*255)
+        if has_grid:
+            verify_lens_grid(image, details, calibration, disk, workbook["Lens grid"], project)
+        else:
+            assert red.getextrema() == (255, 255) and green.getextrema() == (0, 0) and blue.getextrema() == (180, 180)
+            assert alpha.getextrema()[0] == 0
+        assert alpha.getextrema()[1] <= math.ceil(details["Options"]["Opacity"]*255)
         for marker, row, name, azimuth in zip(details["Markers"], rows, "NESW", (0, 90, 180, 270)):
             assert marker["Name"] == row["Direction"] == name
             assert marker["AzimuthDegrees"] == row["True azimuth (degrees)"] == azimuth
@@ -157,12 +251,13 @@ def verify_cardinal_overlay(run):
             assert abs(x-marker["BoundaryX"]) < 1e-6 and abs(y-marker["BoundaryY"]) < 1e-6
             if marker["BoundaryZenithDegrees"] < 89.999:
                 assert not project(azimuth, marker["BoundaryZenithDegrees"] + .001)[2], (name, "not at coverage boundary")
-            assert len(marker["TickPoints"]) >= 2
+            assert len(marker["TickPoints"]) >= (1 if has_grid else 2)
             assert marker["TickPoints"][0] == {"X": marker["BoundaryX"], "Y": marker["BoundaryY"]}
             for point in marker["TickPoints"]:
                 assert 0 <= point["X"] <= width-1 and 0 <= point["Y"] <= height-1
-            ix, iy = round(x), round(y)
-            assert alpha.crop((max(0, ix-3), max(0, iy-3), min(width, ix+4), min(height, iy+4))).getextrema()[1] > 0
+            if not has_grid:
+                ix, iy = round(x), round(y)
+                assert alpha.crop((max(0, ix-3), max(0, iy-3), min(width, ix+4), min(height, iy+4))).getextrema()[1] > 0
     return {"CardinalMarkers": sum(m["Visible"] for m in details["Markers"]), "CardinalNativePixels": width*height, "CardinalProjectionVerified": True}
 
 

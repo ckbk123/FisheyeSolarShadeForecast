@@ -9,6 +9,7 @@ public sealed record CardinalDirectionOverlayOptions
 }
 
 public sealed record CardinalDirectionOverlayPoint(double X, double Y);
+public sealed record CardinalDirectionOverlayRing(int IncidentAngleDegrees, double RadiusPixels, bool Visible);
 public sealed record CardinalDirectionOverlayMarker(string Name, double AzimuthDegrees, bool Visible,
     double? BoundaryZenithDegrees, double? BoundaryX, double? BoundaryY,
     double? LabelX, double? LabelY, string Status, IReadOnlyList<CardinalDirectionOverlayPoint> TickPoints);
@@ -21,10 +22,15 @@ public sealed record CardinalDirectionOverlayResult(byte[] Png, int Width, int H
     CardinalDirectionOverlayTimings Timings, CardinalDirectionOverlayOptions Options, string GeometryConvention,
     CardinalDirectionProjectionMetadata Projection)
 {
+    public IReadOnlyList<CardinalDirectionOverlayRing> Rings { get; init; } = [];
+    public bool LensCenterVisible { get; init; }
+    public CardinalDirectionOverlayPoint? Zenith { get; init; }
+    public int MeridianDotCount { get; init; }
+    public bool HasGrid => LensCenterVisible || Zenith is not null || MeridianDotCount > 0 || Rings.Any(r => r.Visible) || HasMarkers;
     public bool HasMarkers => Markers.Any(m => m.Visible);
 }
 
-/// <summary>Orientation annotations from constant-world-azimuth meridians in the upper hemisphere.
+/// <summary>Calibrated lens-angle rings and projected geographic compass meridians.
 /// Uses the shading projection unchanged; does not calculate sun positions or assume the horizon is visible.</summary>
 public static class CardinalDirectionOverlayGenerator
 {
@@ -32,12 +38,13 @@ public static class CardinalDirectionOverlayGenerator
     private const double SearchStepDegrees = .025;
     public const string Convention = "EXIF-oriented native pixels; x right, y down; true azimuth clockwise from North. " +
         "N/E/S/W anchors mark the furthest resolved visible zenith on their upper-hemisphere constant-azimuth meridians. " +
-        "Each straight tick is a compass glyph along the horizontal world bearing projected onto the camera's right/down axes, with its outer end at the anchor. " +
-        "A dot marks an end-on bearing or an anchor with less than one pixel of room. " +
-        "Endpoints obey calibrated incident angle, actual image disk, and image rectangle. " +
-        "An endpoint at zenith 90 degrees is the horizon; other endpoints are coverage limits, not horizon locations. " +
-        "Default upward camera: N top, E left, S bottom, W right. Labels remain upright. " +
-        "Meridian search spacing 0.025 degrees; boundary refinement 40 bisections. Subpixel raster precision 1/256 pixel.";
+        "Cyan cross: fitted lens center. Cyan rings: incident angle from the optical axis at 30-degree steps. " +
+        "Magenta dots: projected N-S and E-W vertical great circles, including covered directions below the horizon. " +
+        "Their larger magenta dot marks true zenith when visible. Gaps and the undefined optical antipode split paths. " +
+        "Ring and meridian strokes are clipped to calibrated incidence, image disk and rectangle. " +
+        "The fitted center is marked wherever it falls on the photo. Letters label geographic anchors. " +
+        "TickPoints retain the legacy display-glyph coordinates. A horizon endpoint has zenith 90 degrees. " +
+        "Upward camera with a north-pointing top: N top, E left, S bottom, W right.";
 
     public static IReadOnlyList<string> Export(CardinalDirectionOverlayResult result, string directory, CancellationToken ct = default)
         => CardinalDirectionOverlayExporter.Export(result, directory, ct);
@@ -123,23 +130,10 @@ public static class CardinalDirectionOverlayGenerator
             markers.Add(new(name, azimuth, true, zenith, x, y, fits ? left : null, fits ? top+size.Height : null,
                 status, Array.AsReadOnly(points)));
         }
+        var grid = new CalibratedPhotoGrid(projection, labels, ct);
         double geometryMs = timer.Elapsed.TotalMilliseconds;
         ct.ThrowIfCancellationRequested(); timer.Restart();
-        using var alpha = new Mat(projection.Height, projection.Width, MatType.CV_8UC1, Scalar.All(0));
-        var ink = Scalar.All(Math.Round(options.Opacity * 255));
-        foreach (var marker in markers.Where(m => m.Visible))
-        {
-            ct.ThrowIfCancellationRequested();
-            Point[] points = marker.TickPoints.Select(p => new Point(checked((int)Math.Round(p.X*256)), checked((int)Math.Round(p.Y*256)))).ToArray();
-            if (points.Length == 1)
-                Cv2.Circle(alpha, points[0], thickness * 128, ink, -1, LineTypes.AntiAlias, 8);
-            else
-                Cv2.Line(alpha, points[0], points[1], ink, thickness, LineTypes.AntiAlias, 8);
-            if (marker.LabelX is { } lx && marker.LabelY is { } ly)
-                Cv2.PutText(alpha, marker.Name, new Point((int)lx, (int)ly), HersheyFonts.HersheySimplex, fontScale, ink, thickness, LineTypes.AntiAlias);
-        }
-        using var rgba = new Mat(projection.Height, projection.Width, MatType.CV_8UC4, new Scalar(180, 0, 255, 0));
-        Cv2.InsertChannel(alpha, rgba, 3);
+        using var rgba = grid.Render(markers, options.Opacity, fontScale, thickness, ct);
         double renderMs = timer.Elapsed.TotalMilliseconds;
         ct.ThrowIfCancellationRequested(); timer.Restart();
         Cv2.ImEncode(".png", rgba, out var png, [new ImageEncodingParam(ImwriteFlags.PngCompression, 1), new ImageEncodingParam(ImwriteFlags.PngStrategy, 3)]);
@@ -148,7 +142,11 @@ public static class CardinalDirectionOverlayGenerator
         return new(png, projection.Width, projection.Height, markers.AsReadOnly(), projection.Pose,
             new(geometryMs, renderMs, encodeMs, total.Elapsed.TotalMilliseconds), options, Convention,
             new(projection.PrincipalPointX, projection.PrincipalPointY, projection.IncidentAnglePolynomial,
-                projection.MaximumIncidentAngleRadians * 180 / Math.PI, projection.CoverageDisk));
+                projection.MaximumIncidentAngleRadians * 180 / Math.PI, projection.CoverageDisk))
+        {
+            Rings = grid.Rings, LensCenterVisible = grid.LensCenterVisible,
+            Zenith = grid.Zenith, MeridianDotCount = grid.MeridianDotCount
+        };
     }
 
     private static CardinalDirectionOverlayPoint[] CompassTick(CalibratedSkyProjection projection,
