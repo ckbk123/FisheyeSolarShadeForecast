@@ -22,21 +22,20 @@ public sealed class OrientationWorkspaceTests
         try
         {
             var path = OrientationMapAssets.WriteStandalone(directory.FullName);
-            using var index = OrientationMapAssets.Open(OrientationMapAssets.PageUrl, out var mime);
-            Assert.Equal("text/html", mime);
-            using var reader = new StreamReader(index!);
-            string html = reader.ReadToEnd();
-            Assert.Equal(html, File.ReadAllText(path));
-            var links = Regex.Matches(html, "(?:src|href)=\"([^\"]+\\.(?:js|css))\"");
-            Assert.NotEmpty(links);
-            foreach (Match link in links)
+            string standalone = File.ReadAllText(path);
+            using var reader = new StreamReader(OrientationMapAssets.OpenEmbeddedPage());
+            string embedded = reader.ReadToEnd();
+            var references = Regex.Matches(standalone, """(?:src|href)="([^"]+\.(?:js|css))(?=")""");
+            Assert.NotEmpty(references);
+            int previous = 0;
+            foreach (Match link in references)
             {
-                string relative = link.Groups[1].Value;
-                using var asset = OrientationMapAssets.Open(new Uri(new Uri(OrientationMapAssets.PageUrl), relative).AbsoluteUri, out mime);
-                Assert.NotNull(asset);
-                Assert.Equal(relative.EndsWith(".js") ? "text/javascript" : "text/css", mime);
-                using var assetReader = new StreamReader(asset!);
-                Assert.Equal(File.ReadAllText(Path.Combine(directory.FullName, relative)), assetReader.ReadToEnd());
+                string name = link.Groups[1].Value;
+                string source = File.ReadAllText(Path.Combine(directory.FullName, name));
+                int index = embedded.IndexOf(source, StringComparison.Ordinal);
+                Assert.True(index > previous, name);
+                previous = index;
+                Assert.DoesNotContain(link.Value, embedded);
             }
         }
         finally { directory.Delete(recursive: true); }
@@ -51,6 +50,5 @@ public sealed class OrientationWorkspaceTests
     {
         Assert.True(OrientationMapAssets.IsPage(OrientationMapAssets.PageUrl));
         Assert.False(OrientationMapAssets.IsPage(uri));
-        Assert.Null(OrientationMapAssets.Open(uri, out _));
     }
 }

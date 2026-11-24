@@ -29,6 +29,12 @@ function samples(start, end, makePoint, step = 4) {
   return Array.from({length: count + 1}, (_, i) => makePoint(start + (end - start) * i / count));
 }
 
+// Translate along the panel's cross-slope axis so matching faces share a plane.
+function displayCenters(panelFrame) {
+  const pivot = [0, 0, .91];
+  return {panel: move(pivot, panelFrame.right, .68), phone: move(pivot, panelFrame.right, -1.95)};
+}
+
 function create(container, onViewChange) {
   const canvas = document.createElement("canvas");
   canvas.setAttribute("role", "img");
@@ -45,8 +51,8 @@ function create(container, onViewChange) {
     phone: {topHeading: 0, tilt: 28},
     sun: {azimuth: 135, elevation: 42}
   };
-  let options = {active: "panel", labels: true, angles: true, placed: true};
-  let yaw = 221, pitch = 28, zoom = 1, queued = false;
+  let options = {active: "panel", labels: true, angles: true};
+  let yaw = 208, pitch = 28, zoom = 1, queued = false;
   let width, height, scale, centerX, centerY, eye, screenRight, screenUp;
   let labels = [], occupied = [];
 
@@ -487,10 +493,11 @@ function create(container, onViewChange) {
     screenRight = [-Math.cos(a), Math.sin(a), 0];
     screenUp = [-Math.sin(a) * Math.sin(e), -Math.cos(a) * Math.sin(e), Math.cos(e)];
     // Fit the whole compass and sky marker before applying any user-controlled zoom.
-    const bounds = [...samples(0, 360, v => onRing(ringRadius + .34, v)), sun, [0, 0, 3.03]];
-    const horizontal = bounds.map(p => dot(p, screenRight)), vertical = bounds.map(p => dot(p, screenUp));
-    const xMin = Math.min(...horizontal), xMax = Math.max(...horizontal);
-    const yMin = Math.min(...vertical), yMax = Math.max(...vertical);
+    const radius = ringRadius + .34;
+    const ringHeight = radius * Math.abs(Math.sin(e));
+    const sunX = dot(sun, screenRight), sunY = dot(sun, screenUp);
+    const xMin = Math.min(-radius, sunX), xMax = Math.max(radius, sunX);
+    const yMin = Math.min(-ringHeight, sunY), yMax = Math.max(ringHeight, sunY, 3.03 * Math.cos(e));
     const horizontalMargin = width < 450 ? 29 : 57;
     const verticalMargin = height < 340 ? 28 : 34;
     scale = Math.max(
@@ -530,26 +537,19 @@ function create(container, onViewChange) {
     const values = G.sceneValues(state), panels = G.equipmentFrame(state.panel), phones = G.equipmentFrame(state.phone);
     const sun = times(values.sunVector, sunDistance);
     setProjection(sun);
-    const pc = options.placed ? [0, 0, .91] : [-.56, .17, .91];
-    const fc = options.placed ? onFace(pc, panels, .78, .035, .077) : [1.42, -.42, .73];
+    const {panel: pc, phone: fc} = displayCenters(panels);
     grid();
     if (options.angles)
       groundArc(values);
     contactShadow(pc, panels, 2.72, 1.7);
-    if (!options.placed)
-      contactShadow(fc, phones, .50, .89);
+    contactShadow(fc, phones, .50, .89);
     sunBody(sun, values.sunVector);
     panelStand(pc, panels);
     const models = [
       {depth: dot(pc, eye), draw: () => panelBody(pc, panels)},
       {depth: dot(fc, eye), draw: () => phoneBody(fc, phones)}
     ];
-    if (options.placed) {
-      panelBody(pc, panels);
-      if (dot(panels.normal, eye) >= -.045)
-        phoneBody(fc, phones);
-    } else
-      models.sort((a, b) => a.depth - b.depth).forEach(m => m.draw());
+    models.sort((a, b) => a.depth - b.depth).forEach(m => m.draw());
     reserveModel(pc, panels, 2.42, 1.43, .12);
     reserveModel(fc, phones, .50, .89, .85);
     const panelBase = onFace(pc, panels, -.60, .00, .018), phoneBase = onFace(fc, phones, 0, .22, .022);
@@ -594,7 +594,7 @@ function create(container, onViewChange) {
       yaw = 90;
       pitch = 0;
     } else {
-      yaw = 221;
+      yaw = 208;
       pitch = 28;
       name = "orbit";
     }
@@ -683,5 +683,5 @@ function create(container, onViewChange) {
     }
   };
 }
-globalThis.AngleScene = {create};
+globalThis.AngleScene = {create, displayCenters};
 })();

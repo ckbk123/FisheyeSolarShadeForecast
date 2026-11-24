@@ -1,3 +1,6 @@
+using System.Text;
+using System.Text.RegularExpressions;
+
 namespace SolarShade.Desktop;
 
 /// <summary>The same offline files supply the embedded map and the standalone browser fallback.</summary>
@@ -16,19 +19,25 @@ internal static class OrientationMapAssets
     private static bool IsLocal(Uri uri) => uri.Scheme == Uri.UriSchemeHttps &&
         uri.Host == "orientation.invalid" && uri.IsDefaultPort && uri.UserInfo.Length == 0;
 
-    internal static Stream? Open(string address, out string contentType)
+    // One local response avoids a UI-thread round trip per stylesheet/script in WebView2.
+    private static readonly Lazy<byte[]> EmbeddedPage = new(() =>
     {
-        contentType = "text/plain";
-        if (!Uri.TryCreate(address, UriKind.Absolute, out var uri) || !IsLocal(uri) ||
-            !Resources.TryGetValue(uri.AbsolutePath, out var name)) return null;
-        contentType = Path.GetExtension(name) switch
-        {
-            ".js" => "text/javascript",
-            ".css" => "text/css",
-            _ => "text/html"
-        };
-        return Assembly.GetManifestResourceStream(name);
+        string html = ReadAsset("index.html");
+        html = Regex.Replace(html, """<link rel="stylesheet" href="([^"]+)">""",
+            m => "<style>" + ReadAsset(m.Groups[1].Value) + "</style>");
+        html = Regex.Replace(html, """<script defer src="([^"]+)"></script>""",
+            m => "<script>" + ReadAsset(m.Groups[1].Value) + "</script>");
+        return Encoding.UTF8.GetBytes(html);
+    });
+
+    private static string ReadAsset(string name)
+    {
+        using var input = Assembly.GetManifestResourceStream(Resources["/" + name])!;
+        using var reader = new StreamReader(input);
+        return reader.ReadToEnd();
     }
+
+    internal static Stream OpenEmbeddedPage() => new MemoryStream(EmbeddedPage.Value, writable: false);
 
     internal static string WriteStandalone(string directory)
     {

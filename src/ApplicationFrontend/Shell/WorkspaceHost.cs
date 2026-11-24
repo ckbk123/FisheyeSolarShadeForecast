@@ -23,7 +23,7 @@ public sealed class WorkspaceHost : TabControl, IDisposable
             ActiveChanged?.Invoke(this, EventArgs.Empty);
         };
     }
-    public void Register(WorkspaceDescriptor workspace)
+    public TabItem Register(WorkspaceDescriptor workspace)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         if (string.IsNullOrWhiteSpace(workspace.Id) || tabs.ContainsKey(workspace.Id)) throw new ArgumentException("Unique workspace ID required.");
@@ -32,6 +32,7 @@ public sealed class WorkspaceHost : TabControl, IDisposable
         ToolTipService.SetShowOnDisabled(tab, true);
         tabs.Add(workspace.Id, tab); availability.Add(workspace.Id, true); Items.Add(tab);
         if (Items.Count == 1) SelectedItem = tab;
+        return tab;
     }
     public void SetAvailability(string id, bool ready, string? reason)
     {
