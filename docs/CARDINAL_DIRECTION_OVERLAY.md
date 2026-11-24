@@ -1,22 +1,29 @@
-# Cardinal-direction debug overlay
+# Calibrated sky grid
 
-## Library and projection
+**Show sky grid** draws the following guides on the original sky photo. Zoom or expand the preview to inspect them.
 
-`CardinalDirectionOverlayGenerator` and `CardinalDirectionOverlayExporter` live in the existing `SolarShade.Shading` library. The frontend does not calculate bearings or draw annotations. The generator accepts an immutable `CalibratedSkyProjection`, uses its camera pose and coverage, and returns a transparent native-resolution PNG plus numerical marker records.
+| Guide | What it measures |
+| --- | --- |
+| Cyan cross | The calibrated optical center, where the lens axis reaches the photograph. Hover over **Show sky grid** for the original pixel coordinates. |
+| Cyan circles | Angles from the lens axis in 30° steps. The calibration polynomial sets each radius. A tilted phone still has concentric lens rings. |
+| Magenta dotted N–S and E–W lines | The visible parts of the true geographic meridians. The larger magenta dot marks straight overhead (zenith) when visible. A tilted or rolled camera can turn these meridians into curves. |
+| Green outline | The selected calibrated angular limit. The photo edges and detected image disk can further restrict usable coverage. |
 
-The outer endpoint of each tick marks the furthest visible zenith angle on its constant true-azimuth meridian (N=0°, E=90°, S=180°, W=270°). A marker at zenith 90° is on the horizon. Other markers indicate a coverage boundary. Calibrated angular coverage, the detected disk and the image rectangle all constrain visibility.
+![Sky grid drawn on the bundled photograph with the calibrated lens center and true zenith](images/example-calibrated-sky-grid.png)
 
-The tick is a compass glyph. Its outer end marks the projected bearing. From its inner end toward its anchor, it follows the horizontal world bearing projected onto the camera’s image-right and image-down axes. Opposite bearings have parallel ticks. On the south-facing example, east and west lie level even though both anchors are above the optical center. Rolling the camera rotates the ticks. A dot marks an end-on bearing or a location with less than one pixel of room inside coverage. Marks can appear over obstructions.
+## Reading the bundled photograph
 
-The search uses bounded 0.025° increments and 40 boundary bisections. Very thin visible fragments can be unresolved; fragments shorter than one native pixel are reported unavailable. Missing directions are not fabricated. These numerical search limits do not establish physical calibration accuracy.
+On the oriented 3000 × 4000 photo, the fitted center is **(1530.53, 1997.85) px** measured from the top left. The detected image disk is centered at **(1521.88, 2003.13) px**, about 10 px away. The calibration fits checkerboard observations. Disk detection estimates the visible circular footprint of the lens. Agreement between them is a visual check and cannot establish the true optical axis from this photo alone.
 
-The existing camera convention is preserved: with the camera pointing up, zero roll and top heading North, N is above, E left, S below and W right. Roll rotates this arrangement; it cannot reverse handedness. The overlay does not independently mirror the photograph or interchange E/W. A real known-bearing photograph is still needed to validate the entered physical camera orientation; the bundled example pose is illustrative.
+The example lens maps 30° to a radius of 423.23 px and 60° to 776.19 px. The 66.43° half-field ends at 823.94 px. The phone's assigned 28° tilt places true zenith at (1530.53, 1602.06) px, about 396 px above lens center. The magenta axes cross there. [Solar path and camera pose](SOLAR_OVERLAY_CONVENTION.md)
 
-Magenta annotations use 85% target opacity. Text remains upright; label placement may move inside the rectangle or omit a label when space is insufficient. The exported endpoint stays at the true projected boundary independently of text layout. The original image and binary mask remain unchanged.
+## Geometry and coverage
+
+Rings stay with the calibrated lens. Compass lines use the same camera pose and native projection as shading and the solar path. Each line follows a vertical geographic plane through the visible field, including regions below the horizon when covered. Projection gaps split the dotted traces. N/E/S/W labels identify the visible upper-sky bearings and stay upright. In a level skyward camera with north at the top, east appears on the left.
 
 ## Frontend lifecycle
 
-The original-photo viewport and overlay share native image coordinates and one scaling/letterboxing transform, including when the photo preview is downsampled. **Show cardinal directions** changes only visibility and persists the preference.
+The original-photo viewport and overlay share native image coordinates and one scaling/letterboxing transform, including when the photo preview is downsampled. **Show sky grid** changes only visibility and persists the preference.
 
 Orientation preview work has a separate revision/cancellation lifecycle from time-dependent calculation. Relevant committed edits clear stale markers, debounce and request the newest image/calibration/pose. Old callbacks cannot publish after a newer orientation edit. The image stages can run without irradiance, dates, site or panel inputs; full calculations invoke those stages before weather retrieval.
 
@@ -27,12 +34,16 @@ The library-result cache depends on image identity, effective calibration, nativ
 `02-orientation` contains:
 
 - `cardinal-directions-overlay.png`: exact transparent library result displayed on the photo.
-- `cardinal-directions.xlsx`: four direction rows, including bearing, visibility, endpoint zenith/native pixel coordinates, label baseline coordinates and status.
-- `cardinal-directions-details.json`: pose, projection coefficients/coverage/disk, all tick vertices, rendering options, conventions and timing.
+- `cardinal-directions.xlsx`: the **Cardinal directions** sheet gives the four geographic anchors and their native coordinates. The **Lens grid** sheet records the fitted center, projected zenith and lens-angle radii.
+- `cardinal-directions-details.json`: pose, calibrated center, projected zenith, ring radii, coverage, compass anchors and rendering details.
 
 Standalone previews create `orientation-...` runs containing image, calibration and orientation stages. Full calculation runs include the orientation stage alongside existing scientific stages. Cached results are exported into the current run without regenerating their image.
 
-## Measured performance
+## Grid generation on the bundled photo
+
+In a fresh 3000 × 4000 example evaluation, the library spent 15 ms on geometry, 39 ms drawing the grid and 359 ms encoding its transparent PNG (413 ms total). The preview reuses that image when zooming or toggling the grid. These timings describe one run on the development machine.
+
+## Historical tick-overlay measurements
 
 Six calls using the bundled 3000×4000 photo's effective calibration and detected disk: three at zero pose and three with heading/tilt/roll. The first call includes cold initialization; subsequent calls share the process.
 
@@ -43,7 +54,7 @@ Six calls using the bundled 3000×4000 photo's effective calibration and detecte
 
 Measurements exclude image decoding, segmentation, unrelated stage work and weather retrieval. They describe this machine and image, not a hardware-independent guarantee. No solar samples are computed. Evidence and reproducible development harness: `artifacts/cardinal-backend-check`, including `timings.json`, both pose outputs and `independent-verification.json`.
 
-## Verification
+## Historical verification
 
 The shading suite passes 87 tests, including 13 cardinal cases covering analytical cardinal positions, heading/roll, tilt, disk/rectangle clipping, horizon versus coverage endpoints, unavailable directions, alpha, exact exports and cancellation. Independent Python read-back checks PNG dimensions/alpha/color, all four workbook rows, analytical projection from the exported pose/calibration, and boundary exclusion immediately beyond each non-horizon endpoint. `preview-proof.png` records a visual comparison of zero and tilted/rolled poses over the original photo.
 
@@ -55,7 +66,7 @@ The first 696-row example retains exactly 149.33192161721075 kWh/m² before shad
 
 Independent read-back passes all 13 completed Debug Data runs: nine full calculations and four standalone orientation previews. Two deliberately interrupted preview runs are correctly marked Cancelled. Each full calculation contains nine workbooks, 41,760 selected integration samples, four independently verified cardinal markers and 12 million unchanged binary-mask pixels. Evidence: `artifacts/cardinal-verified/workbook-verification.json`.
 
-## Delivery
+## Historical delivery
 
 Updated `Deliverable-rewritten/APPLICATION.exe` and clean `Deliverable.zip`. The native bundled reference run is copied from the verified packaged application's first calculation, including all three new orientation artifacts. The delivery script preserves existing local `Data/settings.json`; the clean ZIP starts with example settings.
 

@@ -50,9 +50,9 @@ internal static class SunPathReportPdf
         g.DrawImage(sunPath, left, top, width, height);
         g.DrawImage(cardinals, left, top, width, height);
 
-        g.DrawString("White = visible sky   Black = obstruction   Yellow = modeled sun path   Colored letters = true compass directions",
+        g.DrawString("White = visible sky     Black = obstruction     Yellow = modeled sun path     N/E/S/W = true compass directions",
             small, ink, new XRect(38, 773, 520, 14), XStringFormats.TopLeft);
-        g.DrawString("Source pixels are unchanged. The path is a geometry annotation, not the apparent size of the solar disk.",
+        g.DrawString("On the sky grid, the cross marks the fitted lens center. Each ring adds 30° from the lens axis.",
             small, muted, new XRect(38, 788, 520, 14), XStringFormats.TopLeft);
         g.DrawString("SolarShade / " + snapshot.Id, small, muted, new XRect(38, 809, 520, 14), XStringFormats.TopLeft);
         document.Save(Path.Combine(directory, "SunPathReport.pdf"));

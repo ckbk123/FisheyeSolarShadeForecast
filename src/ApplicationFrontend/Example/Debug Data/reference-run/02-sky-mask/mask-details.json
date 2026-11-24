@@ -21,9 +21,9 @@
     "DiskMethod": "Auto",
     "ExecutionProvider": "DirectML: NVIDIA GeForce RTX 3070 (adapter 0)",
     "AccelerationFallback": null,
-    "SessionLoadMilliseconds": 1068.8202,
-    "InferenceMilliseconds": 965.5574,
-    "TotalMilliseconds": 2214.3133
+    "SessionLoadMilliseconds": 959.2973,
+    "InferenceMilliseconds": 801.769,
+    "TotalMilliseconds": 1929.8288
   },
   "PixelConvention": "255 = sky; 0 = obstruction or outside lens; EXIF-oriented image coordinates"
 }

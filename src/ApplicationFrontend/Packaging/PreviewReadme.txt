@@ -1,4 +1,4 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.9
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.10
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
@@ -26,7 +26,8 @@ WebView2 or through the tab's option to open it locally in a browser.
 2. Click Update results. Open Study details beneath the graph for weather and run information.
    Use Edit mask at the top right of the mask preview to paint a new variant.
    The editor lets you paint across the whole photo and save those strokes.
-   Zoom either preview to inspect the compass or the mask and its sun path.
+   Show sky grid marks the lens center, 30-degree rings and dotted compass lines.
+   Zoom either preview to inspect the sky grid or the mask and its sun path.
    The green guide on the sky photo and in the editor shows the calibrated FOV.
    A CALIBRATION FAILED stamp on the sky photo means the checkerboard run
    failed. Open Review checkerboard photos for the cause. PROFILE UNUSABLE

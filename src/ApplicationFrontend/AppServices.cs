@@ -554,7 +554,7 @@ public sealed class AppServices : IIrradianceService
                 string directory = debug.BeginStage("02-orientation", reused ? "Reused in-memory orientation overlay" : "Computed", typeof(CardinalDirectionOverlayGenerator));
                 if (!reused)
                 {
-                    progress("Drawing cardinal directions on the sky photograph");
+                    progress("Drawing the calibrated sky grid");
                     var next = await Task.Run(() => CardinalDirectionOverlayGenerator.Generate(
                         new CalibratedSkyProjection(activeProfile.Calibration,
                             EquipmentOrientation.ToCameraPose(s),

@@ -172,27 +172,35 @@ public sealed class CardinalDirectionOverlayTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void DownwardNarrowCameraProducesTransparentUnavailableResult()
+    public void DownwardNarrowCameraHasALensGridWithoutUpperHemisphereLabels()
     {
         var result=CardinalDirectionOverlayGenerator.Generate(new(Profile(),new(0,180)));
         Assert.False(result.HasMarkers);
-        using var png=Cv2.ImDecode(result.Png,ImreadModes.Unchanged);using var alpha=new Mat();
-        Cv2.ExtractChannel(png,alpha,3);Assert.Equal(0,Cv2.CountNonZero(alpha));
+        Assert.True(result.HasGrid);
+        Assert.True(result.LensCenterVisible);
+        Assert.Null(result.Zenith);
+        Assert.True(result.MeridianDotCount > 0);
     }
 
     [Fact]
-    public void NativePngHasStraightMagentaAndBoundedTransparency()
+    public void NativePngIncludesCompassAndLensGuidesWithBoundedTransparency()
     {
         var result=CardinalDirectionOverlayGenerator.Generate(new(Profile()));
         using var png=Cv2.ImDecode(result.Png,ImreadModes.Unchanged);
         Assert.Equal(501,png.Width);Assert.Equal(501,png.Height);Assert.Equal(4,png.Channels());
-        int colored=0;byte maximum=0;int width=png.Width,height=png.Height;
+        int compass = 0, lens = 0;
+        byte maximum = 0;
+        int width=png.Width,height=png.Height;
         for(int y=0;y<height;y++)for(int x=0;x<width;x++)
         {
             var p=png.At<Vec4b>(y,x);maximum=Math.Max(maximum,p.Item3);
-            if(p.Item3==0)continue;colored++;Assert.Equal(180,p.Item0);Assert.Equal(0,p.Item1);Assert.Equal(255,p.Item2);
+            if(p.Item3==0)continue;
+            if (p.Item2 > p.Item1 + 60 && p.Item0 > p.Item1 + 60) compass++;
+            if (p.Item1 > p.Item2 + 60 && p.Item0 > p.Item2 + 60) lens++;
         }
-        Assert.True(colored>100);Assert.Equal((byte)217,maximum);Assert.Equal(0,png.At<Vec4b>(250,250).Item3);
+        Assert.True(compass > 100 && lens > 100);
+        Assert.Equal((byte)217,maximum);
+        Assert.Equal(0,png.At<Vec4b>(0,0).Item3);
     }
 
     [Fact]
@@ -206,10 +214,17 @@ public sealed class CardinalDirectionOverlayTests(ITestOutputHelper output)
             Assert.Equal(result.Png,File.ReadAllBytes(paths[0]));
             using var zip=ZipFile.OpenRead(paths[1]);using var stream=zip.GetEntry("xl/worksheets/sheet1.xml")!.Open();var xml=XDocument.Load(stream);
             XNamespace n="http://schemas.openxmlformats.org/spreadsheetml/2006/main";Assert.Equal(5,xml.Descendants(n+"row").Count());
+            using var workbookStream = zip.GetEntry("xl/workbook.xml")!.Open();
+            Assert.Contains(XDocument.Load(workbookStream).Descendants(n + "sheet"), sheet => (string?)sheet.Attribute("name") == "Lens grid");
             using var json=JsonDocument.Parse(File.ReadAllBytes(paths[2]));var root=json.RootElement;
             Assert.Equal(42,root.GetProperty("Pose").GetProperty("ImageTopAzimuthDegrees").GetDouble());
             Assert.Equal(246,root.GetProperty("Projection").GetProperty("ImageDisk").GetProperty("CenterX").GetDouble());
             Assert.Equal(2,root.GetProperty("Projection").GetProperty("IncidentAngleToRadiusPolynomial").GetArrayLength());
+            Assert.True(root.GetProperty("LensCenterVisible").GetBoolean());
+            Assert.Equal(result.Zenith!.Y, root.GetProperty("Zenith").GetProperty("Y").GetDouble());
+            Assert.Equal(result.MeridianDotCount, root.GetProperty("MeridianDotCount").GetInt32());
+            Assert.Equal(result.Rings.Select(r => r.RadiusPixels),
+                root.GetProperty("Rings").EnumerateArray().Select(r => r.GetProperty("RadiusPixels").GetDouble()));
         }
         finally {if(Directory.Exists(directory)){foreach(var file in Directory.GetFiles(directory))File.Delete(file);Directory.Delete(directory);}}
     }

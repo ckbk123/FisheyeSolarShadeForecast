@@ -100,7 +100,7 @@ Performance benchmarks measure projector construction, all selected sample proje
 
 ## Cardinal-direction diagnostic overlay
 
-`CardinalDirectionOverlayGenerator` and its exporter live in the existing shading library. Four constant-azimuth meridians are projected using `CalibratedSkyProjection` and the same `CameraPose` as solar projection and shading. The visible meridian endpoints anchor magenta ticks; upright labels are placed for display. The generator respects the lens coverage, image rectangle and detected disk rather than assuming all horizon points are in view. It has no irradiance or solar-timeline dependency and does not mirror compass labels independently of the projection.
+`CardinalDirectionOverlayGenerator` and its exporter live in the existing shading library. The generator traces the N–S and E–W meridian planes through `CalibratedSkyProjection` with the same `CameraPose` used by solar projection and shading. Dots follow the visible arcs. The fitted principal point and radial lens polynomial define the center and 30° rings. The generator clips the traces to the calibrated field, photo bounds and detected disk. It has no irradiance or solar-timeline dependency and does not mirror compass labels independently of the projection.
 
 The frontend owns preview sequencing, cancellation, cache keys and visibility only. A separate orientation preview revision allows pose/image/calibration changes to refresh without waiting for weather retrieval or requiring unrelated inputs to be valid. Relevant edits clear stale markers; unrelated edits preserve the current image. The original photo and transparent PNG share one coordinate transform. `02-orientation` records the exact library PNG, compact numerical XLSX and metadata in Debug Data.
 
