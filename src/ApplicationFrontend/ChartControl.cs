@@ -46,6 +46,7 @@ public sealed class IrradianceChart : FrameworkElement
         MouseLeftButtonDown += (_, e) => { drag = e.GetPosition(this); CaptureMouse(); };
         MouseLeftButtonUp += (_, _) => { drag = null; ReleaseMouseCapture(); };
         LostMouseCapture += (_, _) => drag = null;
+        MouseLeave += (_, _) => HoverText?.Invoke("");
         MouseMove += (_, e) =>
         {
             if (rows.Length == 0) return;
@@ -56,11 +57,12 @@ public sealed class IrradianceChart : FrameworkElement
                 if (step != 0)
                 { int span = last - first; first = Math.Clamp(first + step, 0, rows.Length - 1 - span); last = first + span; drag = p; InvalidateVisual(); }
             }
+            if (p.X < Left || p.X >= ActualWidth - RightMargin || p.Y < Top || p.Y > ActualHeight - BottomMargin)
+            { HoverText?.Invoke(""); return; }
             var time = TimeAt(p.X); var r = rows[IndexAt(time)];
-            if (time < r.Start || time > r.End) { HoverText?.Invoke("No data for this interval"); return; }
+            if (time < r.Start || time >= r.End) { HoverText?.Invoke("No data for this interval"); return; }
             var a = TimeZoneInfo.ConvertTime(r.Start, zone); var b = TimeZoneInfo.ConvertTime(r.End, zone);
-            string end = b.ToString(a.Date != b.Date ? "dd.MM.yyyy HH:mm zzz" : "HH:mm zzz", CultureInfo.InvariantCulture);
-            HoverText?.Invoke($"{a:dd.MM.yyyy HH:mm zzz} – {end}   |   Before {Before(r):F1} W/m²   |   After {(After(r) is { } v ? v.ToString("F1") : "—")} W/m²");
+            HoverText?.Invoke($"{TimeZoneSelection.IntervalLabel(a, b)} · Before {Before(r):F1} · After {After(r)?.ToString("F1") ?? "—"} W/m²");
         };
     }
     private int IndexAt(DateTimeOffset time)
@@ -71,6 +73,7 @@ public sealed class IrradianceChart : FrameworkElement
     }
     public void SetData(IReadOnlyList<PanelRow> values, TimeZoneInfo timeZone)
     {
+        HoverText?.Invoke("");
         bool same = rows.Length == values.Count && rows.Length > 0 && rows[0].Start == values[0].Start && rows[^1].End == values[^1].End;
         rows = values.ToArray(); zone = timeZone; if (!same) Reset(); else InvalidateVisual();
     }

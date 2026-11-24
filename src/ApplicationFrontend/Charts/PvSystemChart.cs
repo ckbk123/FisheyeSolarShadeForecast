@@ -54,10 +54,10 @@ public sealed class PvSystemChart : FrameworkElement
             if (drag is { } start) { double shift = (pointer.Value.X - start.X) / Plot.Width * (dragTo - dragFrom); SetRange(dragFrom - shift, dragTo - shift); }
             Report(pointer.Value); InvalidateVisual();
         };
-        MouseLeave += (_, _) => { pointer = null; InvalidateVisual(); };
+        MouseLeave += (_, _) => { pointer = null; Hover?.Invoke(""); InvalidateVisual(); };
     }
     public void SetResult(BatterySimulationResult? value)
-    { if (ReferenceEquals(result, value)) return; result = value; Reset(); }
+    { if (ReferenceEquals(result, value)) return; result = value; pointer = null; Hover?.Invoke(""); Reset(); }
     public void Reset()
     { if (result?.Hours.Count > 0) { from = Time(result.Hours[0].Start); to = Time(result.Hours[^1].End); } InvalidateVisual(); }
     public void Day(DateTime day)
@@ -75,10 +75,15 @@ public sealed class PvSystemChart : FrameworkElement
         double span = Math.Clamp(b - a, Math.Min(3600, last - first), last - first);
         from = Math.Clamp(a, first, last - span); to = from + span; InvalidateVisual();
     }
-    public static string Describe(BatteryHour h) => $"{h.Start:yyyy-MM-dd HH:mm zzz} → {h.End:HH:mm zzz} · {(h.End - h.Start).TotalMinutes:0.##} min{(h.IsPartialHour ? " (partial hour)" : "")}\nConsumption {h.LoadWh:0.##} Wh · PV available {h.PvWh:0.##} Wh · end battery charge {h.EndSocPercent:0.##}% · unmet {h.UnmetLoadWh:0.##} Wh";
+    public static string Describe(BatteryHour hour)
+    {
+        string duration = hour.IsPartialHour ? $" · {(hour.End - hour.Start).TotalMinutes:0.##} min (partial hour)" : "";
+        string shortfall = hour.UnmetLoadWh > 0 ? $" · Unmet {hour.UnmetLoadWh:0.##} Wh" : "";
+        return $"{TimeZoneSelection.IntervalLabel(hour.Start, hour.End)}{duration} · Load {hour.LoadWh:0.##} Wh · PV {hour.PvWh:0.##} Wh · Charge {hour.EndSocPercent:0.#}%{shortfall}";
+    }
     private void Report(Point point)
     {
-        if (result == null || !Plot.Contains(point)) return;
+        if (result == null || !Plot.Contains(point)) { Hover?.Invoke(""); return; }
         double time = from + (point.X - Plot.Left) / Plot.Width * (to - from);
         var rows = result.Hours; int lo = 0, hi = rows.Count - 1;
         while (lo < hi) { int mid = (lo + hi) / 2; if (Time(rows[mid].End) <= time) lo = mid + 1; else hi = mid; }
