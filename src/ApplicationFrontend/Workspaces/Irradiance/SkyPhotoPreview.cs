@@ -6,52 +6,72 @@ namespace SolarShade.Desktop;
 
 public sealed partial class IrradianceWorkspace
 {
-    private Grid CreateSkyPhotoPane(RowDefinition previewRow, UIElement maskPane)
+    private Grid CreatePreviewPair(RowDefinition previewRow)
     {
-        var pane = new Grid { ClipToBounds = true };
-        pane.Children.Add(skyViewport);
+        var pair = new Grid { Margin = new(12, 0, 12, 0) };
+        pair.ColumnDefinitions.Add(new());
+        pair.ColumnDefinitions.Add(new() { Width = new GridLength(12) });
+        pair.ColumnDefinitions.Add(new());
+
+        var skyPane = new Grid { ClipToBounds = true };
+        var maskPane = new Grid { ClipToBounds = true };
+        Grid.SetColumn(maskPane, 2);
+        pair.Children.Add(skyPane);
+        pair.Children.Add(maskPane);
+        skyPane.Children.Add(skyViewport);
+        maskPane.Children.Add(maskViewport);
+        maskPane.Children.Add(editMask);
+
+        AddPreviewTools(skyViewport, skyPane, maskPane, previewRow, "SkyPhoto", "sky photo");
+        AddPreviewTools(maskViewport, maskPane, skyPane, previewRow, "SkyMask", "mask");
+        return pair;
+    }
+
+    private void AddPreviewTools(ImageViewport viewport, Grid pane, Grid otherPane, RowDefinition previewRow, string id, string name)
+    {
+        int column = Grid.GetColumn(pane);
         var tools = new StackPanel {
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(3)
         };
         pane.Children.Add(tools);
-        Point Center() => new(skyViewport.ActualWidth / 2, skyViewport.ActualHeight / 2);
-        Button Tool(string text, string name, string help, string id)
+        Point Center() => new(viewport.ActualWidth / 2, viewport.ActualHeight / 2);
+        Button Tool(string text, string action, string help, string controlId)
         {
             var button = new Button { Content = text, MinWidth = 23, Padding = new(5, 2, 5, 2), Margin = new(1), FontSize = 11 };
-            AutomationProperties.SetName(button, name);
-            AutomationProperties.SetAutomationId(button, id);
+            AutomationProperties.SetName(button, action);
+            AutomationProperties.SetAutomationId(button, controlId);
             StudioTheme.Help(button, help);
             tools.Children.Add(button);
             return button;
         }
-        var minus = Tool("−", "Zoom sky photo out", "Zoom out around the center of the photo view.", "ZoomSkyPhotoOut");
-        var plus = Tool("+", "Zoom sky photo in", "Zoom in around the center. Scroll on the photo to zoom toward the pointer.", "ZoomSkyPhotoIn");
-        var fit = Tool("Fit", "Fit sky photo", "Center the whole photo and its overlays in the available space.", "FitSkyPhoto");
-        var expand = Tool("Expand", "Expand sky photo", "Use the width of both previews to inspect the sky photo and compass.", "ExpandSkyPhoto");
-        minus.Click += (_, _) => skyViewport.ZoomAt(Center(), 1 / 1.5);
-        plus.Click += (_, _) => skyViewport.ZoomAt(Center(), 1.5);
-        fit.Click += (_, _) => skyViewport.Fit();
+        var minus = Tool("−", $"Zoom {name} out", "Zoom out around the center.", $"Zoom{id}Out");
+        var plus = Tool("+", $"Zoom {name} in", "Zoom in around the center. Scroll to zoom toward the pointer.", $"Zoom{id}In");
+        var fit = Tool("Fit", $"Fit {name}", $"Center the whole {name} and its overlays.", $"Fit{id}");
+        var expand = Tool("Expand", $"Expand {name}", $"Use the width of both previews to inspect the {name}.", $"Expand{id}");
+        minus.Click += (_, _) => viewport.ZoomAt(Center(), 1 / 1.5);
+        plus.Click += (_, _) => viewport.ZoomAt(Center(), 1.5);
+        fit.Click += (_, _) => viewport.Fit();
         bool expanded = false;
         expand.Click += (_, _) => {
             expanded = !expanded;
+            Grid.SetColumn(pane, expanded ? 0 : column);
             Grid.SetColumnSpan(pane, expanded ? 3 : 1);
-            maskPane.Visibility = expanded ? Visibility.Collapsed : Visibility.Visible;
+            otherPane.Visibility = expanded ? Visibility.Collapsed : Visibility.Visible;
             previewRow.Height = new(expanded ? Math.Clamp(owner.ActualHeight * .55, 320, 640) : 220);
             expand.Content = expanded ? "Restore" : "Expand";
-            AutomationProperties.SetName(expand, expanded ? "Restore sky photo layout" : "Expand sky photo");
-            StudioTheme.Help(expand, expanded ? "Show the sky photo and mask side by side." : "Use the width of both previews to inspect the sky photo and compass.");
-            if (expanded) _ = skyViewport.RequestNativePhotoAsync();
+            AutomationProperties.SetName(expand, expanded ? $"Restore {name} layout" : $"Expand {name}");
+            StudioTheme.Help(expand, expanded ? "Show the sky photo and mask side by side." : $"Use the width of both previews to inspect the {name}.");
+            if (expanded) viewport.RequestDetail();
             UpdateButtons();
         };
         void UpdateButtons()
         {
-            plus.IsEnabled = skyViewport.HasPhoto;
-            minus.IsEnabled = fit.IsEnabled = skyViewport.Zoom > 1;
-            expand.IsEnabled = skyViewport.HasPhoto || expanded;
+            plus.IsEnabled = viewport.HasImage;
+            minus.IsEnabled = fit.IsEnabled = viewport.Zoom > 1;
+            expand.IsEnabled = viewport.HasImage || expanded;
         }
-        skyViewport.ViewChanged += UpdateButtons;
+        viewport.ViewChanged += UpdateButtons;
         UpdateButtons();
-        return pane;
     }
 }

@@ -16,6 +16,10 @@ public class ImageOverlayPreview : Viewbox
         Stretch = Stretch.Uniform; StretchDirection = StretchDirection.Both;
         surface.Children.Add(mask); surface.Children.Add(overlay); Child = surface;
     }
+    internal void SetImageScalingMode(BitmapScalingMode mode)
+    {
+        if (RenderOptions.GetBitmapScalingMode(mask) != mode) RenderOptions.SetBitmapScalingMode(mask, mode);
+    }
     public bool ShowOverlay
     { get => showOverlay; set { showOverlay = value; overlay.Visibility = value && overlay.Source != null ? Visibility.Visible : Visibility.Collapsed; } }
     public bool OverlayVisible => overlay.Source != null && overlay.Visibility == Visibility.Visible;
