@@ -4,7 +4,7 @@ Windows desktop application and C# scientific libraries for estimating solar irr
 
 ## Current application — 24 November 2026
 
-**Preview 0.3.5** stamps the sky photo and checkerboard review with **CALIBRATION FAILED** when a checkerboard run fails. **PROFILE UNUSABLE** identifies a saved profile the preview cannot apply. A valid fit shows its calibrated field of view in green, including when that field is narrower than the lens rating.
+**Preview 0.3.5** stamps the sky photo and checkerboard review with **CALIBRATION FAILED** when a checkerboard run fails. **PROFILE UNUSABLE** identifies a saved profile the preview cannot apply. A valid fit draws the field supported by its checkerboard corners in green. The automatic sky mask can reduce the usable field further. See the [235° calibration audit](docs/CALIBRATION_AUDIT_2026-11-24.md) for the measured limits.
 
 Solar Irradiance and the offline **Orientation map** use one **top heading** for each device, from flat through vertical. Map controls change only the illustration. Hover over a field or focus it and press **F1** for its explanation. **Help** opens the full guide in a separate window.
 
