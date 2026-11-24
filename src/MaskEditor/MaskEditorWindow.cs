@@ -179,7 +179,8 @@ public sealed class MaskEditorWindow : Window
         bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad; bitmap.StreamSource = stream; bitmap.EndInit(); bitmap.Freeze();
         return bitmap;
     }
-    private static TextBlock Label(string value) => new() { Text = value, Margin = new(7, 8, 3, 5), VerticalAlignment = VerticalAlignment.Center };
+    private static TextBlock Label(string value) => new() { Text = value, Foreground = Brushes.WhiteSmoke,
+        Margin = new(7, 8, 3, 5), VerticalAlignment = VerticalAlignment.Center };
     private static Slider Slider(double min, double max, double value, double width) => new()
     { Minimum = min, Maximum = max, Value = value, Width = width, Margin = new(4, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
     private static Button Button(string title, Action click)

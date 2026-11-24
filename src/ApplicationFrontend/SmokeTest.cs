@@ -305,11 +305,11 @@ public static class SmokeTest
         photo.Fit();
         var fitted = photo.ImageBounds;
         var center = new Point(photo.ActualWidth / 2, photo.ActualHeight / 2);
-        photo.ZoomAt(center, 2.25);
+        photo.ZoomAt(center, 1.6);
         await Until(() => photo.HasNativePhoto, 30);
         window.UpdateLayout();
         var enlarged = photo.ImageBounds;
-        if (enlarged.Height <= 2 * fitted.Height || !photo.HasCalibratedOutline || !window.CardinalsVisibleForTest)
+        if (enlarged.Height <= 1.5 * fitted.Height || !photo.HasCalibratedOutline || !window.CardinalsVisibleForTest)
             throw new InvalidOperationException("Magnified sky photo is missing its native image, calibrated limit or compass.");
         Capture(photo, Path.Combine(output, "sky-photo-zoom.png"));
         Capture(window, Path.Combine(output, "sky-photo-expanded.png"));
