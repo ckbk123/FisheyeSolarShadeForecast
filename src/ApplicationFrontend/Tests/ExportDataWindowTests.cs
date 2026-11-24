@@ -21,13 +21,14 @@ public sealed class ExportDataWindowTests
         try
         {
             var fields = Descendants(dialog).OfType<CheckBox>().ToArray();
-            Assert.Equal(8, fields.Length);
+            Assert.Equal(9, fields.Length);
             Assert.Equal(5, fields.Count(c => c.IsChecked == true));
             Assert.Contains(model, Find<CheckBox>(dialog, "ExportPanelDiffuse").Content.ToString());
             Assert.Contains("zero", AutomationProperties.GetHelpText(Find<CheckBox>(dialog, "ExportDiffuseFactor")));
             var ghi = Find<CheckBox>(dialog, "ExportGlobalHorizontal");
             Assert.False(ghi.IsChecked); Assert.Equal(isotropic, ghi.IsEnabled);
             Assert.Equal(AutomationProperties.GetHelpText(ghi), ghi.ToolTip);
+            Assert.Contains("by source interval start", AutomationProperties.GetHelpText(Find<CheckBox>(dialog, "ExportSourceIntervalBounds")));
             Assert.False(Find<Button>(dialog, "ConfirmExportData").IsEnabled);
             Assert.Null(dialog.SelectedOptions); Assert.Null(dialog.DestinationDirectory);
         }
@@ -49,6 +50,7 @@ public sealed class ExportDataWindowTests
             destination.Text = file; Assert.False(export.IsEnabled);
             destination.Text = folder; Assert.True(export.IsEnabled);
             foreach (var field in Descendants(dialog).OfType<CheckBox>()) field.IsChecked = false;
+            Find<CheckBox>(dialog, "ExportSourceIntervalBounds").IsChecked = true;
             Assert.False(export.IsEnabled);
             Assert.Contains("Select at least one", Find<TextBlock>(dialog, "ExportValidation").Text);
             Find<CheckBox>(dialog, "ExportDirectHorizontal").IsChecked = true; Assert.True(export.IsEnabled);
@@ -94,6 +96,7 @@ public sealed class ExportDataWindowTests
             Find<TextBox>(dialog, "ExportDestination").Text = folder;
             foreach (var field in Descendants(dialog).OfType<CheckBox>()) field.IsChecked = false;
             Find<CheckBox>(dialog, "ExportGlobalHorizontal").IsChecked = true;
+            Find<CheckBox>(dialog, "ExportSourceIntervalBounds").IsChecked = true;
             dialog.ContentRendered += (_, _) => dialog.Dispatcher.BeginInvoke(() =>
             {
                 var button = confirm ? Find<Button>(dialog, "ConfirmExportData") :
@@ -105,6 +108,7 @@ public sealed class ExportDataWindowTests
             {
                 Assert.True(dialog.SelectedOptions?.Irradiance);
                 Assert.Equal(IrradianceFields.GlobalHorizontal, dialog.SelectedOptions!.Fields);
+                Assert.True(dialog.SelectedOptions.SourceIntervalBounds);
                 Assert.Equal(Path.GetFullPath(folder), dialog.DestinationDirectory);
             }
             else

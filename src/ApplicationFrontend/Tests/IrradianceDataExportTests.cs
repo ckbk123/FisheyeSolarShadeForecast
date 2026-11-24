@@ -103,21 +103,23 @@ public sealed class IrradianceDataExportTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task OriginalGhiKeepsEndLabelsAndClippedMeansEvenForGhiOnly(bool includePanel)
+    [InlineData(false, TimestampLabel.End)]
+    [InlineData(true, TimestampLabel.Start)]
+    public async Task SourceBoundsAlignNasaAndOpenMeteoRegardlessOfTheirLabelsAndStudyClipping(bool includePanel, TimestampLabel label)
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
-        var firstEnd = new DateTimeOffset(2025, 5, 14, 18, 0, 0, TimeSpan.Zero);
+        var firstEnd = new DateTimeOffset(2025, 5, 14, 18, 0, 0, TimeSpan.Zero).ToOffset(TimeSpan.FromHours(2));
         var intervals = Enumerable.Range(0, 28).Select(i =>
         {
             var end = firstEnd.AddHours(i);
             double diffuse = end.Hour is >= 4 and <= 17 ? 100 : 0;
-            return new IrradianceInterval($"weather-{i}", end, end.AddHours(-1), end, end.AddHours(-1), end, 0, diffuse)
+            var start = end.AddHours(-1);
+            return new IrradianceInterval($"weather-{i}", label == TimestampLabel.End ? end : start, start, end, start, end, 0, diffuse)
             { GlobalHorizontal = i == 2 ? null : diffuse > 0 ? diffuse + i * 0.01 : 0 };
         }).ToArray();
-        var weather = new IrradianceDataset(intervals, "OpenMeteo", "UTC", "ERA5 synthetic fixture, preceding-hour mean",
-            TimestampLabel.End, TimeSpan.FromHours(1));
+        string source = label == TimestampLabel.End ? "OpenMeteo" : "NasaPower";
+        var weather = new IrradianceDataset(intervals, source, "UTC", $"Synthetic {label}-labeled hourly mean",
+            label, TimeSpan.FromHours(1));
         string input = Path.Combine(fixture.Root, "source.xlsx");
         IrradianceDatasetFiles.Export(weather, input);
         var settings = fixture.Settings with { ImportPath = input, Zone = "India Standard Time" };
@@ -128,21 +130,24 @@ public sealed class IrradianceDataExportTests
         Assert.Equal(TimeSpan.FromMinutes(30), result.Run.Rows[^1].End - result.Run.Rows[^1].Start);
         var fields = IrradianceFields.GlobalHorizontal | (includePanel ? IrradianceFields.ShadedTotal : IrradianceFields.None);
         var modified = result with { Raw = result.Raw with { Intervals = [], Source = "untrusted" } };
-        string output = AppServices.Export(modified, fixture.Root, new(Fields: fields));
+        string output = AppServices.Export(modified, fixture.Root, new(Fields: fields, SourceIntervalBounds: true));
         using var workbook = ZipFile.OpenRead(Path.Combine(output, "irradiance.xlsx"));
         var table = Part(workbook, "xl/worksheets/sheet1.xml").Descendants(Spreadsheet + "row").ToArray();
         Assert.Equal(result.Run.Rows.Count + 1, table.Length);
         var headers = table[0].Descendants(Spreadsheet + "t").Select(t => t.Value).ToArray();
-        Assert.Equal(includePanel ? ["Timeseries", "Final total (W/m²)", "Source GHI (W/m²)"] : new[] { "Timeseries", "Source GHI (W/m²)" }, headers);
+        Assert.Equal(includePanel ? ["Timeseries", "Source interval start", "Source interval end", "Final total (W/m²)", "Source GHI (W/m²)"] :
+            new[] { "Timeseries", "Source interval start", "Source interval end", "Source GHI (W/m²)" }, headers);
         for (int i = 0; i < result.Run.Rows.Count; i++)
         {
             var original = intervals[i + 1];
-            Assert.Equal(original.Timestamp, DateTimeOffset.Parse(Cell(table[i + 1], 'A')!, CultureInfo.InvariantCulture));
-            Assert.Equal(original.GlobalHorizontal, Number(table[i + 1], includePanel ? 'C' : 'B'));
+            Assert.Equal(original.Timestamp.ToString("O", CultureInfo.InvariantCulture), Cell(table[i + 1], 'A'));
+            Assert.Equal(original.SourceStart.ToString("O", CultureInfo.InvariantCulture), Cell(table[i + 1], 'B'));
+            Assert.Equal(original.SourceEnd.ToString("O", CultureInfo.InvariantCulture), Cell(table[i + 1], 'C'));
+            Assert.Equal(original.GlobalHorizontal, Number(table[i + 1], includePanel ? 'E' : 'D'));
         }
         var metadata = Part(workbook, "xl/worksheets/sheet2.xml").Root!.Value;
         Assert.Contains(weather.Source, metadata); Assert.Contains(weather.TimestampConvention, metadata);
-        Assert.Contains("End", metadata);
+        Assert.Contains(label.ToString(), metadata);
         using var receipt = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "export.json")));
         Assert.Equal(weather.Source, receipt.RootElement.GetProperty("WeatherSource").GetString());
         Assert.Equal(AppData.FileKey(Path.Combine(fixture.Debug, "03-irradiance/horizontal-irradiance.xlsx")),

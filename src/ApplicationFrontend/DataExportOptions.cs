@@ -10,7 +10,7 @@ public enum IrradianceFields
 }
 
 /// <summary>Timeseries is included with every selection. The default is the original six-column workbook.</summary>
-public sealed record DataExportOptions(bool Irradiance = true, IrradianceFields Fields = IrradianceFields.Panel)
+public sealed record DataExportOptions(bool Irradiance = true, IrradianceFields Fields = IrradianceFields.Panel, bool SourceIntervalBounds = false)
 {
     internal bool IncludesWeather => (Fields & IrradianceFields.Weather) != 0;
 

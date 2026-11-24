@@ -34,6 +34,10 @@ public sealed class ExportDataWindow : Window
         title.FontWeight = FontWeights.SemiBold; panel.Children.Add(title);
         string diffuseModel = isotropic ? "Isotropic" : "Hay–Davies";
         panel.Children.Add(IrradianceWorkspace.Label("Each row includes the source timestamp and UTC offset.", 13));
+        var sourceBounds = new CheckBox { Content = "Include source interval start and end", Margin = new(0, 6, 0, 0) };
+        AutomationProperties.SetAutomationId(sourceBounds, "ExportSourceIntervalBounds");
+        StudioTheme.Help(sourceBounds, "Match providers by source interval start. Their timestamps can label different ends of the same hour.");
+        panel.Children.Add(sourceBounds);
         var columns = IrradianceExportColumn.ForModel(diffuseModel);
         AddFields(panel, "Panel results", columns.Where(c => IrradianceFields.Panel.HasFlag(c.Field)), true, hasSourceGhi);
         AddFields(panel, "Horizontal weather data", columns.Where(c => IrradianceFields.Weather.HasFlag(c.Field)), false, hasSourceGhi);
@@ -69,7 +73,7 @@ public sealed class ExportDataWindow : Window
             Validate();
             if (!export.IsEnabled) return;
             DestinationDirectory = validatedDirectory;
-            SelectedOptions = new(Fields: SelectedFields());
+            SelectedOptions = new(Fields: SelectedFields(), SourceIntervalBounds: sourceBounds.IsChecked == true);
             DialogResult = true;
         };
         commands.Children.Add(export); panel.Children.Add(commands);
