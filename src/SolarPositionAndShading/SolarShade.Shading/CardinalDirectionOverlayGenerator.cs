@@ -31,7 +31,8 @@ public static class CardinalDirectionOverlayGenerator
     // Four bounded searches, independent of weather/solar sampling. A boundary bracket is subsequently bisected.
     private const double SearchStepDegrees = .025;
     public const string Convention = "EXIF-oriented native pixels; x right, y down; true azimuth clockwise from North. " +
-        "N/E/S/W ticks follow upper-hemisphere constant-azimuth meridians toward their furthest resolved visible zenith. " +
+        "N/E/S/W anchors mark the furthest resolved visible zenith on their upper-hemisphere constant-azimuth meridians. " +
+        "Each straight display tick extends from its anchor toward the calibrated principal point. A dot marks an anchor with less than one pixel of room. " +
         "Endpoints obey calibrated incident angle, actual image disk, and image rectangle. " +
         "An endpoint at zenith 90 degrees is the horizon; other endpoints are coverage limits, not horizon locations. " +
         "Default upward camera: N top, E left, S bottom, W right. Labels remain upright. " +
@@ -84,23 +85,25 @@ public static class CardinalDirectionOverlayGenerator
             }
             CardinalDirectionOverlayMarker Missing(string status) => new(name, azimuth, false, null, null, null, null, null, status, []);
             if (zenith <= 0) { markers.Add(Missing("No resolved visible meridian segment.")); continue; }
-            var points = new List<CardinalDirectionOverlayPoint> { new(x, y) };
-            double length = 0;
+            // Require a resolved sky bearing even when a point-sized intersection touches the coverage boundary.
+            double innerX = x, innerY = y;
             var previousRay = Direction.FromAngles(azimuth, zenith);
-            // Keep ticks on their actual (possibly curved) meridian and within one visible fragment.
-            for (double z = Math.Max(0, zenith - SearchStepDegrees); ; z = Math.Max(0, z - SearchStepDegrees))
+            double meridianSpan = 0;
+            for (double z = zenith; z > 0 && meridianSpan < 1;)
             {
+                z = Math.Max(0, z - SearchStepDegrees);
                 var ray = Direction.FromAngles(azimuth, z);
-                if (!projection.TryProject(ray, out double px, out double py) || !projection.CanConnectProjectedRays(previousRay, ray)) break;
-                var last = points[^1];
-                double distance = Math.Sqrt((px-last.X)*(px-last.X)+(py-last.Y)*(py-last.Y));
-                points.Add(new(px, py)); length += distance; previousRay = ray;
-                if (length >= tickLength || z == 0) break;
+                if (!projection.TryProject(ray, out innerX, out innerY) || !projection.CanConnectProjectedRays(previousRay, ray)) break;
+                meridianSpan = double.Hypot(x - innerX, y - innerY);
+                previousRay = ray;
             }
-            if (length < 1) { markers.Add(Missing("Visible meridian fragment is too short for an unambiguous tick.")); continue; }
-            var inner = points[Math.Min(points.Count - 1, 4)];
-            double dx = x - inner.X, dy = y - inner.Y, magnitude = Math.Sqrt(dx*dx+dy*dy);
-            dx /= magnitude; dy /= magnitude;
+            if (meridianSpan < 1) { markers.Add(Missing("Visible meridian fragment is too short for an unambiguous tick.")); continue; }
+            var points = RadialTick(projection, new(x, y), tickLength);
+            // Place the label beyond the tick. At a dot the resolved meridian supplies a label direction.
+            var inner = points.Length == 2 ? points[1] : new(innerX, innerY);
+            double dx = x - inner.X, dy = y - inner.Y, magnitude = double.Hypot(dx, dy);
+            dx /= magnitude;
+            dy /= magnitude;
             var size = Cv2.GetTextSize(name, HersheyFonts.HersheySimplex, fontScale, thickness, out int baseline);
             double clearance = Math.Abs(dx) * size.Width/2 + Math.Abs(dy) * size.Height/2 + Math.Max(3, scale * .008);
             int left = (int)Math.Round(x + dx*clearance - size.Width/2d);
@@ -115,7 +118,7 @@ public static class CardinalDirectionOverlayGenerator
             string status = zenith >= 90 ? "Horizon endpoint." : "Calibrated coverage boundary.";
             if (!fits) status += " Label omitted: insufficient nonoverlapping image space.";
             markers.Add(new(name, azimuth, true, zenith, x, y, fits ? left : null, fits ? top+size.Height : null,
-                status, points.AsReadOnly()));
+                status, Array.AsReadOnly(points)));
         }
         double geometryMs = timer.Elapsed.TotalMilliseconds;
         ct.ThrowIfCancellationRequested(); timer.Restart();
@@ -125,7 +128,10 @@ public static class CardinalDirectionOverlayGenerator
         {
             ct.ThrowIfCancellationRequested();
             Point[] points = marker.TickPoints.Select(p => new Point(checked((int)Math.Round(p.X*256)), checked((int)Math.Round(p.Y*256)))).ToArray();
-            Cv2.Polylines(alpha, new[] { points }, false, ink, thickness, LineTypes.AntiAlias, 8);
+            if (points.Length == 1)
+                Cv2.Circle(alpha, points[0], thickness * 128, ink, -1, LineTypes.AntiAlias, 8);
+            else
+                Cv2.Line(alpha, points[0], points[1], ink, thickness, LineTypes.AntiAlias, 8);
             if (marker.LabelX is { } lx && marker.LabelY is { } ly)
                 Cv2.PutText(alpha, marker.Name, new Point((int)lx, (int)ly), HersheyFonts.HersheySimplex, fontScale, ink, thickness, LineTypes.AntiAlias);
         }
@@ -140,5 +146,29 @@ public static class CardinalDirectionOverlayGenerator
             new(geometryMs, renderMs, encodeMs, total.Elapsed.TotalMilliseconds), options, Convention,
             new(projection.PrincipalPointX, projection.PrincipalPointY, projection.IncidentAnglePolynomial,
                 projection.MaximumIncidentAngleRadians * 180 / Math.PI, projection.CoverageDisk));
+    }
+
+    private static CardinalDirectionOverlayPoint[] RadialTick(CalibratedSkyProjection projection,
+        CardinalDirectionOverlayPoint anchor, double length)
+    {
+        double dx = projection.PrincipalPointX - anchor.X, dy = projection.PrincipalPointY - anchor.Y;
+        double radius = double.Hypot(dx, dy);
+        if (radius < 1) return [anchor];
+        dx /= radius;
+        dy /= radius;
+        length = Math.Min(radius, length);
+        if (!projection.ContainsImagePixel(anchor.X + dx * length, anchor.Y + dy * length))
+        {
+            // An offset disk or a cropped image can exclude the principal point. Their intersection is convex.
+            double low = 0, high = length;
+            for (int i = 0; i < 32; i++)
+            {
+                double mid = (low + high) / 2;
+                if (projection.ContainsImagePixel(anchor.X + dx * mid, anchor.Y + dy * mid)) low = mid;
+                else high = mid;
+            }
+            length = low;
+        }
+        return length < 1 ? [anchor] : [anchor, new(anchor.X + dx * length, anchor.Y + dy * length)];
     }
 }

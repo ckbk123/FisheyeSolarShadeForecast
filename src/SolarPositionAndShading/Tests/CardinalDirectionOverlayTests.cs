@@ -45,7 +45,7 @@ public sealed class CardinalDirectionOverlayTests(ITestOutputHelper output)
     [InlineData(0,30,0)]
     [InlineData(52,40,-73)]
     [InlineData(237,80,33)]
-    public void TiltedMarkersAndTicksUseExactMeridiansAndActualCoverage(double heading,double tilt,double roll)
+    public void TiltedAnchorsUseExactMeridiansAndActualCoverage(double heading,double tilt,double roll)
     {
         var projection=new CalibratedSkyProjection(Profile(),new(heading,tilt,roll),new(265,242,205));
         var result=CardinalDirectionOverlayGenerator.Generate(projection);
@@ -58,6 +58,55 @@ public sealed class CardinalDirectionOverlayTests(ITestOutputHelper output)
                 Assert.False(projection.TryProject(Direction.FromAngles(m.AzimuthDegrees,m.BoundaryZenithDegrees.Value+.000001),out _,out _));
             Assert.All(m.TickPoints,p=>{Assert.InRange(p.X,0,500);Assert.InRange(p.Y,0,500);Assert.True((p.X-265)*(p.X-265)+(p.Y-242)*(p.Y-242)<=205*205+1e-8);});
         }
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, 66)]
+    [InlineData(52, 40, -73, 66)]
+    [InlineData(35, 81, 17, 117.5)]
+    public void DisplayTicksPointTowardTheOpticalCenterAtTheProjectedCardinal(double heading, double tilt, double roll, double coverage)
+    {
+        var profile = Profile(coverage) with { PrincipalPoint = [223, 239] };
+        var projection = new CalibratedSkyProjection(profile, new(heading, tilt, roll), new(261, 253, 225));
+        var result = CardinalDirectionOverlayGenerator.Generate(projection);
+        Assert.True(result.HasMarkers);
+        foreach (var marker in result.Markers.Where(m => m.Visible))
+        {
+            Assert.True(projection.TryProject(Direction.FromAngles(marker.AzimuthDegrees, marker.BoundaryZenithDegrees!.Value), out var x, out var y));
+            Assert.Equal(new CardinalDirectionOverlayPoint(x, y), marker.TickPoints[0]);
+            Assert.Equal(2, marker.TickPoints.Count);
+            var end = marker.TickPoints[1];
+            double radialX = x - profile.PrincipalPoint[0], radialY = y - profile.PrincipalPoint[1];
+            double length = double.Hypot(x - end.X, y - end.Y);
+            Assert.Equal(radialX * (y - end.Y), radialY * (x - end.X), 7);
+            Assert.True((x - end.X) * radialX + (y - end.Y) * radialY > 0);
+            Assert.Equal(Math.Min(501 * .04, double.Hypot(radialX, radialY)), length, 7);
+        }
+    }
+
+    [Fact]
+    public void OffsetDiskClipsTheStraightTickWhenTheOpticalCenterIsOutside()
+    {
+        var result = CardinalDirectionOverlayGenerator.Generate(new(Profile(), imageDisk: new(280, 250, 4)));
+        var marker = Assert.Single(result.Markers, m => m.Visible);
+        Assert.Equal("W", marker.Name);
+        Assert.Equal(284, marker.TickPoints[0].X, 7);
+        Assert.Equal(276, marker.TickPoints[1].X, 7);
+        Assert.Equal(250, marker.TickPoints[1].Y, 7);
+    }
+
+    [Fact]
+    public void HorizontalCameraMarksACardinalOnItsOpticalAxisWithADot()
+    {
+        var result = CardinalDirectionOverlayGenerator.Generate(new(Profile(117.5), new(0, 90, 29)));
+        var north = result.Markers.Single(m => m.Name == "N");
+        var point = Assert.Single(north.TickPoints);
+        Assert.Equal(250, point.X, 8);
+        Assert.Equal(250, point.Y, 8);
+        Assert.Equal(90, north.BoundaryZenithDegrees);
+        Assert.NotNull(north.LabelX);
+        using var pixels = Cv2.ImDecode(result.Png, ImreadModes.Unchanged);
+        Assert.True(pixels.At<Vec4b>(250, 250).Item3 > 0);
     }
 
     [Fact]

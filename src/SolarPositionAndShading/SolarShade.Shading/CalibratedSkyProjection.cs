@@ -94,9 +94,12 @@ public sealed class CalibratedSkyProjection
         var radius = Polynomial(Math.Atan2(lateral, z));
         x = cx + (lateral < 1e-14 ? 0 : radius*a/lateral);
         y = cy + (lateral < 1e-14 ? 0 : radius*b/lateral);
-        return x >= 0 && x <= Width-1 && y >= 0 && y <= Height-1 &&
-            (x-disk.CenterX)*(x-disk.CenterX)+(y-disk.CenterY)*(y-disk.CenterY) <= disk.RadiusPixels*disk.RadiusPixels;
+        return ContainsImagePixel(x, y);
     }
+
+    internal bool ContainsImagePixel(double x, double y) =>
+        x >= 0 && x <= Width-1 && y >= 0 && y <= Height-1 &&
+        (x-disk.CenterX)*(x-disk.CenterX)+(y-disk.CenterY)*(y-disk.CenterY) <= disk.RadiusPixels*disk.RadiusPixels;
 
     /// <summary>
     /// Tests whether two successfully projected finite unit rays can be joined along their shortest spherical arc
