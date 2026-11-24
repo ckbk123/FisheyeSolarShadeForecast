@@ -9,7 +9,7 @@ namespace SolarShade.Shading;
 /// </summary>
 public sealed class CalibratedSkyProjection
 {
-    private readonly double[] poly;
+    private readonly CalibrationRadialMap radialMap;
     private readonly double cx, cy, minZ;
     private readonly Direction ax, ay, az;
     private readonly ImageDisk disk;
@@ -24,7 +24,10 @@ public sealed class CalibratedSkyProjection
     internal ImageDisk CoverageDisk => disk;
     internal double PrincipalPointX => cx;
     internal double PrincipalPointY => cy;
-    internal IReadOnlyList<double> IncidentAnglePolynomial => Array.AsReadOnly(poly);
+    internal IReadOnlyList<double> IncidentAnglePolynomial => radialMap.Coefficients;
+    internal double? LinearExtensionStartDegrees { get; }
+    internal string ExtensionNote => LinearExtensionStartDegrees is double measured
+        ? FormattableString.Invariant($" The measured radial polynomial ends at {measured:0.###}° from the lens axis. Its tangent continues to the effective limit of {MaximumIncidentAngleRadians * 180 / Math.PI:0.###}° from the axis.") : "";
 
     public CalibratedSkyProjection(CalibrationResult calibration, CameraPose? pose = null, ImageDisk? imageDisk = null)
     {
@@ -40,7 +43,9 @@ public sealed class CalibratedSkyProjection
         if (Math.Abs(calibration.IncidentAngleToRadiusPolynomial[0]) > 1e-9)
             throw new ArgumentException("The incident-angle polynomial must have zero constant coefficient.");
         Width = calibration.ImageWidth; Height = calibration.ImageHeight;
-        poly = (double[])calibration.IncidentAngleToRadiusPolynomial.Clone();
+        radialMap = new CalibrationRadialMap(calibration);
+        var poly = radialMap.Coefficients;
+        LinearExtensionStartDegrees = calibration.LinearExtensionStartDegrees;
         cx = calibration.PrincipalPoint[0]; cy = calibration.PrincipalPoint[1];
         disk = imageDisk ?? new(cx, cy, calibration.ImageCircleRadiusPixels);
         if (!double.IsFinite(disk.CenterX) || !double.IsFinite(disk.CenterY) || !double.IsFinite(disk.RadiusPixels) || disk.RadiusPixels <= 0)
@@ -48,14 +53,15 @@ public sealed class CalibratedSkyProjection
         var maxAngle = calibration.MaximumIncidentAngleDegrees*Math.PI/180;
         MaximumIncidentAngleRadians = maxAngle;
         minZ = Math.Cos(maxAngle);
-        // Conservative analytic Lipschitz bound over [0,maxAngle].
+        double polynomialLimit = LinearExtensionStartDegrees is double start ? start * Math.PI / 180 : maxAngle;
+        // Conservative analytic Lipschitz bound over the measured polynomial segment.
         // theta/sin(theta) increases on [0,pi); triangle inequality bounds all polynomial terms.
         // This can overestimate footprint size but must never underestimate it.
         double lipschitz=0;
         for(int interval=0;interval<128;interval++)
         {
-            double low=maxAngle*interval/128,high=maxAngle*(interval+1)/128,derivativeBound=0,derivativeLower=0,radialBound=0;
-            for(int j=1;j<poly.Length;j++)
+            double low=polynomialLimit*interval/128,high=polynomialLimit*(interval+1)/128,derivativeBound=0,derivativeLower=0,radialBound=0;
+            for(int j=1;j<poly.Count;j++)
             {
                 var endpoint=poly[j]>=0?high:low;
                 derivativeBound+=j*poly[j]*Math.Pow(endpoint,j-1);
@@ -67,13 +73,19 @@ public sealed class CalibratedSkyProjection
             radialBound*=high/Math.Max(1e-15,Math.Sin(high));
             lipschitz=Math.Max(lipschitz,Math.Max(derivativeBound,radialBound));
         }
+        if (LinearExtensionStartDegrees.HasValue)
+        {
+            // On a tangent segment r(t)/t is a weighted average of r(join)/join and the constant slope.
+            // Multiply its bound by max(t/sin(t)) for the azimuthal footprint of the solar disk.
+            double slope = radialMap.SlopeAt(polynomialLimit);
+            double radialRatio = Math.Max(radialMap.RadiusAt(polynomialLimit) / polynomialLimit, slope);
+            lipschitz = Math.Max(lipschitz, Math.Max(slope, radialRatio * maxAngle / Math.Sin(maxAngle)));
+        }
         LipschitzBound = lipschitz;
         for (int i = 0; i <= 2048; i++)
         {
-            var a = maxAngle*i/2048;
-            double derivative = 0;
-            for (int j = poly.Length-1; j >= 1; j--) derivative = derivative*a + j*poly[j];
-            if (derivative <= 0 || Polynomial(a) < 0)
+            var a = polynomialLimit*i/2048;
+            if (radialMap.SlopeAt(a) <= 0 || radialMap.RadiusAt(a) < 0)
                 throw new ArgumentException("Projection must remain monotonic throughout its validated angular range; reduce the range, do not fold rays.");
         }
         Pose = pose ?? new();
@@ -91,7 +103,7 @@ public sealed class CalibratedSkyProjection
         var a = ray.Dot(ax); var b = ray.Dot(ay);
         var lateral = Math.Sqrt(a*a+b*b);
         if(z<0&&lateral<1e-12){x=y=0;return false;} // antipodal optical axis has no unique image azimuth
-        var radius = Polynomial(Math.Atan2(lateral, z));
+        var radius = radialMap.RadiusAt(Math.Atan2(lateral, z));
         x = cx + (lateral < 1e-14 ? 0 : radius*a/lateral);
         y = cy + (lateral < 1e-14 ? 0 : radius*b/lateral);
         return ContainsImagePixel(x, y);
@@ -102,7 +114,7 @@ public sealed class CalibratedSkyProjection
         (x-disk.CenterX)*(x-disk.CenterX)+(y-disk.CenterY)*(y-disk.CenterY) <= disk.RadiusPixels*disk.RadiusPixels;
 
     internal bool ContainsCalibratedPixel(double x, double y) => ContainsImagePixel(x, y) &&
-        double.Hypot(x - cx, y - cy) <= Polynomial(MaximumIncidentAngleRadians);
+        double.Hypot(x - cx, y - cy) <= radialMap.RadiusAt(MaximumIncidentAngleRadians);
 
     /// <summary>
     /// Tests whether two successfully projected finite unit rays can be joined along their shortest spherical arc
@@ -134,12 +146,5 @@ public sealed class CalibratedSkyProjection
         return minimumZ >= minZ && minimumZ > -1 + 1e-14;
     }
 
-    internal double RadiusAtIncidentAngle(double radians) => Polynomial(radians);
-
-    private double Polynomial(double theta)
-    {
-        double value = 0;
-        for (int i = poly.Length-1; i >= 0; i--) value = value*theta+poly[i];
-        return value;
-    }
+    internal double RadiusAtIncidentAngle(double radians) => radialMap.RadiusAt(radians);
 }

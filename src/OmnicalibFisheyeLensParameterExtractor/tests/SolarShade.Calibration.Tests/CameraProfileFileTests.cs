@@ -15,6 +15,23 @@ public sealed class CameraProfileFileTests : IDisposable
         640, 480, [320.25, 240.75], [0, 500.125, -.25, .00125], 65, 238.25, .2, 12, [], DateTimeOffset.Parse("2026-01-01T00:00:00Z"), "fixture");
 
     [Fact]
+    public void TangentExtensionAndDiskRoundTripInBothEffectiveExports()
+    {
+        var effective = CalibrationRadialMap.ExtendTo(Calibration, 85);
+        var paths = CameraProfileFiles.Export(new(effective, "test", "mask extension"), directory);
+        foreach (var path in paths)
+        {
+            var loaded = CameraProfileFiles.Load(path).Calibration;
+            Assert.Equal(65, loaded.LinearExtensionStartDegrees);
+            Assert.Equal(85, loaded.MaximumIncidentAngleDegrees);
+            Assert.Equal(Calibration.ImageCircleRadiusPixels, loaded.ImageCircleRadiusPixels);
+            Assert.Equal(Calibration.IncidentAngleToRadiusPolynomial, loaded.IncidentAngleToRadiusPolynomial);
+            Assert.Equal(new CalibrationRadialMap(effective).RadiusAt(1.4), new CalibrationRadialMap(loaded).RadiusAt(1.4));
+            Assert.Null(CameraProfileFiles.Load(path, coverageOverride: 60).Calibration.LinearExtensionStartDegrees);
+        }
+    }
+
+    [Fact]
     public void ExistingProfileJsonExportsEffectiveNativeParametersAndCoverageOverride()
     {
         Directory.CreateDirectory(directory); string old = Path.Combine(directory, "legacy.json");

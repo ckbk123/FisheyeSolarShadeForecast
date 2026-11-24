@@ -131,6 +131,7 @@ internal static class IrradianceDataExport
                 EffectiveStart = Instant(rows[0], "Start"), EffectiveEnd = Instant(rows[rows.GetArrayLength() - 1], "End"),
                 Panel = root.TryGetProperty("Panel", out var panel) && panel.ValueKind == JsonValueKind.Object ? panel : (JsonElement?)null,
                 PanelStorageConvention = SolarShade.Irradiance.Transposition.PanelOrientation.SolverConvention,
+                snapshot.MaskEdge,
                 snapshot.EquipmentAngles,
                 DatasetFingerprint = root.TryGetProperty("DatasetFingerprint", out var fingerprint) && fingerprint.ValueKind == JsonValueKind.String ? fingerprint.GetString() : null,
                 SourceArtifactSha256 = snapshot.ArtifactHashes.GetValueOrDefault(PanelResults),

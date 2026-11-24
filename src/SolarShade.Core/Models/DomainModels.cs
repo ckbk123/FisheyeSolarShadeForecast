@@ -66,7 +66,12 @@ public sealed record CalibrationResult(
     int UsedImageCount,
     IReadOnlyList<string> RejectedImages,
     DateTimeOffset CreatedUtc,
-    string Algorithm);
+    string Algorithm)
+{
+    /// <summary>Measured half-angle at which the effective radial map switches to its endpoint tangent, when extended.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? LinearExtensionStartDegrees { get; init; }
+}
 
 public sealed record SkyMask(int Width, int Height, byte[] Pixels)
 {

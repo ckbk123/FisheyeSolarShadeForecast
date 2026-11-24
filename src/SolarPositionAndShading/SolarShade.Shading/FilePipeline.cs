@@ -40,8 +40,11 @@ public static class ShadingFilePipeline
         var result = engine.Evaluate(sequence,cancellationToken);
         var shadeMs = stage.Elapsed.TotalMilliseconds; stage.Restart();
         ShadingWorkbook.WriteSolarPositions(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(outputXlsx))!,Path.GetFileNameWithoutExtension(outputXlsx)+"-solar-positions.xlsx"),allPositions,site,cancellationToken);
+        string coverage = calibration.LinearExtensionStartDegrees is double measured
+            ? FormattableString.Invariant($"measured maximum incident angle {measured} degrees, extended along the endpoint tangent to {calibration.MaximumIncidentAngleDegrees} degrees")
+            : $"caller-validated max incident angle {validatedMaximumIncidentAngleDegrees.ToString(CultureInfo.InvariantCulture)} degrees";
         ShadingWorkbook.Write(outputXlsx,result,site,pose,
-            $"{input.Metadata} Calibration: {Path.GetFileName(calibrationYaml)}; caller-validated max incident angle {validatedMaximumIncidentAngleDegrees.ToString(CultureInfo.InvariantCulture)} degrees. Mask: {Path.GetFileName(maskPng)}.",cancellationToken);
+            $"{input.Metadata} Calibration: {Path.GetFileName(calibrationYaml)}; {coverage}. Mask: {Path.GetFileName(maskPng)}.",cancellationToken);
         return new(result,total.Elapsed.TotalMilliseconds,inputMs,prepMs,solarMs,shadeMs,stage.Elapsed.TotalMilliseconds,hardware);
     }
 

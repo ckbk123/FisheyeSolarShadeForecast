@@ -10,6 +10,7 @@ namespace SolarShade.Desktop;
 /// <summary>Read-only description of the same calibrated angle, image rectangle and lens disk used by projection.</summary>
 public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? CircularFullDegrees, string Text, string Explanation)
 {
+    internal CalibrationResult? EffectiveCalibration { get; private init; }
     /// <summary>Frozen paths in native WPF image coordinates, with pixel (0,0) centered at (0.5,0.5).</summary>
     public Geometry? CalibratedOutline { get; private init; }
     /// <summary>Present when the known photo coverage clips the calibrated cone. A disjoint footprint is empty.</summary>
@@ -20,16 +21,6 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
     public static SkyPhotoFieldOfView Unavailable(string reason) => new(null, null, "FOV unavailable", reason);
     internal static SkyPhotoFieldOfView CalibrationFailed(string reason) =>
         new(null, null, "Calibration failed", reason) { StampLabel = CalibrationStamp.FailureLabel, OutlineLabel = "Calibration failed" };
-
-    internal static double CalibratedRadiusPixels(CalibrationResult calibration) =>
-        RadiusAt(calibration.IncidentAngleToRadiusPolynomial, calibration.MaximumIncidentAngleDegrees * Math.PI / 180);
-
-    private static double RadiusAt(double[] polynomial, double radians)
-    {
-        double radius = 0;
-        for (int i = polynomial.Length - 1; i >= 0; i--) radius = radius * radians + polynomial[i];
-        return radius;
-    }
 
     public static SkyPhotoFieldOfView Load(UserSettings settings, int orientedWidth, int orientedHeight, ImageDisk? selectedDisk)
     {
@@ -50,6 +41,9 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
 
     public static SkyPhotoFieldOfView Describe(CalibrationProfile profile, int width, int height, ImageDisk? selectedDisk)
     {
+        if (profile.Calibration.LinearExtensionStartDegrees is double measuredAngle)
+            profile = profile with { Calibration = profile.Calibration with
+                { MaximumIncidentAngleDegrees = measuredAngle, LinearExtensionStartDegrees = null } };
         CameraProfileFiles.Validate(profile.Calibration, width, height);
         // Certify the profile with the actual projection validator, including monotonicity.
         _ = new CalibratedSkyProjection(profile.Calibration, imageDisk: selectedDisk);
@@ -63,7 +57,8 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
             "The full field of view is twice that angle. The calculation applies the selected profile and any saved coverage override. " + profile.CoverageNote;
         double cx = calibration.PrincipalPoint[0], cy = calibration.PrincipalPoint[1];
         double low = 0, high = halfAngle * Math.PI / 180;
-        double calibratedRadius = CalibratedRadiusPixels(calibration);
+        var radial = new CalibrationRadialMap(calibration);
+        double calibratedRadius = radial.RadiusAt(high);
         var cone = new EllipseGeometry(new Point(cx + .5, cy + .5), calibratedRadius, calibratedRadius);
         cone.Freeze();
         double nearestPhotoPoint = double.Hypot(cx - Math.Clamp(cx, 0, width - 1), cy - Math.Clamp(cy, 0, height - 1));
@@ -77,7 +72,7 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
         if (selectedDisk == null)
             return new(fullAngle, null, text + " · photo coverage unconfirmed", explanation +
                 " Import a mask or update results to establish the photo's lens disk.")
-            { CalibratedOutline = cone, OutlineLabel = legend + " · photo coverage unconfirmed" };
+            { EffectiveCalibration = calibration, CalibratedOutline = cone, OutlineLabel = legend + " · photo coverage unconfirmed" };
 
         // The nearest edge bounds the largest complete cone. More distant edges can still provide
         // usable rays, so the displayed footprint uses the actual intersection in pixel coordinates.
@@ -90,7 +85,7 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
             for (int i = 0; i < 64; i++)
             {
                 double middle = (low + high) / 2;
-                if (RadiusAt(calibration.IncidentAngleToRadiusPolynomial, middle) <= radius) low = middle; else high = middle;
+                if (radial.RadiusAt(middle) <= radius) low = middle; else high = middle;
             }
         double circular = 2 * low * 180 / Math.PI;
         text += $" · usable circular FOV: {Format(circular)}°";
@@ -112,6 +107,6 @@ public sealed record SkyPhotoFieldOfView(double? CalibratedFullDegrees, double? 
             text += edge;
             explanation += " The dashed boundary traces the intersection of the calibrated cone, photo lens disk and image rectangle. Its angle can vary around a cropped or off-center photo.";
         }
-        return new(fullAngle, circular, text, explanation) { CalibratedOutline = cone, UsableOutline = usable, OutlineLabel = legend };
+        return new(fullAngle, circular, text, explanation) { EffectiveCalibration = calibration, CalibratedOutline = cone, UsableOutline = usable, OutlineLabel = legend };
     }
 }

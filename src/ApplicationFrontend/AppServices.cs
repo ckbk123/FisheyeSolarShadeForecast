@@ -17,13 +17,24 @@ public sealed record MaskAsset(byte[] OriginalPreview, byte[] MaskPreview, SkyMa
     public LensDisk Disk => Result.Disk;
     public string AiAncestorSha256 => Variant?.AiAncestorSha256 ?? Convert.ToHexString(SHA256.HashData(Png));
 }
-public sealed record OrientationPreview(MaskAsset? Mask, CardinalDirectionOverlayResult? Cardinals, string DebugDirectory);
+public sealed record AppliedMaskEdge(double MeasuredFullDegrees, double EffectiveFullDegrees, int BlackPercent,
+    bool ObservedTerminalBand, string Explanation)
+{
+    public int? ObservedSkyAtCap { get; init; }
+    public int? UnknownAtCap { get; init; }
+}
+
+public sealed record OrientationPreview(MaskAsset? Mask, CardinalDirectionOverlayResult? Cardinals, string DebugDirectory)
+{
+    public AppliedMaskEdge? MaskEdge { get; init; }
+}
 
 public sealed record Evaluation(PanelRun Run, IrradianceDataset Raw, UserSettings Settings, MaskAsset? Mask,
     string Note, double TotalMilliseconds, int PreparationCount)
 {
     public string? DebugDirectory { get; init; }
     public SunPathOverlayResult? SunPath { get; init; }
+    public AppliedMaskEdge? MaskEdge { get; init; }
     public CardinalDirectionOverlayResult? Cardinals { get; init; }
     public int CardinalGenerationCount { get; init; }
     public int SunPathGenerationCount { get; init; }
@@ -62,6 +73,7 @@ public sealed class AppServices : IIrradianceService
     private MaskAsset? mask;
     private IrradianceDataset? raw;
     private CalibrationProfile? profile;
+    private AppliedMaskEdge? profileEdge;
     private PanelSkyScene? scene;
     private SolarTimeline? geometry;
     private SunPathOverlayResult? sunPath;
@@ -102,7 +114,7 @@ public sealed class AppServices : IIrradianceService
             else if (Storage.Current is { } debug)
             {
                 var dirty = debug.Differences(next) | forced | (refreshWeather ? InputDependencies.WeatherChain : ArtifactGroup.None);
-                if (verifyArtifacts) dirty |= InputDependencies.WithDependents(debug.ChangedArtifacts(true));
+                if (verifyArtifacts) dirty |= InputDependencies.WithDependents(debug.ChangedArtifacts(true), settings);
                 changed |= dirty & ~debug.Invalidated;
                 debug.Invalidate(dirty, next.SourcePaths);
             }
@@ -219,7 +231,7 @@ public sealed class AppServices : IIrradianceService
                 debug = new(Storage, persisted, verifiedInputs: dependencies); tracked = new(debug, dependencies, linked); activeRun = tracked;
             }
             var timer = Stopwatch.StartNew();
-            var (activeMask, activeProfile, activeCardinals) = await PrepareImageStages(s, debug, progress, onMask, onCardinals, ct, dependencies.Keys[ArtifactGroup.Mask]);
+            var (activeMask, activeProfile, activeCardinals, appliedEdge) = await PrepareImageStages(s, debug, progress, onMask, onCardinals, ct, dependencies.Keys[ArtifactGroup.Mask]);
             var zone = TimeZoneSelection.Resolve(s.Zone);
             string nextRaw = dependencies.Keys[ArtifactGroup.Irradiance];
             debug.RecordInput("irradiance-request", new { Fingerprint = nextRaw });
@@ -314,7 +326,10 @@ public sealed class AppServices : IIrradianceService
                     progress("Preparing panel visibility");
                     var next = await Task.Run(() => new PanelSkyScene(SkyShadingModule.DecodeMask(activeMask.Png), activeProfile.Calibration,
                         EquipmentOrientation.ToCameraPose(s),
-                        new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius)), ct);
+                        new(activeMask.Disk.CenterX, activeMask.Disk.CenterY, activeMask.Disk.Radius),
+                        isObservedExtensionPixel: activeProfile.Calibration.LinearExtensionStartDegrees.HasValue && activeMask.Variant?.IsImported != true
+                            ? (x, y) => MaskEdgeProbe.IsObservedPixel(x, y, activeMask.Disk, activeMask.Result.Crop, activeMask.Result.InputSize)
+                            : null), ct);
                     ct.ThrowIfCancellationRequested(); scene = next; sceneKey = nextScene;
                 }
             }
@@ -364,7 +379,7 @@ public sealed class AppServices : IIrradianceService
             string note = scene == null ? "Add a calibrated camera profile and sky photo for shading." : "Unknown sky is treated as blocked. No ground reflection. Camera coverage may be provisional.";
             accepted = new(result, raw!, persisted, activeMask, note, timer.Elapsed.TotalMilliseconds, PreparationCount)
                 { DebugDirectory = debug.DirectoryPath, SunPath = activeSunPath, SunPathGenerationCount = SunPathGenerationCount, Cardinals = activeCardinals, CardinalGenerationCount = CardinalGenerationCount,
-                    Dependencies = dependencies, ManagedDebugRun = debug };
+                    MaskEdge = appliedEdge, Dependencies = dependencies, ManagedDebugRun = debug };
             try { if (debug.HasCompleteDataset) AcceptedResultVault.Archive(accepted); }
             catch (Exception archiveError) { try { File.AppendAllText(AppData.PathFor("errors.log"), $"{DateTimeOffset.Now:O} Could not archive accepted result: {archiveError}{Environment.NewLine}"); } catch { } }
             return accepted;
@@ -418,9 +433,9 @@ public sealed class AppServices : IIrradianceService
                 ObserveInputs(settings, refreshSources: true, verifyArtifacts: true);
                 debug = new(Storage, persisted, "orientation"); activeRun = new(debug, InputDependencies.Capture(settings), linked);
             }
-            var (activeMask, _, overlay) = await PrepareImageStages(resolved, debug, progress, onMask, onCardinals, ct);
+            var (activeMask, _, overlay, edge) = await PrepareImageStages(resolved, debug, progress, onMask, onCardinals, ct);
             ct.ThrowIfCancellationRequested(); debug.Complete();
-            return new(activeMask, overlay, debug.DirectoryPath);
+            return new(activeMask, overlay, debug.DirectoryPath) { MaskEdge = edge };
         }
         catch (Exception ex) { debug?.Status(ex is OperationCanceledException ? "Cancelled" : "Failed", ex.Message); throw; }
         finally
@@ -430,7 +445,7 @@ public sealed class AppServices : IIrradianceService
         }
     }
 
-    private async Task<(MaskAsset? Mask, CalibrationProfile? Profile, CardinalDirectionOverlayResult? Cardinals)> PrepareImageStages(
+    private async Task<(MaskAsset? Mask, CalibrationProfile? Profile, CardinalDirectionOverlayResult? Cardinals, AppliedMaskEdge? Edge)> PrepareImageStages(
         UserSettings s, DebugDataRun debug, Action<string> progress, Action<MaskAsset>? onMask,
         Action<CardinalDirectionOverlayResult?>? onCardinals, CancellationToken ct, string? selectedMaskFingerprint = null)
     {
@@ -499,7 +514,7 @@ public sealed class AppServices : IIrradianceService
                     string pixelConvention = "255 = open sky; 0 = obstruction or outside lens; no automatic inversion";
                     if (activeMask.Variant?.Source == "Edited")
                     {
-                        pixelConvention = "255 = open sky; 0 = obstruction. Edited pixels cover the full oriented image. Only rays within calibrated coverage, the lens disk and the image are observed. At the boundary, in-range rays use normal bilinear sampling.";
+                        pixelConvention = "255 = open sky; 0 = obstruction. Edits cover the full oriented image. Projection is limited by the active angular range, lens disk and image. In an AI-derived extension, only the nearest classified pixel is observed. Inside calibration the mask is sampled bilinearly.";
                         string detailsPath = Path.Combine(directory, "mask-details.json");
                         var details = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(detailsPath))!.AsObject();
                         details["PixelConvention"] = pixelConvention;
@@ -526,14 +541,18 @@ public sealed class AppServices : IIrradianceService
             if (!string.IsNullOrEmpty(s.ProfilePath) && activeMask != null)
             {
                 string nextProfile = AppData.Key(new { File = AppData.FileKey(s.ProfilePath), s.CoverageAngle,
-                    Width = activeMask?.Result.Width, Height = activeMask?.Result.Height, Library = AppData.LibraryVersion(typeof(CameraProfileFiles)) });
+                    activeMask.Result.Width, activeMask.Result.Height, Library = AppData.LibraryVersion(typeof(CameraProfileFiles)) });
+                if (s.MaskEdgeThresholdPercent is int threshold)
+                    nextProfile = AppData.Key(new { Source = nextProfile, SelectedMask = maskKey, Threshold = threshold,
+                        Probe = AppData.LibraryVersion(typeof(MaskEdgeProbe)) });
                 debug.RecordInput("camera-profile", new { Fingerprint = nextProfile });
                 string directory = debug.BeginStage("01-calibration", "Loaded effective camera profile", typeof(CameraProfileFiles));
                 if (profileKey != nextProfile || profile == null)
                 {
-                    var next = await Task.Run(() => CameraProfileFiles.Load(s.ProfilePath, activeMask?.Result.Width ?? 0,
-                        activeMask?.Result.Height ?? 0, s.CoverageAngle > 0 ? s.CoverageAngle : null), ct);
-                    ct.ThrowIfCancellationRequested(); profile = next; profileKey = nextProfile;
+                    var next = await Task.Run(() => ResolveStudyProfile(s, activeMask, ct), ct);
+                    ct.ThrowIfCancellationRequested();
+                    (profile, profileEdge) = next;
+                    profileKey = nextProfile;
                 }
                 activeProfile = profile;
                 debug.CompleteStage("01-calibration", debug.NeedsWrite(ArtifactGroup.Profile) ? await Task.Run(() => CameraProfileFiles.Export(activeProfile, directory, ct), ct) : []);
@@ -571,7 +590,39 @@ public sealed class AppServices : IIrradianceService
                 debug.Skip("02-orientation", "Cardinal directions require a calibrated sky photograph");
                 ct.ThrowIfCancellationRequested(); onCardinals?.Invoke(null);
             }
-            return (activeMask, activeProfile, activeCardinals);
+            var edge = activeProfile == null ? null : profileEdge;
+            debug.SetMaskEdge(edge);
+            return (activeMask, activeProfile, activeCardinals, edge);
+    }
+
+    private static (CalibrationProfile Profile, AppliedMaskEdge? Edge) ResolveStudyProfile(UserSettings s, MaskAsset mask, CancellationToken ct)
+    {
+        var source = CameraProfileFiles.Load(s.ProfilePath, mask.Result.Width, mask.Result.Height,
+            s.CoverageAngle > 0 ? s.CoverageAngle : null);
+        var measured = source.Calibration;
+        if (measured.LinearExtensionStartDegrees is double join)
+        {
+            measured = measured with { MaximumIncidentAngleDegrees = join, LinearExtensionStartDegrees = null };
+            source = source with { Calibration = measured, CoverageNote = "Measured portion of the saved effective profile." };
+        }
+        if (s.MaskEdgeThresholdPercent is not int percent) return (source, null);
+        if (percent is not (80 or 90 or 95 or 100)) throw new InvalidDataException("Unsupported mask-edge threshold.");
+        bool ai = mask.Variant?.IsImported != true;
+        var scan = MaskEdgeProbe.AnalyzeTo180(mask.Png, measured.ImageWidth, measured.ImageHeight,
+            measured.PrincipalPoint[0], measured.PrincipalPoint[1], measured.IncidentAngleToRadiusPolynomial,
+            measured.MaximumIncidentAngleDegrees, mask.Disk, ai ? mask.Result.Crop : null, ct, ai ? mask.Result.InputSize : 0);
+        var finding = scan.Findings.Single(f => f.BlackPercent == percent);
+        double effectiveFull = finding.EstimatedLimitFullDegrees ?? scan.CalibratedFullDegrees;
+        var edge = new AppliedMaskEdge(scan.CalibratedFullDegrees, effectiveFull, percent, finding.RadiusPixels.HasValue, finding.Explanation);
+        if (scan.Reached180)
+        {
+            var cap = scan.Samples[^1];
+            edge = edge with { ObservedSkyAtCap = MaskEdgeProbe.SamplesPerRing - cap.UnknownSamples - cap.ObservedBlackSamples,
+                UnknownAtCap = cap.UnknownSamples };
+        }
+        var calibration = CalibrationRadialMap.ExtendTo(measured, effectiveFull / 2);
+        string note = FormattableString.Invariant($" Mask scan at {percent}% black: {edge.MeasuredFullDegrees:0.##}° measured full FOV, {effectiveFull:0.##}° effective full FOV. ") + finding.Explanation;
+        return (source with { Calibration = calibration, CoverageNote = source.CoverageNote + note }, edge);
     }
 
     public static Task<IrradianceDataset> Fetch(UserSettings s, bool refresh, CancellationToken ct) => Task.Run(async () => (await FetchWithOrigin(s with { }, refresh, ct)).Dataset, ct);

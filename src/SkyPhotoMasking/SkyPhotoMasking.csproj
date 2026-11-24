@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="SkyPhotoMasker.cs" />
+    <Compile Include="MaskEdgeProbe.cs" />
     <Compile Include="SkyMaskExporter.cs" />
     <Compile Include="SkyMaskImporter.cs" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.24.4" />

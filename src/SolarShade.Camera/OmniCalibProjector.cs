@@ -42,7 +42,9 @@ public static class OmniCalibProjector
         }
 
         var radialDirection = Math.Sqrt(xCamera * xCamera + yCamera * yCamera);
-        var radius = OmniCalibProfileImporter.EvaluatePolynomial(calibration.IncidentAngleToRadiusPolynomial, incident);
+        var radius = calibration.LinearExtensionStartDegrees.HasValue
+            ? new CalibrationRadialMap(calibration).RadiusAt(incident)
+            : CalibrationRadialMap.Polynomial(calibration.IncidentAngleToRadiusPolynomial, incident);
         if (radialDirection <= 1e-12)
         {
             pixelX = calibration.PrincipalPoint[0];

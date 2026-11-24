@@ -34,6 +34,7 @@ public sealed class DebugDataRun : IDisposable
         public DateTimeOffset? LastSuccessfulUpdateUtc { get; set; }
         public UserSettings Settings { get; set; } = new();
         public StudyPeriod? StudyPeriod { get; set; }
+        public AppliedMaskEdge? MaskEdge { get; set; }
         public string StoredEquipmentConvention => "Settings.PanelAzimuth and Settings.BottomAzimuth are solver inputs clockwise from true north. PanelAzimuth also stores the bearing opposite the marked panel top when flat. BottomAzimuth references image bottom before roll. CameraTilt is signed from up toward image top before roll. CameraRoll rotates the image around the lens. EquipmentAngles gives both top headings when laid flat and the physical normal azimuths.";
         public EquipmentAngleReport? EquipmentAngles => EquipmentAngleReport.From(Settings);
         public Dictionary<string, JsonElement> Inputs { get; set; } = new();
@@ -58,13 +59,13 @@ public sealed class DebugDataRun : IDisposable
             settings = store.PrepareInputs(settings);
             var inputs = verifiedInputs ?? InputDependencies.Capture(settings);
             var previous = store.Current;
-            previous?.Invalidate(previous.Differences(inputs) | (verifiedInputs == null ? InputDependencies.WithDependents(previous.ChangedArtifacts(true)) : ArtifactGroup.None), inputs.SourcePaths);
+            previous?.Invalidate(previous.Differences(inputs) | (verifiedInputs == null ? InputDependencies.WithDependents(previous.ChangedArtifacts(true), settings) : ArtifactGroup.None), inputs.SourcePaths);
             if (kind == "calculation" && previous?.state.Kind == "calibration")
                 previous.Invalidate(ArtifactGroup.Profile | InputDependencies.PoseChain, inputs.SourcePaths);
             previous?.Finish();
             state = previous == null ? new() : JsonSerializer.Deserialize<Manifest>(JsonSerializer.Serialize(previous.state))!;
             state.Id = Guid.NewGuid().ToString("N"); state.StartedUtc = DateTimeOffset.UtcNow; state.Kind = kind; state.UpdateNumber++;
-            state.Settings = settings with { }; state.StudyPeriod = null; state.Software = AppServices.SoftwareFingerprint; state.Keys = inputs.Keys.ToDictionary();
+            state.Settings = settings with { }; state.StudyPeriod = null; state.MaskEdge = null; state.Software = AppServices.SoftwareFingerprint; state.Keys = inputs.Keys.ToDictionary();
             string[] required = kind == "calibration" ? ["01-calibration"] : kind == "orientation" ? ["01-calibration", "02-sky-mask", "02-orientation"] : AllStages;
             foreach (string name in required) state.Stages.TryAdd(name, new("Pending", "", "", []));
             store.Current = this; store.StartStaging(); Status("Running");
@@ -157,6 +158,10 @@ public sealed class DebugDataRun : IDisposable
             Check(); state.Settings = state.Settings with { ProfilePath = PortablePaths.Store(path), CoverageAngle = 0 };
             state.Keys = InputDependencies.Capture(state.Settings).Keys.ToDictionary();
         }
+    }
+    internal void SetMaskEdge(AppliedMaskEdge? edge)
+    {
+        lock (SyncRoot) { Check(); state.MaskEdge = edge; }
     }
     public void Status(string status, string? error = null)
     {

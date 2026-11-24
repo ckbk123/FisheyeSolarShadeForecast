@@ -8,6 +8,34 @@ public sealed class CalibratedSkyProjectionTests
         CameraModelKind.OmniCalibIncidentAnglePolynomial, 501, 501, [250, 250], [0, 500 / Math.PI],
         coverage, 250, null, 0, [], DateTimeOffset.UnixEpoch, "Synthetic equidistant lens");
 
+    [Fact]
+    public void TheMeasuredProfileIsPreservedThroughTheJoinAndTheOuterGridFollowsTheTangent()
+    {
+        // This polynomial folds at 79.03°. Extending it directly to the horizon is invalid.
+        var measured = Profile(60) with { IncidentAngleToRadiusPolynomial = [0, 160, -58] };
+        var effective = CalibrationRadialMap.ExtendTo(measured, 90);
+        var reference = new CalibratedSkyProjection(measured);
+        var projected = new CalibratedSkyProjection(effective);
+        foreach (double zenith in new[] { 0d, 12, 30, 51, 59.9999, 60 })
+        {
+            var ray = Direction.FromAngles(90, zenith);
+            Assert.True(reference.TryProject(ray, out double x, out double y));
+            Assert.True(projected.TryProject(ray, out double extendedX, out double extendedY));
+            Assert.Equal(x, extendedX); Assert.Equal(y, extendedY);
+        }
+        double join = Math.PI / 3, joinRadius = 160 * join - 58 * join * join, slope = 160 - 116 * join;
+        double horizonRadius = joinRadius + slope * Math.PI / 6;
+        Assert.True(projected.TryProject(Direction.FromAngles(270, 90), out var horizonX, out var horizonY));
+        Assert.Equal(250 + horizonRadius, horizonX, 10); Assert.Equal(250, horizonY, 10);
+        Assert.False(projected.TryProject(Direction.FromAngles(270, 90.0001), out _, out _));
+        var overlay = CardinalDirectionOverlayGenerator.Generate(projected);
+        Assert.Equal(60, overlay.Projection.LinearExtensionStartDegrees);
+        Assert.Equal(horizonRadius, Assert.Single(overlay.Rings, r => r.IncidentAngleDegrees == 90).RadiusPixels, 10);
+        Assert.Null(measured.LinearExtensionStartDegrees);
+        Assert.Throws<ArgumentException>(() => new CalibratedSkyProjection(measured with { MaximumIncidentAngleDegrees = 90 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CalibrationRadialMap.ExtendTo(measured, 90.1));
+    }
+
     [Theory]
     [InlineData(0, 250, 125)]
     [InlineData(90, 125, 250)]

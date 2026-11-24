@@ -16,7 +16,11 @@ public sealed record CardinalDirectionOverlayMarker(string Name, double AzimuthD
 public sealed record CardinalDirectionOverlayTimings(double GeometryMilliseconds, double RenderMilliseconds,
     double EncodeMilliseconds, double TotalMilliseconds);
 public sealed record CardinalDirectionProjectionMetadata(double PrincipalPointX, double PrincipalPointY,
-    IReadOnlyList<double> IncidentAngleToRadiusPolynomial, double MaximumIncidentAngleDegrees, ImageDisk ImageDisk);
+    IReadOnlyList<double> IncidentAngleToRadiusPolynomial, double MaximumIncidentAngleDegrees, ImageDisk ImageDisk)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public double? LinearExtensionStartDegrees { get; init; }
+}
 public sealed record CardinalDirectionOverlayResult(byte[] Png, int Width, int Height,
     IReadOnlyList<CardinalDirectionOverlayMarker> Markers, CameraPose Pose,
     CardinalDirectionOverlayTimings Timings, CardinalDirectionOverlayOptions Options, string GeometryConvention,
@@ -41,7 +45,7 @@ public static class CardinalDirectionOverlayGenerator
         "Cyan cross: fitted lens center. Cyan rings: incident angle from the optical axis at 30-degree steps. " +
         "Magenta dots: projected N-S and E-W vertical great circles, including covered directions below the horizon. " +
         "Their larger magenta dot marks true zenith when visible. Gaps and the undefined optical antipode split paths. " +
-        "Ring and meridian strokes are clipped to calibrated incidence, image disk and rectangle. " +
+        "Ring and meridian strokes are clipped to the projection's angular limit, image disk and rectangle. " +
         "The fitted center is marked wherever it falls on the photo. Letters label geographic anchors. " +
         "TickPoints retain the legacy display-glyph coordinates. A horizon endpoint has zenith 90 degrees. " +
         "Upward camera with a north-pointing top: N top, E left, S bottom, W right.";
@@ -125,7 +129,8 @@ public static class CardinalDirectionOverlayGenerator
             bool fits = label.Right < projection.Width && label.Bottom < projection.Height &&
                 !labels.Any(r => r.Left < label.Right && r.Right > label.Left && r.Top < label.Bottom && r.Bottom > label.Top);
             if (fits) labels.Add(label);
-            string status = zenith >= 90 ? "Horizon endpoint." : "Calibrated coverage boundary.";
+            string status = zenith >= 90 ? "Horizon endpoint." :
+                projection.LinearExtensionStartDegrees.HasValue ? "Effective projection boundary." : "Calibrated coverage boundary.";
             if (!fits) status += " Label omitted: insufficient nonoverlapping image space.";
             markers.Add(new(name, azimuth, true, zenith, x, y, fits ? left : null, fits ? top+size.Height : null,
                 status, Array.AsReadOnly(points)));
@@ -140,9 +145,10 @@ public static class CardinalDirectionOverlayGenerator
         double encodeMs = timer.Elapsed.TotalMilliseconds;
         ct.ThrowIfCancellationRequested();
         return new(png, projection.Width, projection.Height, markers.AsReadOnly(), projection.Pose,
-            new(geometryMs, renderMs, encodeMs, total.Elapsed.TotalMilliseconds), options, Convention,
+            new(geometryMs, renderMs, encodeMs, total.Elapsed.TotalMilliseconds), options, Convention + projection.ExtensionNote,
             new(projection.PrincipalPointX, projection.PrincipalPointY, projection.IncidentAnglePolynomial,
-                projection.MaximumIncidentAngleRadians * 180 / Math.PI, projection.CoverageDisk))
+                projection.MaximumIncidentAngleRadians * 180 / Math.PI, projection.CoverageDisk)
+                { LinearExtensionStartDegrees = projection.LinearExtensionStartDegrees })
         {
             Rings = grid.Rings, LensCenterVisible = grid.LensCenterVisible,
             Zenith = grid.Zenith, MeridianDotCount = grid.MeridianDotCount

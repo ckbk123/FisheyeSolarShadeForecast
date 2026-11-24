@@ -90,7 +90,9 @@ internal static class SummaryPdf
         Section("02 / Camera, mask and panel");
         Row("Sky image", Path.GetFileName(s.SkyImage), 2);
         Row("Active profile", Path.GetFileName(s.ProfilePath), 2);
-        Row("Effective coverage", Value(c, "MaximumIncidentAngleDegrees") + "° maximum incident angle | " + (s.CoverageAngle > 0 ? "user override" : "saved profile"));
+        Row("Effective coverage", snapshot.MaskEdge is { } edge
+            ? $"{N(edge.MeasuredFullDegrees)}° measured / {N(edge.EffectiveFullDegrees)}° effective full FOV | {edge.BlackPercent}% black"
+            : Value(c, "MaximumIncidentAngleDegrees") + "° maximum incident angle | " + (s.CoverageAngle > 0 ? "user override" : "saved profile"));
         Row("Phone pose", angles.DescribePhone());
         Row("Photo orientation", angles.DescribeImage(), 2);
         bool imported = maskSource.RootElement.TryGetProperty("ImportedAncestorSha256", out var importedAncestor) && importedAncestor.ValueKind == JsonValueKind.String;

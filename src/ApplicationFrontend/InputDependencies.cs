@@ -56,6 +56,9 @@ public sealed class InputDependencies
         var keys = new Dictionary<ArtifactGroup, string>();
         keys[ArtifactGroup.Mask] = AppData.Key(new { Image, s.Model, s.Resolution, s.CenteredDisk, s.SelectedMaskId, EditedMask, EditedMetadata, MaskAncestor });
         keys[ArtifactGroup.Profile] = AppData.Key(new { Profile, Image, s.CoverageAngle });
+        if (s.MaskEdgeThresholdPercent.HasValue)
+            keys[ArtifactGroup.Profile] = AppData.Key(new { Measured = keys[ArtifactGroup.Profile],
+                Mask = keys[ArtifactGroup.Mask], s.MaskEdgeThresholdPercent });
         keys[ArtifactGroup.Orientation] = AppData.Key(new { Image, s.CenteredDisk, importedGeometry, Profile = keys[ArtifactGroup.Profile], s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
         // Date/site changes do not change the contents of an imported source workbook.
         bool services = WeatherSourceSelection.UsesServices(s);
@@ -73,9 +76,9 @@ public sealed class InputDependencies
     public static InputDependencies Capture(UserSettings s, InputDependencies? previous = null, bool refresh = true) => new(s, previous, refresh);
     public ArtifactGroup Difference(InputDependencies other) => Groups.Where(g => Keys[g] != other.Keys[g]).Aggregate(ArtifactGroup.None, (a, g) => a | g);
 
-    public static ArtifactGroup WithDependents(ArtifactGroup groups)
+    public static ArtifactGroup WithDependents(ArtifactGroup groups, UserSettings? settings = null)
     {
-        if ((groups & ArtifactGroup.Mask) != 0) groups |= ArtifactGroup.Shading;
+        if ((groups & ArtifactGroup.Mask) != 0) groups |= settings?.MaskEdgeThresholdPercent == null ? ArtifactGroup.Shading : ArtifactGroup.Profile | PoseChain;
         if ((groups & ArtifactGroup.Profile) != 0) groups |= PoseChain;
         if ((groups & ArtifactGroup.Orientation) != 0) groups |= PoseChain;
         if ((groups & ArtifactGroup.Irradiance) != 0) groups |= WeatherChain;
@@ -87,9 +90,9 @@ public sealed class InputDependencies
     public static ArtifactGroup ForField(string field, UserSettings settings) => field switch
     {
         "SkyImage" => ArtifactGroup.Profile | ArtifactGroup.Mask | PoseChain,
-        "Model" or "Resolution" => ArtifactGroup.Mask | ArtifactGroup.Shading,
-        "CenteredDisk" => ArtifactGroup.Mask | PoseChain,
-        "SelectedMaskId" => ArtifactGroup.Mask | ArtifactGroup.Shading,
+        "Model" or "Resolution" or "SelectedMaskId" => WithDependents(ArtifactGroup.Mask, settings),
+        "CenteredDisk" => WithDependents(ArtifactGroup.Mask, settings) | PoseChain,
+        nameof(UserSettings.MaskEdgeThresholdPercent) => ArtifactGroup.Profile | PoseChain,
         "ProfilePath" or "CoverageAngle" => ArtifactGroup.Profile | PoseChain,
         "BottomAzimuth" or "CameraTilt" or "CameraRoll" or nameof(UserSettings.PhoneInclination)
             or nameof(UserSettings.PhoneTopHeading) or nameof(UserSettings.PhoneFacingAzimuth) or nameof(UserSettings.FlatImageTopBearing) => PoseChain,

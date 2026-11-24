@@ -17,6 +17,9 @@ internal sealed class SkyPhotoViewport : ImageViewport
     internal ImageOverlayPreview Photo => Layers;
     internal bool HasNativePhoto { get; private set; }
     internal bool HasCalibratedOutline { get; private set; }
+    internal Geometry? BandOutline { get; private set; }
+    internal Geometry? CapOutline { get; private set; }
+    private (double X, double Y, double? Band, double? Cap) scanCoordinates;
     private string? sourcePath;
     private long photoRevision;
     private bool requestedDetail;
@@ -47,10 +50,11 @@ internal sealed class SkyPhotoViewport : ImageViewport
         SetFieldOfView(null);
     }
 
-    internal void SetFieldOfView(SkyPhotoFieldOfView? view)
+    internal void SetFieldOfView(SkyPhotoFieldOfView? view, bool showUsableOutline = true)
     {
+        SetMaskScan(0, 0, null, null);
         HasCalibratedOutline = view?.CalibratedOutline != null;
-        guide.SetOutlines(view?.CalibratedOutline, view?.UsableOutline);
+        guide.SetOutlines(view?.CalibratedOutline, showUsableOutline ? view?.UsableOutline : null);
         var warning = HasImage ? view?.StampLabel : null;
         stamp.SetMessage(warning, view?.Explanation);
         if (warning != null)
@@ -59,6 +63,21 @@ internal sealed class SkyPhotoViewport : ImageViewport
             PositionStamp();
         }
         SetPreviewHelp(Gestures);
+    }
+
+    internal void SetMaskScan(double cx, double cy, double? transition, double? cap)
+    {
+        if (scanCoordinates == (cx, cy, transition, cap)) return;
+        scanCoordinates = (cx, cy, transition, cap);
+        EllipseGeometry? Circle(double? radius)
+        {
+            if (radius is not double r) return null;
+            var circle = new EllipseGeometry(new Point(cx + .5, cy + .5), r, r);
+            circle.Freeze();
+            return circle;
+        }
+        BandOutline = Circle(transition); CapOutline = Circle(cap);
+        guide.SetMaskScan(BandOutline, CapOutline);
     }
 
     private void SetPreviewHelp(string detail)

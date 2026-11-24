@@ -19,12 +19,22 @@ public static class SkyMaskImporter
             throw new InvalidDataException("The mask must contain 8-bit black (0) and white (255) pixels.");
         var disk = SkyPhotoMasker.FindDisk(photo, diskDetection);
         SkyPhotoMasker.ValidateDisk(disk, photo.Width, photo.Height);
+        using var binary = new Mat(source.Height, source.Width, MatType.CV_8UC1);
+        CopyBinaryPixels(source, binary, disk, inverted);
+        Cv2.ImEncode(".png", binary, out byte[] png);
+        return new(png, default, photo.Width, photo.Height, 0, disk, SkyPhotoMasker.CropForDisk(disk),
+            diskDetection.ToString(), "Imported binary mask · no AI", null, 0, 0, 0, null, null);
+    }
+
+    internal static void CopyBinaryPixels(Mat source, Mat binary, LensDisk? disk = null, bool inverted = false,
+        CancellationToken ct = default)
+    {
         int channels = source.Channels(), width = source.Width, height = source.Height;
-        using var binary = new Mat(height, width, MatType.CV_8UC1);
         var sourceRow = new byte[checked(width * channels)];
         var binaryRow = new byte[width];
         for (int y = 0; y < height; y++)
         {
+            ct.ThrowIfCancellationRequested();
             System.Runtime.InteropServices.Marshal.Copy(source.Ptr(y), sourceRow, 0, sourceRow.Length);
             for (int x = 0; x < width; x++)
             {
@@ -35,14 +45,15 @@ public static class SkyMaskImporter
                 if (channels == 4 && sourceRow[offset + 3] != 255)
                     throw new InvalidDataException("The mask must be opaque. Remove transparent pixels before importing.");
                 // Outside-lens pixels have no sky meaning. Apply the photo disk to either polarity.
-                double dx = x - disk.CenterX, dy = y - disk.CenterY;
-                binaryRow[x] = dx * dx + dy * dy > disk.Radius * disk.Radius ? (byte)0
-                    : inverted ? (byte)(255 - value) : value;
+                byte pixel = inverted ? (byte)(255 - value) : value;
+                if (disk != null)
+                {
+                    double dx = x - disk.CenterX, dy = y - disk.CenterY;
+                    if (dx * dx + dy * dy > disk.Radius * disk.Radius) pixel = 0;
+                }
+                binaryRow[x] = pixel;
             }
             System.Runtime.InteropServices.Marshal.Copy(binaryRow, 0, binary.Ptr(y), binaryRow.Length);
         }
-        Cv2.ImEncode(".png", binary, out byte[] png);
-        return new(png, default, photo.Width, photo.Height, 0, disk, SkyPhotoMasker.CropForDisk(disk),
-            diskDetection.ToString(), "Imported binary mask · no AI", null, 0, 0, 0, null, null);
     }
 }

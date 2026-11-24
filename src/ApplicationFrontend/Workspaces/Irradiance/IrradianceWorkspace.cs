@@ -15,6 +15,7 @@ using SolarShade.MaskEditor;
 using Cv2 = OpenCvSharp.Cv2;
 using ImreadModes = OpenCvSharp.ImreadModes;
 using SolarShade.Calibration.Validation;
+using SolarShade.Core.Models;
 
 namespace SolarShade.Desktop;
 
@@ -66,6 +67,11 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private readonly TextBlock beforeEnergy = Label("—", 27), afterEnergy = Label("—", 27), reduction = Label("—", 27), hover = Label("", 12);
     private readonly TextBlock provenance = Label("", 12);
     private readonly SkyPhotoViewport skyViewport = new();
+    private readonly Button estimateEdge = new() { Content = "Estimate edge…", IsEnabled = false };
+    private readonly WrapPanel calculationCoverage = new();
+    private readonly TextBlock calculationFov = Label("", 12, StudioTheme.Ink);
+    private readonly Button calibratedOnly = new() { Content = "Use calibration only", Margin = new(6, 0, 0, 0) };
+    private MaskEdgeWindow? maskEdgeWindow;
     private ImageOverlayPreview photo => skyViewport.Photo;
     private readonly CheckBox showCardinals = new() { Content = "Show sky grid", VerticalAlignment = VerticalAlignment.Center, Margin = new(8, 0, 8, 0) };
     private readonly TextBlock cardinalInfo = Label("", 12);
@@ -266,13 +272,22 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         previewHeader.Children.Add(showSunPath);
         showSunPath.Checked += (_, _) => SetSunPathVisibility(); showSunPath.Unchecked += (_, _) => SetSunPathVisibility();
         StudioTheme.Help(showSunPath, "Update the study to project the sun path for the study period onto the mask. This switch controls its visibility.");
+        previewHeader.Children.Add(estimateEdge);
+        AutomationProperties.SetAutomationId(estimateEdge, "EstimateMaskEdge");
+        estimateEdge.Click += (_, _) => OpenMaskEdge();
+        StudioTheme.Help(estimateEdge, "Inspect the mask for open sky and a dark outer band between the calibrated limit and 180° full angle.");
         var pair = CreatePreviewPair(preview.RowDefinitions[1]);
         Grid.SetRow(pair, 1);
         preview.Children.Add(pair);
         editMask.Click += (_, _) => OpenMaskEditor();
         var previewInfo = new StackPanel { Margin = new(16, 6, 16, 10) };
         maskInfo.Focusable = true;
-        previewInfo.Children.Add(fieldOfViewInfo); previewInfo.Children.Add(maskInfo);
+        previewInfo.Children.Add(fieldOfViewInfo); previewInfo.Children.Add(calculationCoverage); previewInfo.Children.Add(maskInfo);
+        calculationFov.VerticalAlignment = VerticalAlignment.Center;
+        calculationCoverage.Children.Add(calculationFov); calculationCoverage.Children.Add(calibratedOnly);
+        AutomationProperties.SetAutomationId(calculationFov, "CalculationFieldOfView");
+        calibratedOnly.Click += (_, _) => SetCalculationCoverage(null);
+        StudioTheme.Help(calibratedOnly, "Restore the calibrated field for the next Update results.");
         sunPathInfo.Visibility = cardinalInfo.Visibility = Visibility.Collapsed;
         previewInfo.Children.Add(sunPathInfo); previewInfo.Children.Add(cardinalInfo);
         System.Windows.Automation.AutomationProperties.SetAutomationId(fieldOfViewInfo, "SkyPhotoFieldOfView");
@@ -336,6 +351,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         SystemEvents.TimeChanged -= SystemTimeChanged; SystemEvents.UserPreferenceChanged -= SystemPreferenceChanged;
         sourceWatch.Dispose();
         calibrationReviewWindow?.Close();
+        maskEdgeWindow?.Close();
         controller.CommandsChanged -= OnCommandsChanged;
         try { AppData.SaveSettings(settings); } catch { }
         if (inputWork.IsCompleted) controller.Dispose();
@@ -555,6 +571,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 {
                     using var unmaskedPhoto = Cv2.ImRead(PortablePaths.Resolve(settings.SkyImage), ImreadModes.Color);
                     if (unmaskedPhoto.Empty()) throw new InvalidDataException("The selected photograph could not be decoded.");
+                    displayedAsset = null; displayedMaskPng = null; maskViewport.ClearImage(); editMask.IsEnabled = false;
                     displayedPhoto = AppServices.Preview(unmaskedPhoto);
                     skyViewport.SetPhoto(Bitmap(displayedPhoto), unmaskedPhoto.Width, unmaskedPhoto.Height, PortablePaths.Resolve(settings.SkyImage));
                     orientedPhotoWidth = unmaskedPhoto.Width; orientedPhotoHeight = unmaskedPhoto.Height;
@@ -607,7 +624,10 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
                     return true;
                 }) { CalibratedOutline = currentFieldOfView.CalibratedOutline, UsableOutline = currentFieldOfView.UsableOutline,
-                    FieldOfViewLabel = currentFieldOfView.OutlineLabel, FieldOfViewHelp = currentFieldOfView.Explanation }) { Owner = owner };
+                    MaskBandOutline = skyViewport.BandOutline, ScanCapOutline = skyViewport.CapOutline,
+                    FieldOfViewLabel = currentFieldOfView.OutlineLabel +
+                        (skyViewport.BandOutline != null || skyViewport.CapOutline != null ? " · " + calculationFov.Text : ""),
+                    FieldOfViewHelp = currentFieldOfView.Explanation }) { Owner = owner };
             WindowWorkArea.FitToOwner(editor, owner); editor.ShowDialog();
         }
         catch (Exception ex) { ShowError(ex); }
@@ -708,6 +728,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     public Task RecheckSourcesAsync() { RecheckSources(); return inputWork; }
     private void ApplyInvalidation(ArtifactGroup groups)
     {
+        if ((groups & (ArtifactGroup.Profile | ArtifactGroup.Mask)) != 0) maskEdgeWindow?.Close();
         if ((groups & ArtifactGroup.Mask) != 0)
         {
             bool geometryChanged = (groups & (ArtifactGroup.Profile | ArtifactGroup.Orientation)) != 0;
@@ -767,6 +788,9 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         export.IsEnabled = !controller.Verifying && !exporting && !updating && !calibrating && updateState == UpdateState.UpToDate && completed != null &&
             services.IsCurrent(completed) && completed.ManagedDebugRun?.HasCompleteDataset == true;
         editMask.IsEnabled = displayedAsset != null && !updating && !calibrating && !exporting;
+        estimateEdge.IsEnabled = CanEstimateEdge;
+        maskEdgeWindow?.SetStudyEditable(CanChangeMaskCoverage);
+        RefreshCalculationCoverage();
         choosePhoto.IsEnabled = !calibrating && !exporting;
         importMask.IsEnabled = !updating && !calibrating && !exporting && File.Exists(PortablePaths.Resolve(settings.SkyImage));
         savedStudies.IsEnabled = !updating && !calibrating && !exporting && !controller.DependentBusy && !controller.Verifying;
@@ -911,14 +935,70 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             if (sunPathIsCurrent) ClearSunPath(currentFieldOfView.Explanation);
         }
         skyViewport.SetFieldOfView(currentFieldOfView);
+        estimateEdge.IsEnabled = CanEstimateEdge;
+        if (maskEdgeWindow != null && (!estimateEdge.IsEnabled ||
+            !maskEdgeWindow.Matches(settings.SkyImage, displayedAsset, currentFieldOfView.EffectiveCalibration)))
+            maskEdgeWindow.Close();
         fieldOfViewInfo.Text = currentFieldOfView.Text;
         fieldOfViewInfo.Foreground = currentFieldOfView.StampLabel != null ? Brushes.Firebrick :
             currentFieldOfView.CalibratedOutline == null ? StudioTheme.Muted : Brushes.DarkGreen;
         StudioTheme.Help(fieldOfViewInfo, currentFieldOfView.OutlineLabel + ". " + currentFieldOfView.Explanation);
         StudioTheme.Help(images, currentFieldOfView.Explanation);
+        RefreshCalculationCoverage();
+    }
+    private bool CanEstimateEdge => !calibrating && currentFieldOfView.EffectiveCalibration != null && displayedPhoto != null;
+    private bool CanChangeMaskCoverage => !updating && !calibrating && !exporting && !controller.DependentBusy && !closing;
+    private void SetCalculationCoverage(int? threshold)
+    {
+        if (!CanChangeMaskCoverage || settings.MaskEdgeThresholdPercent == threshold) return;
+        settings.MaskEdgeThresholdPercent = threshold;
+        Changed();
+        RefreshCalculationCoverage();
+    }
+    private void RefreshCalculationCoverage()
+    {
+        calculationCoverage.Visibility = settings.MaskEdgeThresholdPercent.HasValue ? Visibility.Visible : Visibility.Collapsed;
+        calibratedOnly.IsEnabled = CanChangeMaskCoverage;
+        var applied = updateState == UpdateState.UpToDate && completed?.Settings.MaskEdgeThresholdPercent == settings.MaskEdgeThresholdPercent
+            ? completed?.MaskEdge : null;
+        if (applied != null && currentFieldOfView.EffectiveCalibration is { } measured &&
+            Math.Abs(2 * measured.MaximumIncidentAngleDegrees - applied.MeasuredFullDegrees) < .000001)
+        {
+            string basis = "calibrated";
+            if (applied.EffectiveFullDegrees > applied.MeasuredFullDegrees)
+            {
+                double half = applied.EffectiveFullDegrees / 2;
+                var effective = CalibrationRadialMap.ExtendTo(measured, half);
+                double radius = new CalibrationRadialMap(effective).RadiusAt(half * Math.PI / 180);
+                skyViewport.SetMaskScan(measured.PrincipalPoint[0], measured.PrincipalPoint[1],
+                    applied.ObservedTerminalBand ? radius : null, applied.ObservedTerminalBand ? null : radius);
+                basis = applied.ObservedTerminalBand ? "amber band" : "blue extrapolated cap";
+            }
+            else skyViewport.SetMaskScan(0, 0, null, null);
+            calculationFov.Text = $"Calculation FOV · {applied.EffectiveFullDegrees:0.##}° full · {applied.BlackPercent}% black · {basis}";
+            StudioTheme.Help(calculationFov, applied.Explanation);
+            return;
+        }
+        skyViewport.SetMaskScan(0, 0, null, null);
+        if (settings.MaskEdgeThresholdPercent is not int percent) return;
+        calculationFov.Text = $"For calculation · {percent}% black · " + (updating ? "updating…" : "update required");
+        StudioTheme.Help(calculationFov, "Update results to apply the mask-based angular coverage to shading and solar directions.");
+    }
+    private void OpenMaskEdge()
+    {
+        RefreshFieldOfView();
+        if (!estimateEdge.IsEnabled || displayedPhoto == null) return;
+        if (maskEdgeWindow != null) { maskEdgeWindow.Activate(); return; }
+        var dialog = new MaskEdgeWindow(owner, settings.SkyImage, Bitmap(displayedPhoto), displayedAsset, currentFieldOfView,
+            settings.MaskEdgeThresholdPercent, percent => SetCalculationCoverage(percent));
+        dialog.SetStudyEditable(CanChangeMaskCoverage);
+        maskEdgeWindow = dialog;
+        dialog.Closed += (_, _) => maskEdgeWindow = null;
+        dialog.Show();
     }
     public static string OrientationInputKey(UserSettings s) => AppData.Key(new
-    { s.SkyImage, s.ProfilePath, s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle, s.BottomAzimuth, s.CameraTilt, s.CameraRoll });
+    { s.SkyImage, s.ProfilePath, s.Model, s.Resolution, s.CenteredDisk, s.CoverageAngle, s.BottomAzimuth, s.CameraTilt, s.CameraRoll,
+        s.MaskEdgeThresholdPercent, Mask = s.MaskEdgeThresholdPercent.HasValue ? s.SelectedMaskId : null });
     private void InvalidateOrientation(string message)
     {
         orientationRevision++;
@@ -1151,6 +1231,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if (invalidFields.Any(f => f is "Columns" or "Rows" or "SquareMm" || InputDependencies.ForField(f, settings) != ArtifactGroup.None))
         { status.Text = "Correct the highlighted fields first"; return; }
         calibrating = true;
+        maskEdgeWindow?.Close();
         RefreshCalibrationOutcome();
         pending?.Cancel(); revision++; export.IsEnabled = false;
         MarkPreviousResults(); SetUpdateState(UpdateState.Updating, "Calibrating checkerboard photographs…");

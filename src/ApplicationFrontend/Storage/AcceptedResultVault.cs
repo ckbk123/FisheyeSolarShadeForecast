@@ -20,7 +20,7 @@ internal static class AcceptedResultVault
     {
         var sources = InputDependencies.Capture(s);
         bool services = WeatherSourceSelection.UsesServices(s);
-        return AppData.Key(new
+        string baseline = AppData.Key(new
         {
             Software = AppServices.SoftwareFingerprint,
             UseDataServices = services,
@@ -33,6 +33,7 @@ internal static class AcceptedResultVault
             End = services ? s.End : (DateTime?)null, s.Zone,
             Provider = services ? s.Provider : (int?)null, s.ImportWindow, s.ImportIntervalMinutes, s.Substeps, s.Isotropic
         });
+        return s.MaskEdgeThresholdPercent.HasValue ? AppData.Key(new { baseline, s.MaskEdgeThresholdPercent }) : baseline;
     }
     private static string Folder(string key) => Path.Combine(AppData.PathFor("AcceptedResults"), key);
     private static string BlobPath(string hash) => Path.Combine(AppData.PathFor("AcceptedResults"), "Blobs", hash);
@@ -134,7 +135,7 @@ internal static class AcceptedResultVault
             {
                 DebugDirectory = store.Root, SunPath = saved.SunPath, Cardinals = saved.Cardinals,
                 SunPathGenerationCount = saved.SunPathGenerationCount, CardinalGenerationCount = saved.CardinalGenerationCount,
-                Dependencies = inputs, ManagedDebugRun = store.Current
+                Dependencies = inputs, ManagedDebugRun = store.Current, MaskEdge = manifest.MaskEdge
             };
             return (store.Current, result);
         }
