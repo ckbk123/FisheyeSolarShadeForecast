@@ -4,6 +4,8 @@ Windows desktop application and C# scientific libraries for estimating solar irr
 
 ## Current application — 24 November 2026
 
+**Preview 0.3.9** aligns opposite compass ticks on the sky photo and identifies older phone poses that include roll. The [May sun-path check](docs/SOLAR_OVERLAY_CONVENTION.md) shows why the example Sun crosses north of overhead and verifies the track against an independent solar calculation.
+
 **Preview 0.3.8** uses the timestamps in an imported weather file for the study period. Import mode includes a template, checkerboard photos support zoom and pan, and the bundled study uses the south-facing 28° example from Orientation map.
 
 **Preview 0.3.7** shows the phone beside the panel in Orientation map, including when their angles match. Calibration gives a one-line outcome, and **Study details** under the irradiance chart holds the weather source, sky coverage and run information.
@@ -39,7 +41,7 @@ See [baseline scope and versioning workflow](docs/BASELINE.md) for the original 
 
 The **PV–battery backend and PV Autonomy workspace** are in `src/PvBatterySimulation` and `src/ApplicationFrontend/Workspaces/PvAutonomy`. They consume the accepted shaded panel irradiance and system/load settings to return hourly battery SoC, unmet load and curtailment. The workspace is explicitly evaluated after Solar Irradiance is current; its result and export remain separate from the irradiance snapshot. See [model, API and validation](src/PvBatterySimulation/README.md) and [application usage](src/ApplicationFrontend/RUNNING.md).
 
-The local Preview 0.3.8 application is in **`Deliverable/APPLICATION.exe`**, with a matching clean **`Deliverable.zip`** for sharing. These generated outputs are not Git-tracked releases. Keep the executable alongside its Example, Data and Debug Data folders; all four segmentation models and the runtime are bundled. Start with **Load example** or select your own inputs, then click **Update results**. See [application usage, imports, validation and packaging](src/ApplicationFrontend/RUNNING.md). Source and integration tests are under `src/ApplicationFrontend` and the library project folders.
+The local Preview 0.3.9 application is in **`Deliverable/APPLICATION.exe`**, with a matching clean **`Deliverable.zip`** for sharing. These generated outputs are not Git-tracked releases. Keep the executable alongside its Example, Data and Debug Data folders; all four segmentation models and the runtime are bundled. Start with **Load example** or select your own inputs, then click **Update results**. See [application usage, imports, validation and packaging](src/ApplicationFrontend/RUNNING.md). Source and integration tests are under `src/ApplicationFrontend` and the library project folders.
 
 The solar-position and fisheye shading library is in **`src/SolarPositionAndShading`**. It exports timestamp/zenith/azimuth XLSX data, computes direct and constant-isotropic diffuse shading from the existing mask/calibration contracts, and writes a separate shading workbook. See [API, defaults and integration](src/SolarPositionAndShading/README.md), [validation and performance](src/SolarPositionAndShading/VALIDATION.md), and [the 0.25° solar-radius overlay](src/SolarPositionAndShading/Validator/results/noon-20260531-radius-0.25-detail.png).
 

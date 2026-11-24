@@ -4,6 +4,8 @@
 
 The overlay is implemented in the existing SolarShade.Shading library. SunPathOverlayGenerator consumes the selected samples already prepared in SolarTimeline and uses CalibratedSkyProjection, the same lightweight projector now used by shading. It produces semi-transparent golden-yellow daily tracks at the native mask resolution. No extra ephemeris sequence is calculated and no irradiance observations are added.
 
+For the bundled May study, see the [illustrated check of the equipment angles and solar track](SOLAR_OVERLAY_CONVENTION.md).
+
 ## Accuracy and behaviour
 
 - Every selected sample is inspected; no days or source intervals are discarded for speed.
