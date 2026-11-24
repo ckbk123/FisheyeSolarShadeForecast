@@ -25,8 +25,8 @@ public sealed class DependencyTests
         yield return ["Latitude", 11d, InputDependencies.GeometryChain];
         yield return ["Longitude", 107d, InputDependencies.GeometryChain];
         yield return ["Elevation", 100d, InputDependencies.GeometryChain];
-        yield return ["Start", new DateTime(2025, 5, 2), InputDependencies.GeometryChain];
-        yield return ["End", new DateTime(2025, 5, 30), InputDependencies.GeometryChain];
+        yield return ["Start", new DateTime(2025, 5, 2), ArtifactGroup.None];
+        yield return ["End", new DateTime(2025, 5, 30), ArtifactGroup.None];
         yield return ["Substeps", 15, InputDependencies.GeometryChain];
         yield return ["Zone", "UTC", InputDependencies.WeatherChain];
         yield return ["ImportPath", "other.csv", InputDependencies.WeatherChain];

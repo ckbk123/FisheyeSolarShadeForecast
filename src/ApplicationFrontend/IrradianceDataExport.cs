@@ -119,13 +119,15 @@ internal static class IrradianceDataExport
             Number(row, "AfterTotal");
             Factor(direct, afterDirect); Factor(diffuse, afterDiffuse);
         }
+        var period = new StudyPeriod(Instant(rows[0], "Start"), Instant(rows[rows.GetArrayLength() - 1], "End"));
+        var (firstDay, lastDay) = period.LocalDates(TimeZoneSelection.Resolve(snapshot.Settings.Zone));
         string metadata = "Panel irradiance interval means in W/m². Direct and diffuse are unshaded components on the panel; " +
             "final total irradiance is the saved shaded direct plus shaded sky diffuse. No ground reflection. " +
             "Unknown sky is blocked in the final total. Timeseries preserves every saved source timestamp label and its UTC offset. " +
             FactorSemantics + $" Diffuse model: {model}. Provenance: " + JsonSerializer.Serialize(new {
                 ResultId = snapshot.Id, Model = model, TimeZoneId = zone, TimestampConvention = convention,
-                StudyStartDate = DateOnly.FromDateTime(snapshot.Settings.Start),
-                StudyEndDateInclusive = DateOnly.FromDateTime(snapshot.Settings.End),
+                StudyStart = period.Start, StudyEndExclusive = period.End, StudyTimeZoneId = snapshot.Settings.Zone,
+                StudyStartDate = DateOnly.FromDateTime(firstDay), StudyEndDateInclusive = DateOnly.FromDateTime(lastDay),
                 EffectiveStart = Instant(rows[0], "Start"), EffectiveEnd = Instant(rows[rows.GetArrayLength() - 1], "End"),
                 Panel = root.TryGetProperty("Panel", out var panel) && panel.ValueKind == JsonValueKind.Object ? panel : (JsonElement?)null,
                 PanelStorageConvention = SolarShade.Irradiance.Transposition.PanelOrientation.SolverConvention,

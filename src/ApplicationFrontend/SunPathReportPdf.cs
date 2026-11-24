@@ -32,7 +32,8 @@ internal static class SunPathReportPdf
         g.DrawString("Sky mask and sun path", title, ink, new XRect(38, 30, 520, 25), XStringFormats.TopLeft);
         var s = snapshot.Settings;
         var angles = snapshot.EquipmentAngles ?? throw new InvalidDataException("Saved equipment angles are invalid.");
-        g.DrawString($"{s.Latitude:0.######}° N, {s.Longitude:0.######}° E  |  {s.Start:yyyy-MM-dd} to {s.End:yyyy-MM-dd}  |  {s.Zone}",
+        var period = snapshot.StudyPeriod ?? StudyPeriod.Calendar(s);
+        g.DrawString($"{s.Latitude:0.######}° N, {s.Longitude:0.######}° E  |  {period.Describe(TimeZoneSelection.Resolve(s.Zone))}  |  {s.Zone}",
             small, muted, new XRect(38, 58, 520, 14), XStringFormats.TopLeft);
         g.DrawString(angles.DescribePhone(),
             small, muted, new XRect(38, 73, 520, 14), XStringFormats.TopLeft);

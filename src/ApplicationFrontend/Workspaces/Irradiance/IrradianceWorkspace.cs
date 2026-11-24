@@ -48,7 +48,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private readonly TextBlock lastWeatherResult = Label("", 11);
     private readonly TextBlock runDetails = Label("", 12), modelDetails = Label("", 12);
     private readonly Expander studyDetails = new() { Header = "Study details", Visibility = Visibility.Collapsed };
-    private readonly Button chooseWeatherFile = new() { Content = "Choose XLSX / CSV file" };
+    private readonly Button chooseWeatherFile = new() { Content = "Upload weather file…" };
     private readonly WeatherSourceSwitch weatherMode = new();
     private readonly StackPanel serviceWeatherControls = new(), importWeatherControls = new();
     private readonly Button stop = new() { Content = "Stop", IsEnabled = false };
@@ -209,20 +209,25 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         zone.SelectionChanged += (_, _) => { if (!loading && !settings.UseSystemTimeZone && zone.SelectedValue is string z) { settings.Zone = z; Changed(); } };
         StudioTheme.Help(zone, "Regional time zones follow daylight saving time. A fixed UTC offset applies year-round. Site coordinates set the weather location.");
         Section(inputs, "Weather data");
-        Field(inputs, "Start date · DD.MM.YYYY", "Start"); Field(inputs, "End date · inclusive · DD.MM.YYYY", "End");
         inputs.Children.Add(weatherMode);
         StudioTheme.Help(weatherMode, "Choose a weather service or import a local file containing direct horizontal and diffuse horizontal irradiance.");
         weatherMode.Checked += (_, _) => SelectWeatherMode(true);
         weatherMode.Unchecked += (_, _) => SelectWeatherMode(false);
         inputs.Children.Add(serviceWeatherControls); inputs.Children.Add(importWeatherControls);
+        Field(serviceWeatherControls, "Start date · DD.MM.YYYY", "Start"); Field(serviceWeatherControls, "End date · inclusive · DD.MM.YYYY", "End");
         provider = Combo(serviceWeatherControls, "Weather data service", ["NASA POWER", "Open-Meteo · ERA5"]);
         System.Windows.Automation.AutomationProperties.SetName(provider, "Weather data source");
         provider.SelectionChanged += (_, _) =>
         {
             if (!loading && provider.SelectedIndex >= 0) { settings.Provider = provider.SelectedIndex; Changed(); }
         };
-        chooseWeatherFile.Click += (_, _) => PickImport(); importWeatherControls.Children.Add(chooseWeatherFile);
-        StudioTheme.Help(chooseWeatherFile, "Include Timestamp, BHI (direct horizontal) and DHI (diffuse horizontal), in W/m². A sample CSV row is 2025-05-15T12:00:00+07:00,500,100. Example/Irradiance contains a sample workbook.");
+        var fileActions = new WrapPanel();
+        importWeatherControls.Children.Add(fileActions);
+        var template = Button("Download template…", SaveWeatherTemplate);
+        StudioTheme.Help(template, "Save an editable Excel file with three sample hourly readings.");
+        fileActions.Children.Add(template);
+        chooseWeatherFile.Click += (_, _) => PickImport(); fileActions.Children.Add(chooseWeatherFile);
+        StudioTheme.Help(chooseWeatherFile, "Open a local Excel or CSV file with timestamps, direct horizontal and diffuse horizontal irradiance in W/m². Its intervals set the study period.");
         window = Combo(importWeatherControls, "Imported rows represent", ["Preceding interval · end labels", "Following interval · start labels", "Centered interval"]); window.SelectionChanged += (_, _) => { if (!loading) { settings.ImportWindow = window.SelectedIndex; Changed(); } };
         Field(importWeatherControls, "Interval length (min)", "ImportIntervalMinutes");
         StudioTheme.Help(window, "Use the source file’s timestamp convention. Native workbook metadata takes precedence over these interval settings.");
@@ -260,7 +265,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         StudioTheme.Help(showCardinals, "Update the study to project the compass at the edge of the calibrated view. The bearings use the same camera pose as shading.");
         previewHeader.Children.Add(showSunPath);
         showSunPath.Checked += (_, _) => SetSunPathVisibility(); showSunPath.Unchecked += (_, _) => SetSunPathVisibility();
-        StudioTheme.Help(showSunPath, "Update the study to project the sun path for the selected dates onto the mask. This switch controls its visibility.");
+        StudioTheme.Help(showSunPath, "Update the study to project the sun path for the study period onto the mask. This switch controls its visibility.");
         var pair = CreatePreviewPair(preview.RowDefinitions[1]);
         Grid.SetRow(pair, 1);
         preview.Children.Add(pair);
@@ -284,7 +289,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         var toolbar = new WrapPanel { Margin = new(14, 4, 10, 0), VerticalAlignment = VerticalAlignment.Center }; Grid.SetRow(toolbar, 1); graph.Children.Add(toolbar);
         var component = new ComboBox { ItemsSource = new[] { "Total irradiance", "Direct component", "Sky diffuse component" }, SelectedIndex = 0, Width = 170 }; component.SelectionChanged += (_, _) => { chart.Component = component.SelectedIndex; chart.InvalidateVisual(); }; toolbar.Children.Add(component);
         AutomationProperties.SetName(component, "Irradiance component");
-        var fullPeriod = Button("Full period", chart.Reset);
+        var fullPeriod = Button("Full period", () => { graphDay.SelectedDate = null; chart.Reset(); });
         StudioTheme.Help(fullPeriod, "Show the entire study period. Scroll over the plot to zoom, drag to pan, or choose a day.");
         StudioTheme.Help(component, "Both curves show irradiance on the panel. The model treats unobserved sky as blocked and excludes ground reflection.");
         toolbar.Children.Add(fullPeriod); graphDay = new DatePicker { Width = 125, Margin = new(4, 0, 0, 0) }; graphDay.SelectedDateChanged += (_, _) => { if (graphDay.SelectedDate is { } d) chart.Day(d); }; toolbar.Children.Add(graphDay);
@@ -433,7 +438,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         model.SelectedIndex = (int)settings.Model; resolution.SelectedIndex = settings.Resolution == 512 ? 1 : 0; provider.SelectedIndex = settings.Provider; UpdateTimeZoneControls(); window.SelectedIndex = settings.ImportWindow; isotropic.IsChecked = settings.Isotropic;
         showSunPath.IsChecked = settings.ShowSunPath; maskPreview.ShowOverlay = settings.ShowSunPath;
         showCardinals.IsChecked = settings.ShowCardinalDirections; photo.ShowOverlay = settings.ShowCardinalDirections;
-        PopulateImages(); graphDay.SelectedDate = settings.Start;
+        PopulateImages();
         RefreshMaskChoices();
         RefreshCalibrationReview();
         loading = false;
@@ -637,7 +642,9 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void QueueObservation(bool refreshSources, bool verifyArtifacts)
     {
-        var previous = inputWork; var snapshot = settings with { }; var invalid = invalidFields.ToArray(); long observedRevision = revision;
+        var previous = inputWork; var snapshot = settings with { };
+        var invalid = invalidFields.Where(f => InputDependencies.ForField(f, snapshot) != ArtifactGroup.None).ToArray();
+        long observedRevision = revision;
         observations++; if (verifyArtifacts) fullCheckQueued = true;
         controller.Verifying = true; RefreshButtons();
         inputWork = ObserveAsync();
@@ -840,7 +847,19 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         ShowWeatherOrigin(result);
         if (result.Mask != null) ShowMask(result.Mask);
         ShowCardinals(result.Cardinals); ShowSunPath(result.SunPath);
-        chart.SetData(result.Run.Rows, TimeZoneSelection.Resolve(result.Settings.Zone));
+        var zone = TimeZoneSelection.Resolve(result.Settings.Zone);
+        if (chart.SetData(result.Run.Rows, zone)) graphDay.SelectedDate = null;
+        if (result.Run.Rows.Count > 0)
+        {
+            var (first, last) = new StudyPeriod(result.Run.Rows[0].Start, result.Run.Rows[^1].End).LocalDates(zone);
+            if (graphDay.DisplayDateStart != first || graphDay.DisplayDateEnd != last)
+            {
+                graphDay.SelectedDate = null;
+                graphDay.DisplayDateEnd = null;
+                graphDay.DisplayDateStart = first; graphDay.DisplayDateEnd = last;
+                graphDay.DisplayDate = first;
+            }
+        }
         beforeEnergy.Text = result.Run.BeforeEnergy.ToString("F2"); afterEnergy.Text = result.Run.AfterEnergy?.ToString("F2") ?? "—";
         reduction.Text = result.Run.LossPercent is { } loss ? loss.ToString("F1") + "%" : "—";
         modelDetails.Text = result.Run.SkyCoverage is { } coverage ? $"{result.Run.Model} · observed sky coverage {coverage:P1}" : "Baseline only";
@@ -1102,6 +1121,14 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         dialog.Show();
     }
     private void PickImport() { var p = new OpenFileDialog { Title = "Choose horizontal irradiance: timestamp, BHI and DHI in W/m²", Filter = "Horizontal irradiance|*.xlsx;*.csv" }; if (p.ShowDialog(owner) == true) SelectWeatherFile(p.FileName); else RefreshWeatherSource(); }
+    private void SaveWeatherTemplate()
+    {
+        var dialog = new SaveFileDialog { Title = "Save weather template", FileName = "weather-template.xlsx", DefaultExt = ".xlsx", Filter = "Excel workbook|*.xlsx" };
+        if (dialog.ShowDialog(owner) != true) return;
+        try { WeatherSourceSelection.WriteImportTemplate(dialog.FileName); status.Text = "Weather template saved"; detail.Text = dialog.FileName; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        { status.Text = "Could not save template"; detail.Text = ex.Message; }
+    }
     public void SelectWeatherFile(string path)
     { WeatherSourceSelection.SelectFile(settings, path); Changed(); RefreshWeatherSource(); status.Text = "Weather file selected"; detail.Text = path; }
     private void ShowWeatherOrigin(Evaluation result)
@@ -1119,7 +1146,8 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     internal async Task Calibrate()
     {
         if (calibrating || updating || controller.DependentBusy) return;
-        if (invalidFields.Count > 0) { status.Text = "Correct the highlighted fields first"; return; }
+        if (invalidFields.Any(f => f is "Columns" or "Rows" or "SquareMm" || InputDependencies.ForField(f, settings) != ArtifactGroup.None))
+        { status.Text = "Correct the highlighted fields first"; return; }
         calibrating = true;
         RefreshCalibrationOutcome();
         pending?.Cancel(); revision++; export.IsEnabled = false;
@@ -1186,7 +1214,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             ("Camera calibration", "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles."),
             ("Sky photos and masks", "2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show cardinal directions adds a separate orientation overlay to the original colored photograph. It is generated during Update results before irradiance retrieval, and reused when its inputs are unchanged. The letters follow the same camera convention as sun paths and shading. Scroll over either preview or use + and − to zoom, drag to pan, and choose Fit to see the whole frame. Expand gives the selected preview the width of both panes. The mask and its sun path zoom together. The solid green line marks the calibrated limit around the lens axis. A dashed line marks the usable boundary when the detected disk or image edges limit coverage.\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Original masks stay available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. The internal Debug Data includes mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Keep Data/Masks and Data/AcceptedResults when moving the application."),
             ("Phone, panel and site orientation", "Lay the panel flat, front up. Its top heading runs from its center toward the marked edge that you raise for tilt. On the phone, use the lens end as the top. Measure both headings clockwise from true north, with east 90°, south 180° and west 270°. Enter tilt from horizontal, 0° flat to 90° vertical. The top heading is always the bearing you would measure with the equipment laid flat. At vertical the raised edge points straight up, and the retained heading still determines the direction the front faces.\n\nThe calculated lens and panel front azimuths follow the outward axes, clockwise from geographic south. South is 0°, west +90°, north ±180° and east −90°. A south-facing 28° panel has a north top heading (0°) and a south front azimuth (0°). When flat, the front points up and has no azimuth. Turning the panel still rotates its marked top. Turning the phone rotates its photograph and overlays. With image top north, east appears on the left.\n\nCopy panel pose to phone aligns the phone’s lens end with the marked panel top and copies its tilt and heading once, including at 0° tilt. A saved camera with roll keeps its original image orientation. The pose readout identifies older placements that need the explicit uphill placement control before editing.\n\nEnter site coordinates in decimal degrees, for example latitude 43.56, longitude 1.48. Southern latitudes and western longitudes are negative. Solar azimuth is clockwise from true north. Study dates include the complete end day."),
-            ("Weather, imports and calculation", "4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Provide complete coverage of both selected date boundaries. Missing periods are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the isotropic option in Weather data. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional."),
+            ("Weather, imports and calculation", "4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Download template saves an editable example. Upload weather file opens your XLSX or CSV. Its intervals set the study period, including partial days. Gaps are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the isotropic option in Weather data. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional."),
             ("Data exports", "Choose the Excel columns to export and a destination folder. Every row includes the source timestamp and its UTC offset. Choose source interval start and end to compare providers by the same physical hour. The default columns are direct and diffuse panel irradiance, the two shading factors and the final shaded total. A factor is blank when its unshaded component is zero. For weather diagnostics select Source GHI, Direct horizontal or Diffuse horizontal. Source GHI is available when the weather input saved the original global horizontal readings. The Weather source sheet identifies the source and explains the timestamp convention. The workbook and its receipt are saved in a new scenario folder after a complete shaded update. Cancel closes the window without writing files. The full diagnostic snapshot includes Summary.pdf and SunPathReport.pdf."),
             ("Diagnostics and saved files", "Each explicit update maintains one current Debug Data set beside APPLICATION.exe: 01-calibration (YAML/profile), 02-sky-mask (PNG), 02-orientation (cardinal PNG/XLSX/JSON), 03-irradiance (XLSX), 04-solar-positions (XLSX), 05-transposition (XLSX), and 06-shading (visibility, transmission and shaded results). run.json records stage origins, saved files, fingerprints and the current status. Only a complete calculation is marked Complete; calibration or orientation alone is Partial. Unavailable stages are marked skipped. Edits remove affected files from the latest run, hide stale overlays and disable export. Camera rotation preserves the mask and numerical solar positions; panel edits preserve upstream files. Source-file changes are checked without recalculating. Close any locked diagnostic workbook and retry Update. Valid files are kept unchanged. Replacements are staged before publication. Verified old run folders are migrated after protecting selected inputs under Data/Inputs. Close the other SolarShade instance if this dataset is already in use.\n\nKeep APPLICATION.exe, Example, Data and Debug Data together when moving the package. Data stores settings, caches, extracted model weights and durable Profiles/Inputs. Keep these durable inputs when moving or backing up the application. Your own inputs may be anywhere. Data location:\n" + AppData.Root + ""),
             ("PV Autonomy", "Solar Irradiance estimates historical direct + sky-diffuse irradiance. Once its complete shaded dataset is current, open PV Autonomy to enter a daily consumption profile, panel area and efficiencies, battery capacity and initial charge. Evaluate system computes hourly battery charge and unmet load for this study. First model use is slower; later panel edits reuse expensive work."),

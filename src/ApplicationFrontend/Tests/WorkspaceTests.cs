@@ -69,10 +69,11 @@ public sealed class WorkspaceTests
         var settings = new UserSettings { Start = start.Date, End = start.Date, Zone = "UTC" };
         var rows = Enumerable.Range(0, 24).Select(i => new PanelRow(start.AddHours(i), start.AddHours(i), start.AddHours(i + 1),
             0, 0, 0, 0, 0) { IntervalId = i.ToString() }).ToArray();
-        IrradianceReadiness.ValidatePanel(new(rows, 1, 0, "test"), settings);
-        Assert.Throws<InvalidDataException>(() => IrradianceReadiness.ValidatePanel(new(rows.Skip(1).ToArray(), 1, 0, "test"), settings));
+        var period = StudyPeriod.Calendar(settings);
+        IrradianceReadiness.ValidatePanel(new(rows, 1, 0, "test"), period);
+        Assert.Throws<InvalidDataException>(() => IrradianceReadiness.ValidatePanel(new(rows.Skip(1).ToArray(), 1, 0, "test"), period));
         rows[8] = rows[8] with { AfterDirect = double.NaN };
-        Assert.Throws<InvalidDataException>(() => IrradianceReadiness.ValidatePanel(new(rows, 1, 0, "test"), settings));
+        Assert.Throws<InvalidDataException>(() => IrradianceReadiness.ValidatePanel(new(rows, 1, 0, "test"), period));
     }
 
     [Fact]

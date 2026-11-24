@@ -33,6 +33,7 @@ public sealed class DebugDataRun : IDisposable
         public DateTimeOffset UpdatedUtc { get; set; }
         public DateTimeOffset? LastSuccessfulUpdateUtc { get; set; }
         public UserSettings Settings { get; set; } = new();
+        public StudyPeriod? StudyPeriod { get; set; }
         public string StoredEquipmentConvention => "Settings.PanelAzimuth and Settings.BottomAzimuth are solver inputs clockwise from true north. PanelAzimuth also stores the bearing opposite the marked panel top when flat. BottomAzimuth references image bottom before roll. CameraTilt is signed from up toward image top before roll. CameraRoll rotates the image around the lens. EquipmentAngles gives both top headings when laid flat and the physical normal azimuths.";
         public EquipmentAngleReport? EquipmentAngles => EquipmentAngleReport.From(Settings);
         public Dictionary<string, JsonElement> Inputs { get; set; } = new();
@@ -63,7 +64,7 @@ public sealed class DebugDataRun : IDisposable
             previous?.Finish();
             state = previous == null ? new() : JsonSerializer.Deserialize<Manifest>(JsonSerializer.Serialize(previous.state))!;
             state.Id = Guid.NewGuid().ToString("N"); state.StartedUtc = DateTimeOffset.UtcNow; state.Kind = kind; state.UpdateNumber++;
-            state.Settings = settings with { }; state.Software = AppServices.SoftwareFingerprint; state.Keys = inputs.Keys.ToDictionary();
+            state.Settings = settings with { }; state.StudyPeriod = null; state.Software = AppServices.SoftwareFingerprint; state.Keys = inputs.Keys.ToDictionary();
             string[] required = kind == "calibration" ? ["01-calibration"] : kind == "orientation" ? ["01-calibration", "02-sky-mask", "02-orientation"] : AllStages;
             foreach (string name in required) state.Stages.TryAdd(name, new("Pending", "", "", []));
             store.Current = this; store.StartStaging(); Status("Running");
@@ -138,13 +139,14 @@ public sealed class DebugDataRun : IDisposable
             state.Invalidated &= ~StageGroups(name); state.Stages[name] = new("Skipped", reason, "", []); Status("Running");
         }
     }
-    public void Complete()
+    public void Complete(StudyPeriod? studyPeriod = null)
     {
         lock (SyncRoot)
         {
             Check();
             if (state.Kind != "calculation") { Status("Partial"); return; }
             if (state.Invalidated != ArtifactGroup.None || state.Stages.Values.Any(stage => stage.Status is not ("Complete" or "Skipped"))) throw new InvalidOperationException("A stage has not completed its debug output.");
+            state.StudyPeriod = studyPeriod;
             state.LastSuccessfulUpdateUtc = DateTimeOffset.UtcNow; Status("Complete");
         }
     }
