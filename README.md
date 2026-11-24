@@ -10,7 +10,7 @@ Windows desktop application and C# scientific libraries for estimating solar irr
 
 **Preview 0.3.7** shows the phone beside the panel in Orientation map, including when their angles match. Calibration gives a one-line outcome, and **Study details** under the irradiance chart holds the weather source, sky coverage and run information.
 
-**Preview 0.3.6** added selectable Excel columns for published source GHI, horizontal components and panel results. Both the sky photograph and binary mask support zoom and pan. Straight compass ticks point toward the calibrated optical center. See the [weather provider comparison](docs/IRRADIANCE_PROVIDERS.md#hourly-ghi-check) for a live check against NASA POWER and Open-Meteo.
+**Preview 0.3.6** added selectable Excel columns for published source GHI, horizontal components and panel results. Both the sky photograph and binary mask support zoom and pan. See the [weather provider comparison](docs/IRRADIANCE_PROVIDERS.md#hourly-ghi-check) for a live check against NASA POWER and Open-Meteo.
 
 **CALIBRATION FAILED** identifies a failed checkerboard run. **PROFILE UNUSABLE** identifies a saved profile the preview cannot apply. A valid fit draws the field supported by its checkerboard corners in green. The automatic sky mask can reduce the usable field further. See the [235° calibration audit](docs/CALIBRATION_AUDIT_2026-11-24.md) for the measured limits.
 
