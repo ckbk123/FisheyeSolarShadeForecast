@@ -1,5 +1,8 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media;
 using SolarShade.Desktop;
 using Xunit;
 using static ManualUpdateTests;
@@ -7,6 +10,30 @@ using static ManualUpdateTests;
 [Collection("Manual update UI")]
 public sealed class FailedCalibrationAttemptTests
 {
+    private static void AssertOutcome(MainWindow window, string expected, Brush color)
+    {
+        var outcome = Assert.IsType<TextBlock>(LogicalTreeHelper.FindLogicalNode(window.Irradiance, "CalibrationOutcome"));
+        Assert.Equal(expected, outcome.Text);
+        Assert.Equal(SystemParameters.HighContrast ? SystemColors.WindowTextBrush : color, outcome.Foreground);
+        Assert.False(string.IsNullOrWhiteSpace(outcome.ToolTip as string));
+    }
+
+    [Theory]
+    [InlineData("", "No calibration")]
+    [InlineData("absent.json", "Profile unavailable")]
+    [InlineData("malformed.json", "Profile unusable")]
+    public void MissingOrInvalidProfilesDoNotReportAFit(string file, string expected) => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        string profile = file == "" ? "" : Path.Combine(fixture.Root, file);
+        if (file == "malformed.json") File.WriteAllText(profile, "{}");
+        AppData.SaveSettings(fixture.Settings with { ProfilePath = profile });
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try { AssertOutcome(window, expected, file == "" ? StudioTheme.Muted : Brushes.Firebrick); }
+        finally { await window.InputsSettled; window.Close(); }
+    });
+
     [Fact]
     public void MissingBoardFolderDoesNotLabelAnExistingProfileAsAFailedFit() => Sta(async () =>
     {
@@ -20,6 +47,7 @@ public sealed class FailedCalibrationAttemptTests
             Assert.Equal(UpdateState.Failed, window.UpdateStateForTest);
             Assert.StartsWith("Calibrated FOV", window.Irradiance.FieldOfViewTextForTest);
             Assert.Null(AppData.ReadSettings()!.LastCalibrationFailure);
+            AssertOutcome(window, "Calibration Success", Brushes.DarkGreen);
         }
         finally { await window.InputsSettled; window.Close(); }
     });
@@ -45,8 +73,11 @@ public sealed class FailedCalibrationAttemptTests
                 await Until(() => !first.UpdatingForTest);
                 Assert.True(first.ExportEnabledForTest);
 
-                await first.Irradiance.Calibrate();
+                var running = first.Irradiance.Calibrate();
+                AssertOutcome(first, "Calibrating…", StudioTheme.Muted);
+                await running;
                 await first.RecheckSourcesAsync();
+                AssertOutcome(first, "Calibration Failed", Brushes.Firebrick);
                 Assert.Equal("Calibration failed", first.Irradiance.FieldOfViewTextForTest);
                 Assert.NotNull(first.Irradiance.CalibrationReviewForTest?.Report.Failure);
                 Assert.False(first.ExportEnabledForTest);
@@ -64,6 +95,7 @@ public sealed class FailedCalibrationAttemptTests
         {
             _ = new WindowInteropHelper(window).EnsureHandle();
             Assert.Equal("Calibration failed", window.Irradiance.FieldOfViewTextForTest);
+            AssertOutcome(window, "Calibration Failed", Brushes.Firebrick);
             Assert.NotNull(window.Irradiance.CalibrationReviewForTest?.Report.Failure);
             if (retry)
             {
@@ -80,6 +112,7 @@ public sealed class FailedCalibrationAttemptTests
             await window.InputsSettled;
             Assert.Null(AppData.ReadSettings()!.LastCalibrationFailure);
             Assert.StartsWith("Calibrated FOV", window.Irradiance.FieldOfViewTextForTest);
+            AssertOutcome(window, "Calibration Success", Brushes.DarkGreen);
         }
         finally { await window.InputsSettled; window.Close(); }
     });
