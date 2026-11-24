@@ -20,7 +20,7 @@ The app projects sunlight into the **phone** frame and calculates panel incidenc
 
 ## Independent checks
 
-| Site and date | Local solar noon | Solar bearing | Elevation |
+| Site and date | Local solar noon | Solar bearing | Geometric elevation |
 | --- | --- | --- | ---: |
 | Example · May 1, 2025 | 11:50:17 UTC+07 | North | 85.65° |
 | Example · May 15, 2025 | 11:49:32 UTC+07 | North | 81.88° |
@@ -32,7 +32,7 @@ The check used the imported workbook's 744 hourly intervals and the saved local 
 
 - **Time and sky direction.** Across all 44,640 minute midpoints, the greatest angular separation between the app's geometric solar direction and SPA was below 0.0084°.
 - **Camera and mask.** The independent projection used local east–north–up coordinates. Camera right points west, image top is (0, cos 28°, sin 28°), and the lens points along (0, −sin 28°, cos 28°). Applying the bundled lens's incident-angle-to-radius polynomial to the apparent solar directions reproduced every one of the 1,006 exported track vertices to within 0.13 native pixel. Each vertex also landed on the rendered yellow overlay.
-- **Panel irradiance.** Multiplying direct normal irradiance by the positive part of the Sun–panel incidence cosine reproduced the exported direct component to within 0.000001 W/m² across all 44,640 substeps.
+- **Panel irradiance.** Above the apparent horizon, direct panel irradiance equals direct normal irradiance times the positive part of the Sun–panel incidence cosine. Below the horizon the direct component is zero. This check reproduced the exported values to within 0.000001 W/m² across all 44,640 substeps.
 - **Repeatable checks.** Five regression cases exercise the application's timeline, panel transposition and native overlay with fixed independent expected bearings, elevations and pixel positions. They cover morning, noon, afternoon, a change of season and a change of latitude. [Regression cases](../src/ApplicationFrontend/Tests/SolarOverlayConventionTests.cs)
 
 The example's 28° tilt and north-pointing top are study settings. The photograph has no independent field measurement of its heading and tilt. These checks establish where SolarShade should draw the Sun **for the entered pose**. Confirming its alignment with actual trees or buildings requires the pose used when the photo was taken.
