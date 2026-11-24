@@ -28,8 +28,9 @@ public sealed class MainWindow : Window
         FontSize = 13;
         UseLayoutRounding = true;
         var root = new DockPanel(); Content = root;
-        var header = new Grid { MinHeight = 58, Background = StudioTheme.Navy };
-        DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
+        var header = new Grid { VerticalAlignment = VerticalAlignment.Center };
+        var headerBand = new Border { MinHeight = 58, Background = StudioTheme.Navy, Child = header };
+        DockPanel.SetDock(headerBand, Dock.Top); root.Children.Add(headerBand);
         header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         header.RowDefinitions.Add(new() { Height = GridLength.Auto }); header.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var title = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new(18, 6, 10, 6) };
@@ -39,6 +40,7 @@ public sealed class MainWindow : Window
         header.Children.Add(title);
         if (TryFindResource("HeaderButton") is Style headerButton) actions.Resources[typeof(Button)] = headerButton;
         actions.Margin = new(8, 4, 14, 4); actions.VerticalAlignment = VerticalAlignment.Center;
+        actions.HorizontalAlignment = HorizontalAlignment.Right;
         Grid.SetColumn(actions, 1); header.Children.Add(actions);
         bool? stackedHeader = null;
         FrameworkElement? visibleActions = null;
@@ -74,6 +76,7 @@ public sealed class MainWindow : Window
             if (ReferenceEquals(visibleActions, next)) return;
             if (visibleActions != null) visibleActions.Visibility = Visibility.Collapsed;
             visibleActions = next;
+            actions.Visibility = next == null ? Visibility.Collapsed : Visibility.Visible;
             FitWordmark();
             if (next == null) return;
             if (!actions.Children.Contains(next)) actions.Children.Add(next);

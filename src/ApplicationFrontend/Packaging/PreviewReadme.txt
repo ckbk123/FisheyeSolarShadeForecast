@@ -24,10 +24,10 @@ WebView2 or through the tab's option to open it locally in a browser.
    an opaque, exact black/white grayscale PNG at the oriented photo dimensions
    without AI. Choose white or black for open sky, name the mask, then import it.
 2. Click Update results. Editing inputs alone does not calculate.
-   Use Edit mask on the mask preview to paint a new black/white variant in a
-   separate window. You can paint across the whole photo and save those strokes.
-   Zoom the original sky photo to inspect the compass. The green FOV guide in
-   the preview and editor shows the angular limit of your selected calibration.
+   Use Edit mask at the top right of the mask preview to paint a new variant.
+   The editor lets you paint across the whole photo and save those strokes.
+   Zoom either preview to inspect the compass or the mask and its sun path.
+   The green guide on the sky photo and in the editor shows the calibrated FOV.
    A CALIBRATION FAILED stamp on the sky photo means the checkerboard run
    failed. Open Review checkerboard photos for the cause. PROFILE UNUSABLE
    means the selected profile could not be applied to this sky photo.
