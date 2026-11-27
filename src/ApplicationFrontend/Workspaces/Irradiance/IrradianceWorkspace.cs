@@ -166,10 +166,10 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         var body = new Grid { Margin = new(16, 12, 16, 0) };
         var inputs = new StackPanel { Margin = new(14) };
         var inputHost = Card(); inputHost.VerticalAlignment = VerticalAlignment.Top; body.Children.Add(inputHost);
-        var tuning = new StackPanel { Margin = new(0, 0, 0, 8) };
         var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = inputs }; inputHost.Child = scroll;
         System.Windows.Automation.AutomationProperties.SetAutomationId(scroll, "IrradianceInputs");
         ImagesAndCalibration = BuildImageSetup();
+        AddPanelControls(inputs);
         AddPhoneControls(inputs);
         Section(inputs, "Site location");
         Field(inputs, "Latitude (°)", "Latitude"); Field(inputs, "Longitude (°)", "Longitude"); Field(inputs, "Elevation (m)", "Elevation");
@@ -222,8 +222,6 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         inputs.Children.Add(weatherSource);
         isotropic = new() { Content = "Use isotropic diffuse light", Margin = new(0, 8, 0, 8) }; isotropic.Checked += (_, _) => { if (!loading) { settings.Isotropic = true; Changed(); } }; isotropic.Unchecked += (_, _) => { if (!loading) { settings.Isotropic = false; Changed(); } }; inputs.Children.Add(isotropic);
         StudioTheme.Help(isotropic, "Treat diffuse light as uniform across the sky. The default Hay–Davies model includes brighter sky around the sun.");
-        inputs.Children.Add(tuning);
-        AddPanelControls(tuning);
         update.Background = StudioTheme.Blue; update.Foreground = Brushes.White;
         System.Windows.Automation.AutomationProperties.SetAutomationId(update, "UpdateResults");
         System.Windows.Automation.AutomationProperties.SetAutomationId(refreshData, "RefreshData");

@@ -27,10 +27,10 @@ public sealed class EquipmentAngleControlTests
 
             Assert.True(phoneTop.IsEnabled);
             var phoneTilt = Box("PhoneInclination");
-            Assert.Equal("Phone tilt", AutomationProperties.GetName(phoneTilt));
-            Assert.Equal("Phone top heading", AutomationProperties.GetName(phoneTop));
-            Assert.Equal("Panel tilt", AutomationProperties.GetName(Box("PanelTilt")));
-            Assert.Equal("Panel top heading", AutomationProperties.GetName(panelTop));
+            Assert.Equal("Phone tilt (3), degrees", AutomationProperties.GetName(phoneTilt));
+            Assert.Equal("Phone top heading (4), degrees", AutomationProperties.GetName(phoneTop));
+            Assert.Equal("Panel tilt (1), degrees", AutomationProperties.GetName(Box("PanelTilt")));
+            Assert.Equal("Panel top heading (2), degrees", AutomationProperties.GetName(panelTop));
             foreach (var field in new[] { phoneTilt, phoneTop, Box("PanelTilt"), panelTop })
             {
                 var help = Assert.IsType<string>(field.ToolTip);
@@ -206,6 +206,63 @@ public sealed class EquipmentAngleControlTests
             Assert.Equal(Visibility.Collapsed, notice.Visibility);
             Assert.Equal(Visibility.Collapsed, align.Visibility);
             Assert.False(window.ExportEnabledForTest);
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
+    [Fact]
+    public void EmbeddedMapCopiesOnlyTheExplicitlyAppliedFourAngles() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(loadExampleOnFirstRun: false, applicationServices: service);
+        try
+        {
+            window.Show(); window.Workspaces.Select("orientation"); window.UpdateLayout();
+            var map = (OrientationWorkspace)window.Workspaces.Active!.View;
+            Microsoft.Web.WebView2.Wpf.WebView2? web = null;
+            var timeout = System.Diagnostics.Stopwatch.StartNew();
+            while (timeout.Elapsed < TimeSpan.FromSeconds(30))
+            {
+                web = Descendants(map).OfType<Microsoft.Web.WebView2.Wpf.WebView2>().FirstOrDefault();
+                if (web?.CoreWebView2 != null && web.Visibility == Visibility.Visible) break;
+                await Task.Delay(100);
+            }
+            Assert.NotNull(web?.CoreWebView2);
+            var settings = window.IrradianceController.Settings;
+            var saved = settings with { };
+            string labels = await web!.ExecuteScriptAsync("""
+                (() => {
+                  const labels = [];
+                  for (const [device, values] of [['panel',[18.5,275]],['phone',[67,41.5]]]) {
+                    document.querySelector('[data-active='+device+']').click();
+                    document.querySelectorAll('#fields label').forEach((label,i) => {
+                      labels.push(label.textContent);
+                      const input = label.control;
+                      input.value = values[i];
+                      input.dispatchEvent(new Event('change'));
+                    });
+                  }
+                  return labels.join('|');
+                })()
+                """);
+            Assert.Equal("Panel tilt (1)|Panel top heading (2)|Phone tilt (3)|Phone top heading (4)",
+                System.Text.Json.JsonSerializer.Deserialize<string>(labels));
+            Assert.Equal(saved, settings);
+            await web.ExecuteScriptAsync("document.getElementById('apply-angles').click()");
+            for (int i = 0; i < 100 && window.Workspaces.Active?.Id == "orientation"; i++) await Task.Delay(30);
+            Assert.Equal("irradiance", window.Workspaces.Active?.Id);
+            Assert.Equal(18.5, settings.PanelTilt); Assert.Equal(275, settings.PanelTopHeading);
+            Assert.Equal(67, settings.PhoneInclination); Assert.Equal(41.5, settings.PhoneTopHeading);
+            Assert.Equal(0, settings.CameraRoll); Assert.Equal(0, fixture.Runs);
+            Assert.Equal(saved with { PanelTilt = 18.5, PanelAzimuth = 95, CameraTilt = -67, BottomAzimuth = 221.5, CameraRoll = 0 }, settings);
+            var controls = Descendants(window.Irradiance).OfType<DockPanel>().ToList();
+            foreach (var label in System.Text.Json.JsonSerializer.Deserialize<string>(labels)!.Split('|'))
+            {
+                var row = Assert.Single(controls, r => r.Children.OfType<TextBlock>().Any(t =>
+                    string.Concat(t.Inlines.OfType<System.Windows.Documents.Run>().Select(run => run.Text)) == label));
+                Assert.Contains(row.Children.OfType<TextBlock>(), t => t.Text == "°");
+            }
         }
         finally { window.Close(); await window.InputsSettled; }
     });

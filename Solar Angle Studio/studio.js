@@ -23,6 +23,15 @@
 
   if (new URLSearchParams(location.search).get("embedded") === "1") {
     document.documentElement.classList.add("embedded");
+    const host = window.chrome?.webview;
+    if (host) {
+      $("apply-angles").hidden = false;
+      $("apply-angles").addEventListener("click", () => {
+        host.postMessage({type: "applyEquipmentAngles", panelTilt: state.panel.tilt,
+          panelTopHeading: state.panel.topHeading, phoneTilt: state.phone.tilt, phoneTopHeading: state.phone.topHeading});
+      });
+      host.addEventListener("message", event => { $("apply-status").textContent = event.data; });
+    }
   }
 
   function setViewButton(view) {
@@ -106,11 +115,13 @@
     render(id, value);
   }
 
+  const references = {panelTilt: 1, panelTopHeading: 2, phoneTilt: 3, phoneTopHeading: 4};
   function makeField(f) {
     const group = document.createElement("div");
     group.className = "angle-field";
     group.id = "group-" + f.id;
-    group.innerHTML = '<div class="field-head"><label for="num-' + f.id + '">' + f.name + '</label>' +
+    group.innerHTML = '<div class="field-head"><label for="num-' + f.id + '">' + f.name +
+      (references[f.id] ? ' <small>(' + references[f.id] + ')</small>' : '') + '</label>' +
       '<div class="number-box"><input type="number" id="num-' + f.id + '" step="any"><span aria-hidden="true">°</span></div></div>' +
       '<input class="range" type="range" step="0.1" id="range-' + f.id + '" aria-label="' + f.name + ' slider">' +
       '<div class="limits"><span>' + f.limits[0] + '</span><span>' + f.limits[1] + '</span></div>';

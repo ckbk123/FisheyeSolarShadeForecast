@@ -2,7 +2,7 @@
 
 Select **Orientation map** to the left of **Solar Irradiance** in the desktop app. You can also open **index.html** directly from this folder in a modern browser. Keep the six HTML, CSS and JavaScript files together for offline use.
 
-The diagram keeps its own example angles in memory. Choose **Panel**, **Phone** or **Sun** to explore an object, then use **Orbit**, **Top** or **Side** to inspect the geometry. Drag or use arrow keys to orbit a focused scene. Scroll, pinch or use + and − to zoom. Home resets the view.
+The diagram keeps its own example angles in memory. In the desktop tab, **Apply angles to Solar Irradiance** copies Panel tilt (1), Panel top heading (2), Phone tilt (3) and Phone top heading (4) in degrees. The forecast uses the illustrated lens-end-uphill pose. Click **Update results** to calculate. The illustrated sun stays in the map. Choose **Panel**, **Phone** or **Sun** to explore an object, then use **Orbit**, **Top** or **Side** to inspect the geometry. Drag or use arrow keys to orbit a focused scene. Scroll, pinch or use + and − to zoom. Home resets the view.
 
 ## Read the angles
 

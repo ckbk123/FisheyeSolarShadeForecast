@@ -2,13 +2,14 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
 
 namespace SolarShade.Desktop;
 
 public sealed partial class IrradianceWorkspace
 {
-    private const string PhoneHeadingHelp = "With the phone flat, measure clockwise from true north toward the lens end (0–360°). See Orientation map.";
-    private const string PanelHeadingHelp = "With the panel flat and face up, measure clockwise from true north toward its top edge (0–360°). See Orientation map.";
+    private const string PhoneHeadingHelp = "With the phone flat, measure clockwise from true north toward the lens end (0–360°). Copy this angle from Orientation map or enter it here.";
+    private const string PanelHeadingHelp = "With the panel flat and face up, measure clockwise from true north toward its top edge (0–360°). Copy this angle from Orientation map or enter it here.";
     private readonly Dictionary<string, Slider> angleSliders = new();
     private TextBlock savedRoll = null!;
     private Button useUphillPlacement = null!;
@@ -18,9 +19,9 @@ public sealed partial class IrradianceWorkspace
     private void AddPhoneControls(Panel parent)
     {
         Section(parent, "Camera pose");
-        AddAngleField(parent, "Phone tilt", nameof(UserSettings.PhoneInclination),
-            "Raise the lens end from 0° (flat) to 90° (vertical). See Orientation map.");
-        AddAngleField(parent, "Phone top heading", nameof(UserSettings.PhoneTopHeading), PhoneHeadingHelp);
+        AddAngleField(parent, "Phone tilt", 3, nameof(UserSettings.PhoneInclination),
+            "Raise the lens end from 0° (flat) to 90° (vertical). Copy this angle from Orientation map or enter it here.");
+        AddAngleField(parent, "Phone top heading", 4, nameof(UserSettings.PhoneTopHeading), PhoneHeadingHelp);
         savedRoll = Label("", 12);
         StudioTheme.Help(savedRoll, "This photo also uses a sideways roll. Orientation map shows the phone with its top pointing directly uphill.");
         parent.Children.Add(savedRoll);
@@ -42,21 +43,27 @@ public sealed partial class IrradianceWorkspace
     private void AddPanelControls(Panel parent)
     {
         Section(parent, "Panel installation");
-        AddAngleField(parent, "Panel tilt", nameof(UserSettings.PanelTilt),
-            "Raise the top edge from 0° (flat) to 90° (vertical). See Orientation map.", 0, 90);
-        AddAngleField(parent, "Panel top heading", nameof(UserSettings.PanelTopHeading), PanelHeadingHelp, 0, 360);
+        AddAngleField(parent, "Panel tilt", 1, nameof(UserSettings.PanelTilt),
+            "Raise the top edge from 0° (flat) to 90° (vertical). Copy this angle from Orientation map or enter it here.", 0, 90);
+        AddAngleField(parent, "Panel top heading", 2, nameof(UserSettings.PanelTopHeading), PanelHeadingHelp, 0, 360);
     }
 
-    private void AddAngleField(Panel parent, string label, string property, string help, double? minimum = null, double? maximum = null)
+    private void AddAngleField(Panel parent, string label, int reference, string property, string help, double? minimum = null, double? maximum = null)
     {
         var row = new DockPanel();
         var number = MakeField(property);
         number.Width = 80;
-        AutomationProperties.SetName(number, label);
+        AutomationProperties.SetName(number, $"{label} ({reference}), degrees");
         StudioTheme.Help(number, help);
+        var unit = Label("°", 13);
+        unit.VerticalAlignment = VerticalAlignment.Center;
+        unit.Margin = new(3, 0, 0, 3);
+        DockPanel.SetDock(unit, Dock.Right); row.Children.Add(unit);
         DockPanel.SetDock(number, Dock.Right);
         row.Children.Add(number);
-        var caption = Label(label, 12);
+        var caption = Label("", 12);
+        caption.Inlines.Add(new Run(label));
+        caption.Inlines.Add(new Run($" ({reference})") { FontSize = 10 });
         StudioTheme.Help(caption, help);
         caption.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(caption);
@@ -66,7 +73,7 @@ public sealed partial class IrradianceWorkspace
             Minimum = min, Maximum = max, TickFrequency = 1, IsSnapToTickEnabled = true,
             Margin = new(0, 0, 8, 7), Tag = property
         };
-        AutomationProperties.SetName(slider, label);
+        AutomationProperties.SetName(slider, $"{label} ({reference}), degrees");
         StudioTheme.Help(slider, help);
         angleSliders.Add(property, slider);
         slider.ValueChanged += (_, _) =>
@@ -80,6 +87,23 @@ public sealed partial class IrradianceWorkspace
 
     private static bool IsEquipmentField(string property) => property is nameof(UserSettings.PhoneInclination)
         or nameof(UserSettings.PhoneTopHeading) or nameof(UserSettings.PanelTilt) or nameof(UserSettings.PanelTopHeading);
+
+    internal bool ApplyMapAngles(EquipmentMapAngles angles)
+    {
+        if (closing || loading || photoChanging || photoCleanupFailed || updating || calibrating || exporting || controller.DependentBusy) return false;
+        settings.PanelTilt = angles.PanelTilt;
+        settings.PanelTopHeading = angles.PanelTopHeading;
+        EquipmentOrientation.SetUphillPhone(settings, angles.PhoneTilt, angles.PhoneTopHeading);
+        foreach (string key in fields.Keys.Where(IsEquipmentField))
+        {
+            invalidFields.Remove(key);
+            fields[key].ClearValue(Control.BorderBrushProperty);
+        }
+        phoneTiltEditOrigin = null;
+        RefreshEquipmentControls();
+        Changed();
+        return true;
+    }
 
     private void ApplyPhonePlacement()
     {

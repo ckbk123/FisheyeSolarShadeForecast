@@ -6,17 +6,21 @@ using Microsoft.Web.WebView2.Wpf;
 
 namespace SolarShade.Desktop;
 
-/// <summary>An isolated illustration. The browser is created only when this tab is first displayed.</summary>
+/// <summary>Interactive equipment orientation map. The browser is created only when this tab is first displayed.</summary>
 public sealed class OrientationWorkspace : UserControl, IDisposable
 {
     private Task<CoreWebView2Environment>? environmentTask;
     private WebView2? browser;
+    private readonly Func<EquipmentMapAngles, bool>? apply;
     private bool started, disposed;
     private static string CacheRoot => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SolarShade", "OrientationMap");
 
-    public OrientationWorkspace()
+    public OrientationWorkspace() : this(null) { }
+
+    internal OrientationWorkspace(Func<EquipmentMapAngles, bool>? applyAngles)
     {
+        apply = applyAngles;
         Loaded += (_, _) => StartIfVisible();
         IsVisibleChanged += (_, _) => StartIfVisible();
     }
@@ -51,7 +55,13 @@ public sealed class OrientationWorkspace : UserControl, IDisposable
             if (disposed) return;
             var core = view.CoreWebView2;
             core.Settings.AreHostObjectsAllowed = false;
-            core.Settings.IsWebMessageEnabled = false;
+            core.Settings.IsWebMessageEnabled = apply != null;
+            core.WebMessageReceived += (_, e) =>
+            {
+                if (disposed || apply == null || !OrientationMapAssets.IsPage(e.Source)) return;
+                if (EquipmentMapAngles.Read(e.WebMessageAsJson) is not { } angles) return;
+                core.PostWebMessageAsString(apply(angles) ? "Angles applied." : "Finish the current operation, then apply the angles again.");
+            };
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
             core.NewWindowRequested += (_, e) => e.Handled = true;
