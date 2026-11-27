@@ -86,7 +86,7 @@ public sealed class ResponsiveLayoutTests
                 field.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
                 AssertVisibleInsideWorkspace(field, window.Irradiance);
             }
-            var diffuse = Descendants<CheckBox>(window.Irradiance).Single(c => Equals(c.Content, "Use isotropic diffuse light"));
+            var diffuse = Descendants<CheckBox>(window.Irradiance).Single(c => Equals(c.Content, "Assume uniform sky brightness"));
             diffuse.BringIntoView(); await Task.Delay(30); window.UpdateLayout();
             AssertVisibleInsideWorkspace(diffuse, window.Irradiance);
             Capture(window, $"historical-data-{width}-{height}");

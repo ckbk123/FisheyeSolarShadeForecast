@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using SolarShade.Desktop;
 using SolarShade.Irradiance;
 using Xunit;
@@ -64,7 +63,7 @@ public sealed class WeatherSourceModeTests
     }
 
     [Fact]
-    public void ToggleShowsOnlyTheChosenControlsAndAnEmptyImportStaysPending() => Sta(async () =>
+    public void DataSourceShowsOnlyTheChosenControlsAndAnEmptyImportStaysPending() => Sta(async () =>
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
         AppData.SaveSettings(fixture.Settings with { UseDataServices = true, ImportPath = "", Provider = 1 });
@@ -72,7 +71,7 @@ public sealed class WeatherSourceModeTests
         try
         {
             var controls = Descendants(owner.Irradiance).ToArray();
-            var mode = Assert.Single(controls.OfType<ToggleButton>(), c => AutomationProperties.GetAutomationId(c) == "WeatherSourceMode");
+            var mode = Assert.Single(controls.OfType<ComboBox>(), c => AutomationProperties.GetAutomationId(c) == "WeatherSourceMode");
             var provider = Assert.Single(controls.OfType<ComboBox>(), c => AutomationProperties.GetName(c) == "Weather data source");
             var choose = Assert.Single(controls.OfType<Button>(), c => Equals(c.Content, "Upload weather file…"));
             var template = Assert.Single(controls.OfType<Button>(), c => Equals(c.Content, "Download template…"));
@@ -82,23 +81,23 @@ public sealed class WeatherSourceModeTests
                 Assert.Same(provider.Parent, controls.OfType<TextBox>().Single(t => Equals(t.Tag, property)).Parent);
             var update = Assert.Single(controls.OfType<Button>(), c => AutomationProperties.GetAutomationId(c) == "UpdateResults");
             var refresh = Assert.Single(controls.OfType<Button>(), c => AutomationProperties.GetAutomationId(c) == "RefreshData");
-            Assert.True(mode.IsChecked); Assert.Equal("Use Data Services", mode.Content); Assert.Equal(2, provider.Items.Count);
+            Assert.Equal(0, mode.SelectedIndex); Assert.Equal("Weather services", mode.SelectedItem); Assert.Equal(2, provider.Items.Count);
             Assert.Equal(Visibility.Visible, ((FrameworkElement)provider.Parent).Visibility);
             Assert.Equal(Visibility.Collapsed, importControls.Visibility);
-            mode.IsChecked = false; await owner.InputsSettled;
-            Assert.Equal("Import Own Excel", mode.Content); Assert.False(update.IsEnabled); Assert.False(refresh.IsEnabled);
+            mode.SelectedIndex = 1; await owner.InputsSettled;
+            Assert.Equal("My Excel or CSV file", mode.SelectedItem); Assert.False(update.IsEnabled); Assert.False(refresh.IsEnabled);
             Assert.Equal(Visibility.Collapsed, ((FrameworkElement)provider.Parent).Visibility);
             Assert.Equal(Visibility.Visible, importControls.Visibility);
             owner.Calculate(); await owner.InputsSettled;
             Assert.Null(owner.Completed); Assert.Equal(0, fixture.Runs); Assert.Empty(owner.IrradianceController.Settings.ImportPath);
             Assert.False(AppData.ReadSettings()!.UseDataServices);
             // Cancelling the file picker makes no selection and therefore leaves this pending mode intact.
-            await owner.RecheckSourcesAsync(); Assert.False(mode.IsChecked); Assert.False(update.IsEnabled);
+            await owner.RecheckSourcesAsync(); Assert.Equal(1, mode.SelectedIndex); Assert.False(update.IsEnabled);
             owner.Irradiance.SelectWeatherFile(fixture.Settings.ImportPath); await owner.InputsSettled;
             Assert.True(update.IsEnabled);
-            mode.IsChecked = true; await owner.InputsSettled;
+            mode.SelectedIndex = 0; await owner.InputsSettled;
             Assert.Equal(1, provider.SelectedIndex); Assert.Empty(owner.IrradianceController.Settings.ImportPath);
-            mode.IsChecked = false; await owner.InputsSettled;
+            mode.SelectedIndex = 1; await owner.InputsSettled;
             Assert.Equal(fixture.Settings.ImportPath, owner.IrradianceController.Settings.ImportPath); Assert.True(update.IsEnabled);
         }
         finally { owner.Close(); }
