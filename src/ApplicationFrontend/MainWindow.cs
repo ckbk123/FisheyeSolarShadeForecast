@@ -60,7 +60,12 @@ public sealed class MainWindow : Window
         root.Children.Add(host);
         Irradiance = new(this, new(applicationServices ?? new()), systemZoneProvider, loadExampleOnFirstRun);
         host.Register(new("images", "Images & calibration", Irradiance.ImagesAndCalibration));
-        var orientation = new OrientationWorkspace();
+        var orientation = new OrientationWorkspace(angles =>
+        {
+            if (!Irradiance.ApplyMapAngles(angles)) return false;
+            host.Select("irradiance");
+            return true;
+        });
         var orientationTab = host.Register(new("orientation", "Orientation map", orientation));
         orientationTab.MouseEnter += async (_, _) =>
         {

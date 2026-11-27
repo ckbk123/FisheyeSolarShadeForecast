@@ -8,8 +8,8 @@ longer while Windows extracts the bundled runtime and model.
 Hover over a study control for guidance, or focus it and press F1. Escape closes
 keyboard help. Open Help for the full guide while working on your study.
 
-The Orientation map tab illustrates the phone, panel and sun in 3D. Its angles
-apply only to the illustration. The map works offline with Microsoft Edge
+In Orientation map, Apply angles to Solar Irradiance copies the four numbered
+phone and panel angles in degrees. The illustrated sun stays in the map. The map works offline with Microsoft Edge
 WebView2 or through the tab's option to open it locally in a browser.
 
 1. Open Solar Irradiance. Load the example or select your study inputs.

@@ -93,8 +93,13 @@ public static class EquipmentOrientation
     {
         if (!(settings.PanelTilt >= 0 && settings.PanelTilt <= 90) || !(settings.PanelAzimuth >= 0 && settings.PanelAzimuth <= 360))
             throw new ArgumentOutOfRangeException(nameof(settings), "Enter a valid panel orientation before placing the phone.");
-        settings.BottomAzimuth = Wrap360(settings.PanelAzimuth);
-        settings.CameraTilt = settings.PanelTilt == 0 ? 0 : -settings.PanelTilt;
+        SetUphillPhone(settings, settings.PanelTilt, settings.PanelTopHeading);
+    }
+
+    internal static void SetUphillPhone(UserSettings settings, double tilt, double topHeading)
+    {
+        settings.BottomAzimuth = Wrap360(topHeading + 180);
+        settings.CameraTilt = tilt == 0 ? 0 : -tilt;
         settings.CameraRoll = 0;
     }
 
