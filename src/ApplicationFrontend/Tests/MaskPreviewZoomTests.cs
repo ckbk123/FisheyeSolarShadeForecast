@@ -147,6 +147,77 @@ public sealed class MaskPreviewZoomTests
         finally { window.Close(); await window.InputsSettled; }
     });
 
+    [Fact]
+    public void ReplacingAPhotoWithTheSameDimensionsRejectsItsPendingMaskEditor() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false) { ShowActivated = false };
+        try
+        {
+            window.Show(); await window.RecheckSourcesAsync(); await window.InputsSettled;
+            var edit = Descendants<Button>(window).Single(b => Equals(b.Content, "Edit mask"));
+            await Until(() => edit.IsEnabled);
+            string first = AppData.FileKey(fixture.Settings.SkyImage);
+            using (var second = new OpenCvSharp.Mat(303, 201, OpenCvSharp.MatType.CV_8UC3, OpenCvSharp.Scalar.Green))
+                OpenCvSharp.Cv2.ImWrite(fixture.Settings.SkyImage, second);
+            string current = AppData.FileKey(fixture.Settings.SkyImage);
+            Assert.NotEqual(first, current);
+
+            // Open the editor in this dispatcher turn, before a file watcher can clear the old preview.
+            bool editorOpened = false;
+            var pending = window.Dispatcher.InvokeAsync(() =>
+            {
+                var editor = window.OwnedWindows.OfType<SolarShade.MaskEditor.MaskEditorWindow>().SingleOrDefault();
+                if (editor == null) return;
+                editorOpened = true;
+                editor.Close();
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
+            edit.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await pending.Task; await window.InputsSettled;
+            Assert.False(editorOpened);
+            Assert.False(edit.IsEnabled);
+            Assert.False(Descendants<MaskViewport>(window).Single().HasImage);
+            Assert.Empty(ManualMaskStore.List(current));
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReplacingAnEditedPhotoRestoresTheReplacementPhotosOwnMask(bool restart) => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        string photoA = fixture.Settings.SkyImage;
+        string photoB = Path.Combine(fixture.Root, "site-b.png");
+        using (var image = new OpenCvSharp.Mat(303, 201, OpenCvSharp.MatType.CV_8UC3, OpenCvSharp.Scalar.Green))
+            OpenCvSharp.Cv2.ImWrite(photoB, image);
+        string imported = Path.Combine(fixture.Root, "mask.png");
+        using (var mask = new OpenCvSharp.Mat(303, 201, OpenCvSharp.MatType.CV_8UC1, OpenCvSharp.Scalar.Black))
+            OpenCvSharp.Cv2.ImWrite(imported, mask);
+        var a = ManualMaskStore.Import(photoA, imported, "A", centeredDisk: true);
+        var b = ManualMaskStore.Import(photoB, imported, "B", centeredDisk: true);
+        AppData.SaveSettings(fixture.Settings with { SelectedMaskId = a.Id,
+            LastMaskByPhoto = new() { [a.PhotoSha256] = a.Id, [b.PhotoSha256] = b.Id } });
+        if (restart) File.Copy(photoB, photoA, true);
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false) { ShowActivated = false };
+        try
+        {
+            if (!restart)
+            {
+                Assert.Equal(a.Id, window.IrradianceController.Settings.SelectedMaskId);
+                File.Copy(photoB, photoA, true);
+                await window.RecheckSourcesAsync(); await window.InputsSettled;
+            }
+            Assert.Equal(b.Id, window.IrradianceController.Settings.SelectedMaskId);
+            Assert.Equal(b.Id, AppData.ReadSettings()!.SelectedMaskId);
+            window.Show();
+            Assert.True(Descendants<MaskViewport>(window).Single().HasImage);
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
     {
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)

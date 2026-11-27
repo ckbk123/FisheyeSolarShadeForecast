@@ -84,6 +84,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private int orientedPhotoWidth, orientedPhotoHeight;
     private long orientationRevision;
     private byte[]? displayedPhoto, displayedCardinals;
+    private string? displayedPhotoSha256;
     private CardinalDirectionOverlayResult? currentCardinals;
     private readonly MaskViewport maskViewport = new();
     private ImageOverlayPreview maskPreview => maskViewport.Layers;
@@ -321,7 +322,9 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         settings = services.PrepareInputs(settings);
         LoadFields();
         uiInputs = InputDependencies.Capture(settings);
-        if (settings.VerifyRefinedEdge(uiInputs))
+        bool maskChanged = SelectedMaskBelongsToAnotherPhoto(uiInputs.Image);
+        if (maskChanged) { RestorePhotoMaskSelection(); RefreshMaskChoices(); }
+        if (settings.VerifyRefinedEdge(uiInputs) || maskChanged)
         {
             uiInputs = InputDependencies.Capture(settings, uiInputs, false);
             SaveInputs();
@@ -512,6 +515,10 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             }
         }
     }
+    private bool SelectedMaskBelongsToAnotherPhoto(SourceIdentity image) =>
+        image.HasDigest && settings.SelectedMaskId is string id &&
+        settings.LastMaskByPhoto.Any(entry => entry.Value == id && entry.Key != image.Content);
+
     private void RefreshMaskChoices()
     {
         if (maskChoice == null) return;
@@ -574,40 +581,55 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 if (AppServices.LoadCachedAiMask(settings) is { } ai) ShowMask(ai);
                 else if (File.Exists(PortablePaths.Resolve(settings.SkyImage)))
                 {
-                    using var unmaskedPhoto = Cv2.ImRead(PortablePaths.Resolve(settings.SkyImage), ImreadModes.Color);
+                    using var unmaskedPhoto = ReadPhoto(settings.SkyImage, out string photoHash);
                     if (unmaskedPhoto.Empty()) throw new InvalidDataException("The selected photograph could not be decoded.");
                     displayedAsset = null; displayedMaskPng = null; maskViewport.ClearImage(); editMask.IsEnabled = false;
                     displayedPhoto = AppServices.Preview(unmaskedPhoto);
+                    displayedPhotoSha256 = photoHash;
                     skyViewport.SetPhoto(Bitmap(displayedPhoto), unmaskedPhoto.Width, unmaskedPhoto.Height, PortablePaths.Resolve(settings.SkyImage));
                     orientedPhotoWidth = unmaskedPhoto.Width; orientedPhotoHeight = unmaskedPhoto.Height;
                     RefreshFieldOfView();
                     ShowMaskPending();
                 }
-                else { orientedPhotoWidth = orientedPhotoHeight = 0; RefreshFieldOfView(); }
+                else { ClearMaskPreview(true); RefreshFieldOfView(); }
                 return;
             }
             var (variant, png) = ManualMaskStore.Load(settings.SkyImage, settings.SelectedMaskId);
             if (!ManualMaskStore.IsCompatible(variant, settings))
                 throw new InvalidDataException("The selected edit was made with different AI settings.");
-            using var original = Cv2.ImRead(PortablePaths.Resolve(settings.SkyImage), ImreadModes.Color);
+            using var original = ReadPhoto(settings.SkyImage, out string originalHash);
+            if (originalHash != variant.PhotoSha256)
+                throw new IOException("The sky photo changed while loading its saved mask.");
             using var binary = Cv2.ImDecode(png, ImreadModes.Grayscale);
             if (original.Empty() || original.Width != variant.BaseMask.Width || original.Height != variant.BaseMask.Height)
                 throw new InvalidDataException("Saved mask and selected photo dimensions differ.");
             ShowMask(new MaskAsset(AppServices.Preview(original), AppServices.Preview(binary), variant.BaseMask with { Png = png },
-                variant.Description, variant));
+                variant.Description, variant) { PhotoSha256 = variant.PhotoSha256 });
         }
-        catch (Exception ex) { orientedPhotoWidth = orientedPhotoHeight = 0; RefreshFieldOfView(); ShowError(ex); }
+        catch (Exception ex) { ClearMaskPreview(true); RefreshFieldOfView(); ShowError(ex); }
     }
+    private static OpenCvSharp.Mat ReadPhoto(string path, out string sha256)
+    {
+        byte[] bytes = File.ReadAllBytes(PortablePaths.Resolve(path));
+        sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
+        return Cv2.ImDecode(bytes, ImreadModes.Color);
+    }
+
     private void OpenMaskEditor()
     {
         var source = displayedAsset;
         if (source == null || updating || calibrating) return;
         try
         {
-            string path = PortablePaths.Resolve(settings.SkyImage), photoHash = ManualMaskStore.PhotoHash(path);
+            string path = PortablePaths.Resolve(settings.SkyImage);
+            using var original = ReadPhoto(path, out string photoHash);
+            if (photoHash != source.PhotoSha256)
+            {
+                ReloadChangedSkyPhoto();
+                return;
+            }
             string? openingVariantId = settings.SelectedMaskId;
             long openingRevision = revision;
-            using var original = Cv2.ImRead(path, ImreadModes.Color);
             if (original.Empty() || original.Width != source.Result.Width || original.Height != source.Result.Height)
                 throw new InvalidDataException("The selected photo no longer matches the displayed mask.");
             Cv2.ImEncode(".png", original, out byte[] orientedPhoto);
@@ -623,7 +645,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                             throw new IOException("The opening edited mask changed on disk. Reopen the editor.");
                     }
                     var variant = ManualMaskStore.Save(path, source.Result, source.AiAncestorSha256, openingVariantId, label, png,
-                        source.Variant == null ? source.Png : null);
+                        source.Variant == null ? source.Png : null, expectedPhotoSha256: source.PhotoSha256);
                     settings.SelectedMaskId = variant.Id;
                     settings.LastMaskByPhoto = new(settings.LastMaskByPhoto) { [photoHash] = variant.Id };
                     Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
@@ -712,8 +734,18 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 if (observedRevision != revision) return;
                 if (refreshSources)
                 {
+                    var previousImage = uiInputs?.Image;
                     uiInputs = result.verified;
-                    if (settings.VerifyRefinedEdge(uiInputs))
+                    bool edgeChanged = settings.VerifyRefinedEdge(uiInputs);
+                    bool replaced = previousImage is { HasDigest: true } && uiInputs.Image.HasDigest &&
+                        string.Equals(previousImage.Path, uiInputs.Image.Path, StringComparison.OrdinalIgnoreCase) &&
+                        previousImage.Content != uiInputs.Image.Content;
+                    if (replaced || SelectedMaskBelongsToAnotherPhoto(uiInputs.Image))
+                    {
+                        ReloadChangedSkyPhoto();
+                        return;
+                    }
+                    if (edgeChanged)
                     {
                         if (!settings.ApparentFullFovDegrees.HasValue)
                         {
@@ -729,6 +761,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 if (refreshSources && result.changed != ArtifactGroup.None)
                 {
                     revision++; pending?.Cancel(); ApplyInvalidation(result.changed); RefreshInputState();
+                    if ((result.changed & ArtifactGroup.Mask) != 0) ShowSelectedMaskPreview();
                 }
                 if (result.restored != null && !updating && !calibrating && settings.LastCalibrationFailure == null)
                     PresentResult(result.restored, restored: true);
@@ -750,16 +783,33 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if (!fullCheckQueued) QueueObservation(true, true);
     }
     public Task RecheckSourcesAsync() { RecheckSources(); return inputWork; }
+    private void ReloadChangedSkyPhoto()
+    {
+        revision++; pending?.Cancel();
+        ApplyInvalidation(ArtifactGroup.Mask | ArtifactGroup.Profile | InputDependencies.PoseChain);
+        RestorePhotoMaskSelection();
+        Changed(refreshSources: true);
+        RefreshMaskChoices(); ShowSelectedMaskPreview(); RefreshInputState();
+    }
+
+    private void ClearMaskPreview(bool clearPhoto)
+    {
+        if (clearPhoto)
+        {
+            skyViewport.ClearPhoto(); displayedPhoto = null; displayedPhotoSha256 = null;
+            orientedPhotoWidth = orientedPhotoHeight = 0;
+        }
+        maskViewport.ClearImage(); displayedMaskPng = null; displayedAsset = null;
+        editMask.IsEnabled = false; ShowMaskPending();
+    }
+
     private void ApplyInvalidation(ArtifactGroup groups)
     {
         if ((groups & (ArtifactGroup.Profile | ArtifactGroup.Mask)) != 0) maskEdgeWindow?.Close();
         if ((groups & ArtifactGroup.Mask) != 0)
         {
             bool geometryChanged = (groups & (ArtifactGroup.Profile | ArtifactGroup.Orientation)) != 0;
-            if (geometryChanged) { skyViewport.ClearPhoto(); displayedPhoto = null; orientedPhotoWidth = orientedPhotoHeight = 0; }
-            maskViewport.ClearImage(); displayedMaskPng = null;
-            displayedAsset = null; editMask.IsEnabled = false;
-            ShowMaskPending();
+            ClearMaskPreview(geometryChanged);
         }
         if ((groups & (ArtifactGroup.Profile | ArtifactGroup.Mask)) != 0) RefreshFieldOfView();
         if ((groups & ArtifactGroup.Orientation) != 0) InvalidateOrientation("Cardinal directions waiting for Update results");
@@ -925,11 +975,13 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     public void ShowMask(MaskAsset asset)
     {
-        if (displayedPhoto != null) asset = asset with { OriginalPreview = displayedPhoto };
+        if (displayedPhoto != null && displayedPhotoSha256 == asset.PhotoSha256)
+            asset = asset with { OriginalPreview = displayedPhoto };
         if (!ReferenceEquals(displayedPhoto, asset.OriginalPreview))
         {
             skyViewport.SetPhoto(Bitmap(asset.OriginalPreview), asset.Result.Width, asset.Result.Height, PortablePaths.Resolve(settings.SkyImage));
-            displayedPhoto = asset.OriginalPreview; displayedCardinals = null; currentCardinals = null;
+            displayedPhoto = asset.OriginalPreview; displayedPhotoSha256 = asset.PhotoSha256;
+            displayedCardinals = null; currentCardinals = null;
         }
         // The mask and overlay share one native-resolution viewport; preview rounding cannot misalign them.
         if (!ReferenceEquals(displayedMaskPng, asset.Png))

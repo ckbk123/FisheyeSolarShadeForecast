@@ -237,26 +237,67 @@ public sealed class MaskEditingTests
     });
 
     [Fact]
+    public void PreviousAiCacheIsIgnoredWhileSavedEditsRemainAvailable() => Sta(() =>
+    {
+        using var fixture = new Fixture();
+        var settings = fixture.Settings;
+        var ai = Assert.IsType<MaskAsset>(AppServices.LoadCachedAiMask(settings));
+        var edit = ManualMaskStore.Save(settings.SkyImage, ai.Result, ai.AiAncestorSha256,
+            null, "Saved edit", ai.Png, ai.Png, expectedPhotoSha256: ai.PhotoSha256);
+
+        // Recreate an installed v0.3.13 cache that has no photo-to-mask provenance.
+        string cache = AppData.PathFor("mask-stages");
+        Directory.Move(cache, Path.Combine(fixture.Root, "fixture-cache"));
+        string previousKey = AppData.Key(new { Image = ai.PhotoSha256, settings.Model, settings.Resolution,
+            settings.CenteredDisk, Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = "mask-orchestration-v1" });
+        SkyMaskExporter.Export(ai.Result, Path.Combine(cache, previousKey), "Previous version");
+
+        Assert.Null(AppServices.LoadCachedAiMask(settings));
+        Assert.Equal(ai.Png, ManualMaskStore.Load(settings.SkyImage, edit.Id).Png);
+        return Task.CompletedTask;
+    });
+
+    [Fact]
     public void PhotoSwitchBackRestoresOnlyTheExactVerifiedPhoto() => Sta(async () =>
     {
         using var fixture = new Fixture(); int calculations = 0;
         using var service = new AppServices(fixture.Debug, (input, scene, ct) =>
         { calculations++; return ShadingCorrectionModule.ApplyToPanel(input, scene, ct); });
         var first = await service.Evaluate(fixture.Settings, false, _ => { }, null, CancellationToken.None);
-        string secondPhoto = Path.Combine(fixture.Root, "second.jpg");
-        using (var original = Cv2.ImRead(fixture.Settings.SkyImage, ImreadModes.Color)) Cv2.ImWrite(secondPhoto, original);
+        string secondSite = Directory.CreateDirectory(Path.Combine(fixture.Root, "second-site")).FullName;
+        string secondPhoto = Path.Combine(secondSite, Path.GetFileName(fixture.Settings.SkyImage));
+        using (var photo = new Mat(first.Mask!.Result.Height, first.Mask.Result.Width, MatType.CV_8UC3, Scalar.Green))
+            Cv2.ImWrite(secondPhoto, photo);
         var secondSettings = fixture.Settings with { SkyImage = secondPhoto };
-        string secondKey = AppData.Key(new { Image = AppData.FileKey(secondPhoto), secondSettings.Model,
+        string secondSha256 = AppData.FileKey(secondPhoto);
+        string secondKey = AppData.Key(new { Image = secondSha256, secondSettings.Model,
             secondSettings.Resolution, secondSettings.CenteredDisk,
             Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = AppServices.MaskCacheSchema });
-        SkyMaskExporter.Export(first.Mask!.Result, AppData.PathFor(Path.Combine("mask-stages", secondKey)), "Synthetic second photo");
+        using var blocked = new Mat(first.Mask.Result.Height, first.Mask.Result.Width, MatType.CV_8UC1, Scalar.Black);
+        Cv2.ImEncode(".png", blocked, out byte[] blockedPng);
+        SkyMaskExporter.Export(first.Mask.Result with { Png = blockedPng }, AppData.PathFor(Path.Combine("mask-stages", secondKey)), "Synthetic second photo");
+        Assert.Throws<IOException>(() => ManualMaskStore.Save(secondPhoto, first.Mask.Result, first.Mask.AiAncestorSha256,
+            null, "Stale edit", first.Mask.Png, first.Mask.Png, expectedPhotoSha256: first.Mask.PhotoSha256));
+        Assert.Empty(ManualMaskStore.List(secondSha256));
         service.ObserveInputs(secondSettings, refreshSources: true);
         var second = await service.Evaluate(secondSettings, false, _ => { }, null, CancellationToken.None);
         Assert.True(service.IsCurrent(second)); Assert.Equal(2, calculations);
+        Assert.Equal(secondSha256, second.Mask!.PhotoSha256);
+        Assert.Equal(secondSha256, AppServices.LoadCachedAiMask(secondSettings)!.PhotoSha256);
+        Assert.Equal(blockedPng, second.Mask.Png);
+        string stage = Path.Combine(fixture.Debug, "02-sky-mask");
+        Assert.Equal(blockedPng, File.ReadAllBytes(Path.Combine(stage, "sky-mask.png")));
+        using var provenance = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(stage, "mask-provenance.json")));
+        Assert.Equal(secondSha256, provenance.RootElement.GetProperty("PhotoSha256").GetString());
+        Assert.Equal(AppData.FileKey(Path.Combine(stage, "sky-mask.png")), provenance.RootElement.GetProperty("ActiveMaskSha256").GetString());
+        var manifest = AppData.Read<DebugDataRun.Manifest>(Path.Combine(fixture.Debug, "run.json"))!;
+        Assert.Equal("Complete", manifest.Status);
+        Assert.Equal(secondSha256, manifest.Inputs["sky-mask"].GetProperty("PhotoSha256").GetString());
         service.ObserveInputs(fixture.Settings, refreshSources: true);
         var restored = service.TryRestoreAccepted(fixture.Settings);
         Assert.NotNull(restored); Assert.True(service.IsCurrent(restored)); Assert.Equal(2, calculations);
         Assert.Equal(first.Mask.Png, restored.Mask!.Png);
+        Assert.Equal(AppData.FileKey(fixture.Settings.SkyImage), restored.Mask.PhotoSha256);
         Assert.NotEqual(AppData.FileKey(secondPhoto), AppData.FileKey(fixture.Settings.SkyImage));
     });
 }

@@ -16,9 +16,10 @@ internal static class AcceptedResultVault
     private sealed record VaultManifest(string Owner, string Key, string RunSha256, string EvaluationSha256,
         Dictionary<string, string> ArtifactHashes);
 
-    internal static string Key(UserSettings s)
+    internal static string Key(UserSettings s) => Key(s, InputDependencies.Capture(s));
+
+    private static string Key(UserSettings s, InputDependencies sources)
     {
-        var sources = InputDependencies.Capture(s);
         bool services = WeatherSourceSelection.UsesServices(s);
         string baseline = AppData.Key(new
         {
@@ -104,14 +105,18 @@ internal static class AcceptedResultVault
     internal static (DebugDataRun Run, Evaluation Evaluation)? Restore(DebugDataStore store, UserSettings settings)
     {
         if (WeatherSourceSelection.Problem(settings) != null) return null;
-        string key = Key(settings), folder = Folder(key);
+        var inputs = InputDependencies.Capture(settings);
+        string key = Key(settings, inputs), folder = Folder(key);
         if (!Directory.Exists(folder)) return null;
         var (vault, saved) = Verify(folder, key);
         var manifest = AppData.Read<DebugDataRun.Manifest>(Path.Combine(folder, "run.json"))!;
         if (manifest.Status != "Complete" || manifest.Invalidated != ArtifactGroup.None ||
             manifest.Software != AppServices.SoftwareFingerprint || manifest.Kind != "calculation")
             throw new InvalidDataException("Archived result is not a complete result from this software version.");
-        var inputs = InputDependencies.Capture(settings);
+        // Keep the inputs that identify this archive stable until its mask and manifest have been restored.
+        using var lockedInputs = SnapshotExport.LockInputs(inputs);
+        inputs = InputDependencies.Capture(settings);
+        if (Key(settings, inputs) != key) return null;
         lock (store.Gate)
         {
             store.Check();

@@ -74,16 +74,16 @@ public static class ManualMaskStore
         return png;
     }
     public static MaskVariant Save(string photoPath, SkyMaskResult baseMask, string aiAncestorHash,
-        string? parentId, string label, byte[] png, byte[]? aiAncestorPng = null)
+        string? parentId, string label, byte[] png, byte[]? aiAncestorPng = null, string? expectedPhotoSha256 = null)
     {
         // An edit of an imported mask retains its imported ancestor; no AI source is required.
         MaskVariant? importedParent = parentId == null ? null : Load(photoPath, parentId).Variant;
         if (importedParent?.IsImported == true)
             return Publish(photoPath, baseMask, label, png, importedParent.AncestorSha256, parentId,
                 File.ReadAllBytes(AncestorPath(PhotoHash(photoPath), importedParent.AncestorSha256, true)),
-                importedParent with { Source = "Edited" });
+                importedParent with { Source = "Edited" }, expectedPhotoSha256);
         aiAncestorPng ??= LoadAncestor(photoPath, aiAncestorHash);
-        return Publish(photoPath, baseMask, label, png, aiAncestorHash, parentId, aiAncestorPng);
+        return Publish(photoPath, baseMask, label, png, aiAncestorHash, parentId, aiAncestorPng, expectedPhotoSha256: expectedPhotoSha256);
     }
     public static MaskVariant Import(string photoPath, string maskPath, string label, bool inverted = false,
         bool centeredDisk = false)
@@ -100,10 +100,10 @@ public static class ManualMaskStore
         return Publish(photoPath, mask, label, mask.Png, ancestorHash, null, mask.Png, imported);
     }
     private static MaskVariant Publish(string photoPath, SkyMaskResult baseMask, string label, byte[] png,
-        string ancestorHash, string? parentId, byte[] ancestorPng, MaskVariant? imported = null)
+        string ancestorHash, string? parentId, byte[] ancestorPng, MaskVariant? imported = null, string? expectedPhotoSha256 = null)
     {
         string hash = PhotoHash(photoPath);
-        if (imported != null && imported.PhotoSha256 != hash)
+        if ((expectedPhotoSha256 != null && expectedPhotoSha256 != hash) || (imported != null && imported.PhotoSha256 != hash))
             throw new IOException("The photograph changed while saving the mask. Choose the photo again.");
         if (string.IsNullOrWhiteSpace(label) || label.Length > 100) throw new ArgumentException("Enter a mask name of 1–100 characters.");
         CheckHash(ancestorHash);

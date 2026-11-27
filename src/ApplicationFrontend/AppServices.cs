@@ -13,6 +13,7 @@ namespace SolarShade.Desktop;
 
 public sealed record MaskAsset(byte[] OriginalPreview, byte[] MaskPreview, SkyMaskResult Result, string Description, MaskVariant? Variant = null)
 {
+    public required string PhotoSha256 { get; init; }
     public byte[] Png => Result.Png;
     public LensDisk Disk => Result.Disk;
     public string AiAncestorSha256 => Variant?.AiAncestorSha256 ?? Convert.ToHexString(SHA256.HashData(Png));
@@ -67,9 +68,9 @@ public sealed record Evaluation(PanelRun Run, IrradianceDataset Raw, UserSetting
 /// <summary>UI stage sequencing and cache coordination. All scientific work and artifacts are library-owned.</summary>
 public sealed class AppServices : IIrradianceService
 {
-    internal const string MaskCacheSchema = "mask-orchestration-v1";
+    internal const string MaskCacheSchema = "mask-orchestration-v2";
     // Bump the orchestration schema when scientific sequencing changes. UI/PV builds must not evict upstream caches.
-    internal static string SoftwareFingerprint => AppData.Key(new { Schema = "irradiance-orchestration-v2", Libraries = new[] { typeof(CalibrationWorkflow), typeof(CameraProfileFiles),
+    internal static string SoftwareFingerprint => AppData.Key(new { Schema = "irradiance-orchestration-v3", Libraries = new[] { typeof(CalibrationWorkflow), typeof(CameraProfileFiles),
         typeof(IrradianceClient), typeof(TranspositionModule), typeof(SolarPositionModule), typeof(ShadingCorrectionModule), typeof(SkyPhotoMasker) }.Select(AppData.LibraryVersion).ToArray() });
     public static readonly SemaphoreSlim NativeGate = new(1, 1);
     private readonly SemaphoreSlim evaluationGate = new(1, 1);
@@ -173,11 +174,15 @@ public sealed class AppServices : IIrradianceService
                     if (!selected.Png.SequenceEqual(maskResult.Png)) throw new InvalidDataException("Restored mask does not match the selected edit.");
                     variant = selected.Variant;
                 }
-                using var original = Cv2.ImRead(PortablePaths.Resolve(settings.SkyImage), ImreadModes.Color);
+                string photoPath = PortablePaths.Resolve(settings.SkyImage);
+                string photoSha256 = result.Dependencies!.Image.Content;
+                using var source = File.OpenRead(photoPath);
+                VerifyMaskPhoto(source, photoSha256);
+                using var original = Cv2.ImRead(photoPath, ImreadModes.Color);
                 using var binary = Cv2.ImDecode(maskResult.Png, ImreadModes.Grayscale);
                 asset = new(Preview(original), Preview(binary), maskResult,
                     variant == null ? $"{maskResult.Width} × {maskResult.Height} · {maskResult.Model} · AI mask"
-                        : variant.Description, variant);
+                        : variant.Description, variant) { PhotoSha256 = photoSha256 };
             }
             currentInputs = InputDependencies.Capture(settings);
             accepted = result with { Mask = asset };
@@ -257,7 +262,7 @@ public sealed class AppServices : IIrradianceService
                 debug = new(Storage, persisted, verifiedInputs: dependencies); tracked = new(debug, dependencies, linked); activeRun = tracked;
             }
             var timer = Stopwatch.StartNew();
-            var (activeMask, activeProfile, activeCardinals, appliedEdge) = await PrepareImageStages(s, debug, progress, onMask, onCardinals, ct, dependencies.Keys[ArtifactGroup.Mask]);
+            var (activeMask, activeProfile, activeCardinals, appliedEdge) = await PrepareImageStages(s, debug, progress, onMask, onCardinals, ct, dependencies);
             var zone = TimeZoneSelection.Resolve(s.Zone);
             string nextRaw = dependencies.Keys[ArtifactGroup.Irradiance];
             debug.RecordInput("irradiance-request", new { Fingerprint = nextRaw });
@@ -454,12 +459,13 @@ public sealed class AppServices : IIrradianceService
             settings = PrepareInputs(settings);
             var persisted = PortablePaths.Map(settings, path => PortablePaths.Store(path));
             var resolved = PortablePaths.Map(settings, path => PortablePaths.Resolve(path));
+            InputDependencies dependencies;
             lock (inputGate)
             {
-                ObserveInputs(settings, refreshSources: true, verifyArtifacts: true);
-                debug = new(Storage, persisted, "orientation"); activeRun = new(debug, InputDependencies.Capture(settings), linked);
+                ObserveInputs(settings, out dependencies, refreshSources: true, verifyArtifacts: true);
+                debug = new(Storage, persisted, "orientation", verifiedInputs: dependencies); activeRun = new(debug, dependencies, linked);
             }
-            var (activeMask, _, overlay, edge) = await PrepareImageStages(resolved, debug, progress, onMask, onCardinals, ct);
+            var (activeMask, _, overlay, edge) = await PrepareImageStages(resolved, debug, progress, onMask, onCardinals, ct, dependencies);
             ct.ThrowIfCancellationRequested(); debug.Complete();
             return new(activeMask, overlay, debug.DirectoryPath) { MaskEdge = edge };
         }
@@ -473,18 +479,18 @@ public sealed class AppServices : IIrradianceService
 
     private async Task<(MaskAsset? Mask, CalibrationProfile? Profile, CardinalDirectionOverlayResult? Cardinals, AppliedMaskEdge? Edge)> PrepareImageStages(
         UserSettings s, DebugDataRun debug, Action<string> progress, Action<MaskAsset>? onMask,
-        Action<CardinalDirectionOverlayResult?>? onCardinals, CancellationToken ct, string? selectedMaskFingerprint = null)
+        Action<CardinalDirectionOverlayResult?>? onCardinals, CancellationToken ct, InputDependencies inputs)
     {
             MaskAsset? activeMask = null;
             if (!string.IsNullOrEmpty(s.SkyImage))
             {
-                string nextMask = s.SelectedMaskId == null ? AiMaskKey(s, s.SkyImage)
-                    : selectedMaskFingerprint ?? InputDependencies.Capture(s).Keys[ArtifactGroup.Mask];
-                debug.RecordInput("sky-mask", new { Fingerprint = nextMask });
+                string photoSha256 = inputs.Image.Content;
+                string nextMask = s.SelectedMaskId == null ? AiMaskKey(s, photoSha256) : inputs.Keys[ArtifactGroup.Mask];
+                debug.RecordInput("sky-mask", new { Fingerprint = nextMask, PhotoSha256 = photoSha256 });
                 string directory = debug.BeginStage("02-sky-mask", "Preparing selected sky mask", typeof(SkyPhotoMasker));
                 if (mask == null || maskKey != nextMask) progress("Preparing sky mask");
                 string maskOrigin;
-                (activeMask, maskOrigin) = await LoadStudyMask(s, nextMask, ct);
+                (activeMask, maskOrigin) = await LoadStudyMask(s, photoSha256, nextMask, ct);
                 debug.Origin("02-sky-mask", maskOrigin);
                 debug.CompleteStage("02-sky-mask", debug.NeedsWrite(ArtifactGroup.Mask) ? await Task.Run(() =>
                 {
@@ -499,7 +505,7 @@ public sealed class AppServices : IIrradianceService
                         AppData.Write(detailsPath, details);
                     }
                     string provenance = Path.Combine(directory, "mask-provenance.json");
-                    AppData.Write(provenance, new { Source = activeMask.Variant?.Source ?? "AI",
+                    AppData.Write(provenance, new { Source = activeMask.Variant?.Source ?? "AI", activeMask.PhotoSha256,
                         VariantId = activeMask.Variant?.Id, Label = activeMask.Variant?.Label,
                         AiAncestorSha256 = activeMask.Variant?.IsImported == true ? null : activeMask.AiAncestorSha256,
                         ImportedFileName = activeMask.Variant?.ImportedFileName,
@@ -620,17 +626,23 @@ public sealed class AppServices : IIrradianceService
         try
         {
             lock (inputGate) ObjectDisposedException.ThrowIf(disposeRequested, this);
-            string? key = study.SelectedMaskId == null
-                ? await Task.Run(() => AiMaskKey(study, study.SkyImage), ct).ConfigureAwait(false) : null;
-            return (await LoadStudyMask(study, key, ct).ConfigureAwait(false)).Asset;
+            string photoSha256 = await Task.Run(() => AppData.FileKey(study.SkyImage), ct).ConfigureAwait(false);
+            string? key = study.SelectedMaskId == null ? AiMaskKey(study, photoSha256) : null;
+            return (await LoadStudyMask(study, photoSha256, key, ct).ConfigureAwait(false)).Asset;
         }
         finally { ReleaseOperation(); }
     }
 
-    private static string AiMaskKey(UserSettings s, string photo) => AppData.Key(new { Image = AppData.FileKey(photo),
+    private static string AiMaskKey(UserSettings s, string photoSha256) => AppData.Key(new { Image = photoSha256,
         s.Model, s.Resolution, s.CenteredDisk, Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = MaskCacheSchema });
 
-    private async Task<(MaskAsset Asset, string Origin)> LoadStudyMask(UserSettings s, string? key, CancellationToken ct)
+    private static void VerifyMaskPhoto(Stream photo, string expectedSha256)
+    {
+        if (Convert.ToHexString(SHA256.HashData(photo)) != expectedSha256)
+            throw new IOException("The sky photo changed while preparing its mask. Select the current photo again.");
+    }
+
+    private async Task<(MaskAsset Asset, string Origin)> LoadStudyMask(UserSettings s, string photoSha256, string? key, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (key != null && mask != null && maskKey == key) return (mask, "Reused in-memory mask");
@@ -640,6 +652,9 @@ public sealed class AppServices : IIrradianceService
             var loaded = await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
+                // The classifier and preview decoder both reopen this path. Keep the verified bytes stable for both.
+                using var source = File.OpenRead(s.SkyImage);
+                VerifyMaskPhoto(source, photoSha256);
                 SkyMaskResult result;
                 MaskVariant? variant = null;
                 string origin;
@@ -670,8 +685,6 @@ public sealed class AppServices : IIrradianceService
                             maskerKey = modelKey;
                         }
                         result = masker!.CreateMaskDetailed(s.SkyImage, s.Model);
-                        if (AiMaskKey(s, s.SkyImage) != key)
-                            throw new IOException("The sky photo changed during mask preparation. Reopen Refine edge or update the study.");
                         origin = "Computed by SkyPhotoMasker";
                         // The metadata is the completion marker. A failed write can leave a PNG
                         // for the next attempt, but never a partially published pair.
@@ -687,7 +700,7 @@ public sealed class AppServices : IIrradianceService
                     throw new InvalidDataException("The mask dimensions must match the selected oriented photo.");
                 var asset = new MaskAsset(Preview(image), Preview(binary), result,
                     variant == null ? $"{result.Width} × {result.Height} · {result.Model} · {result.ExecutionProvider} · AI mask"
-                        : $"{result.Width} × {result.Height} · {variant.Description}", variant);
+                        : $"{result.Width} × {result.Height} · {variant.Description}", variant) { PhotoSha256 = photoSha256 };
                 return (Asset: asset, Origin: origin);
             }, ct).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
@@ -702,7 +715,9 @@ public sealed class AppServices : IIrradianceService
         if (string.IsNullOrEmpty(settings.SkyImage)) return null;
         string photo = PortablePaths.Resolve(settings.SkyImage);
         if (!File.Exists(photo)) return null;
-        string key = AiMaskKey(settings, photo);
+        using var source = File.OpenRead(photo);
+        string photoSha256 = Convert.ToHexString(SHA256.HashData(source));
+        string key = AiMaskKey(settings, photoSha256);
         string cache = AppData.PathFor(Path.Combine("mask-stages", key));
         if (!File.Exists(Path.Combine(cache, "sky-mask.png")) || !File.Exists(Path.Combine(cache, "mask-details.json"))) return null;
         var result = SkyMaskExporter.Load(cache);
@@ -711,7 +726,7 @@ public sealed class AppServices : IIrradianceService
         if (photoPixels.Empty() || photoPixels.Width != result.Width || photoPixels.Height != result.Height)
             throw new InvalidDataException("The cached AI mask no longer matches the selected photo.");
         return new(Preview(photoPixels), Preview(maskPixels), result,
-            $"{result.Width} × {result.Height} · {result.Model} · {result.ExecutionProvider} · AI mask");
+            $"{result.Width} × {result.Height} · {result.Model} · {result.ExecutionProvider} · AI mask") { PhotoSha256 = photoSha256 };
     }
 
     public static byte[] Preview(Mat source)
