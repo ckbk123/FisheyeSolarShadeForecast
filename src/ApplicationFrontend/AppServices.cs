@@ -633,8 +633,71 @@ public sealed class AppServices : IIrradianceService
         finally { ReleaseOperation(); }
     }
 
-    private static string AiMaskKey(UserSettings s, string photoSha256) => AppData.Key(new { Image = photoSha256,
-        s.Model, s.Resolution, s.CenteredDisk, Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = MaskCacheSchema });
+    internal static string AiMaskKey(UserSettings s, string photoSha256, string? library = null, string package = MaskCacheSchema) =>
+        AppData.Key(new { Image = photoSha256, s.Model, s.Resolution, s.CenteredDisk, Library = library ?? AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = package });
+
+    private sealed record MaskCacheSource(string Owner, string Key, string PhotoSha256);
+    private const string MaskCacheOwner = "SolarShade.MaskStage.v1";
+
+    public SourceIdentity? LastRecordedSkyPhoto(string path)
+    {
+        lock (inputGate) return Storage.Current?.LastRecordedSkyPhoto(path);
+    }
+
+    public Task DiscardPhotoAsync(SourceIdentity previousPhoto, UserSettings replacement, string expectedPhotoSha256) => Task.Run(async () =>
+    {
+        if (!PhotoStorageCleanup.IsHash(previousPhoto.Content) || !PhotoStorageCleanup.IsHash(expectedPhotoSha256))
+            throw new ArgumentException("Both sky photos must have verified identities.");
+        previousPhoto = previousPhoto with { Path = PortablePaths.Resolve(previousPhoto.Path) };
+        await evaluationGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            lock (inputGate)
+            {
+                var prepared = PrepareInputs(replacement);
+                using var replacementFile = File.OpenRead(PortablePaths.Resolve(prepared.SkyImage));
+                var inputs = InputDependencies.Capture(prepared);
+                if (inputs.Image.Content != expectedPhotoSha256) throw new IOException("The new sky photo changed. Select it again.");
+                if (expectedPhotoSha256 == previousPhoto.Content) return;
+                var cleanup = new PhotoStorageCleanup(previousPhoto, inputs.SourcePaths);
+                var libraries = new HashSet<string> { AppData.LibraryVersion(typeof(SkyPhotoMasker)) };
+                var run = AppData.Read<DebugDataRun.Manifest>(Path.Combine(Storage.Root, "run.json"));
+                if (run?.Stages.TryGetValue("02-sky-mask", out var stage) == true && Guid.TryParse(stage.LibraryVersion, out _))
+                    libraries.Add(stage.LibraryVersion);
+                var discardArchives = AcceptedResultVault.PreparePhotoRemoval(cleanup, libraries);
+                DiscardAiStages(cleanup, libraries);
+                ManualMaskStore.DiscardPhoto(cleanup);
+                discardArchives();
+                if (Storage.Current is { } current) current.DiscardPhotoArtifacts(previousPhoto, prepared, inputs);
+                else Values.DiscardPhotoResults();
+                currentInputs = inputs; accepted = null; mask = null; maskKey = null;
+                profile = null; profileEdge = null; scene = null; cardinals = null; sunPath = null; resultCache = null;
+            }
+        }
+        finally { ReleaseOperation(); }
+    });
+
+    private static void DiscardAiStages(PhotoStorageCleanup cleanup, HashSet<string> libraries)
+    {
+        var legacyKeys = new HashSet<string>();
+        foreach (string library in libraries)
+        foreach (var model in Enum.GetValues<SkyModel>())
+        foreach (int resolution in new[] { 512, 1024 })
+        foreach (bool centered in new[] { false, true })
+        foreach (string package in new[] { "mask-orchestration-v1", MaskCacheSchema })
+            legacyKeys.Add(AiMaskKey(new() { Model = model, Resolution = resolution, CenteredDisk = centered }, cleanup.PhotoSha256, library, package));
+        foreach (string folder in PhotoStorageCleanup.Directories(AppData.PathFor("mask-stages")))
+        {
+            string key = Path.GetFileName(folder);
+            if (!PhotoStorageCleanup.IsHash(key)) continue;
+            var source = PhotoStorageCleanup.Read<MaskCacheSource>(Path.Combine(folder, "photo-source.json"));
+            bool match = source == null ? legacyKeys.Contains(key) :
+                source.Owner == MaskCacheOwner && source.Key == key && source.PhotoSha256 == cleanup.PhotoSha256;
+            if (!match) continue;
+            cleanup.RemoveFile(folder, "sky-mask.png"); cleanup.RemoveFile(folder, "mask-details.json"); cleanup.RemoveFile(folder, "photo-source.json");
+            PhotoStorageCleanup.RemoveIfEmpty(folder);
+        }
+    }
 
     private static void VerifyMaskPhoto(Stream photo, string expectedSha256)
     {
@@ -690,6 +753,7 @@ public sealed class AppServices : IIrradianceService
                         // for the next attempt, but never a partially published pair.
                         string metadata = Path.Combine(cache, "mask-details.json");
                         if (File.Exists(metadata) && !File.Exists(Path.Combine(cache, "sky-mask.png"))) File.Delete(metadata);
+                        AppData.Write(Path.Combine(cache, "photo-source.json"), new MaskCacheSource(MaskCacheOwner, key!, photoSha256));
                         SkyMaskExporter.Export(result, cache, "Computed");
                     }
                 }

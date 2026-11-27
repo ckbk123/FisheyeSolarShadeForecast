@@ -138,6 +138,8 @@ public sealed class PvAutonomyWorkspace : UserControl, IDisposable
             summary.Text = $"{(Controller.IsCurrent ? "" : "Previous · ")}Minimum charge {s.MinimumSocPercent:0.#}%    Final charge {result.Hours[^1].EndSocPercent:0.#}%    Unmet load {s.UnmetLoadWh:0.##} Wh";
             day.DisplayDateStart = result.Hours[0].Start.Date; day.DisplayDateEnd = result.Hours[^1].Start.Date;
         }
+        else if (day.SelectedDate != null || day.DisplayDateStart != null)
+        { day.SelectedDate = null; day.DisplayDateStart = null; day.DisplayDateEnd = null; }
     }
     private void ShowModelTotals()
     {

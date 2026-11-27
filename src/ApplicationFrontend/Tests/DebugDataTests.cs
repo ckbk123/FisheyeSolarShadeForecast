@@ -7,6 +7,63 @@ public sealed class DebugDataTests : IDisposable
 {
     private readonly string root=Path.Combine(Path.GetTempPath(),"solar-run-files-"+Guid.NewGuid().ToString("N"));
     [Fact]
+    public void RecoveringAnInterruptedLegacyMaskPublicationDeletesItsUnregisteredPngAndKeepsNotes()
+    {
+        var settings = new UserSettings();
+        string directory = Path.Combine(root, "02-sky-mask");
+        string mask = Path.Combine(directory, "sky-mask.png"), note = Path.Combine(directory, "field-note.txt");
+        using (var store = new DebugDataStore(root))
+        {
+            var run = new DebugDataRun(store, settings, "calculation");
+            run.BeginStage("02-sky-mask", "Computed", typeof(DebugDataTests));
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(mask, "moved by a previous version before it updated its manifest");
+            File.WriteAllText(note, "observer's note");
+        }
+        using var recovered = new DebugDataStore(root);
+        recovered.PrepareInputs(settings);
+        Assert.False(File.Exists(mask));
+        Assert.Equal("observer's note", File.ReadAllText(note));
+    }
+
+    [Fact]
+    public void LockedPvArtifactLeavesItsSourceManifestForRetry()
+    {
+        using var store = new DebugDataStore(root);
+        string directory = Directory.CreateDirectory(Path.Combine(root, "07-battery")).FullName;
+        const string owner = "SolarShade.DependentResult.v1";
+        File.WriteAllText(Path.Combine(directory, ".owner"), owner);
+        string note = Path.Combine(directory, "field-note.txt"), battery = Path.Combine(directory, "battery-hourly.xlsx");
+        File.WriteAllText(note, "personal"); File.WriteAllText(battery, "output");
+        string manifest = Path.Combine(directory, "module.json");
+        AppData.Write(manifest, new DependentResultStore.Manifest(owner, "site-a", "source", "settings", "software", new()));
+        using (File.Open(battery, FileMode.Open, FileAccess.Read, FileShare.None))
+            Assert.Throws<IOException>(() => DependentResultStore.DiscardPhotoPublication(store, "site-a"));
+        Assert.True(File.Exists(manifest));
+        DependentResultStore.DiscardPhotoPublication(store, "site-a");
+        Assert.False(File.Exists(battery)); Assert.False(File.Exists(manifest));
+        Assert.Equal("personal", File.ReadAllText(note));
+    }
+
+    [Fact]
+    public void PhotoSwitchRetiresOnlyItsInterruptedPvPublicationInAMixedFolder()
+    {
+        string directory = Directory.CreateDirectory(Path.Combine(root, "07-battery")).FullName;
+        const string owner = "SolarShade.DependentResult.v1";
+        File.WriteAllText(Path.Combine(directory, ".owner"), owner);
+        string note = Path.Combine(directory, "field-note.txt"), output = Path.Combine(directory, "battery-hourly.csv");
+        string publishing = Path.Combine(directory, ".module-publishing.json");
+        File.WriteAllText(note, "personal");
+        AppData.Write(publishing, new DependentResultStore.Manifest(owner, "site-a", "source", "settings", "software", new()));
+        File.WriteAllText(output, "moved before the program closed");
+        using var recovered = new DebugDataStore(root);
+        DependentResultStore.DiscardPhotoPublication(recovered, "other-site");
+        Assert.True(File.Exists(output)); Assert.True(File.Exists(publishing));
+        DependentResultStore.DiscardPhotoPublication(recovered, "site-a");
+        Assert.False(File.Exists(output)); Assert.False(File.Exists(publishing));
+        Assert.Equal("personal", File.ReadAllText(note));
+    }
+    [Fact]
     public void CannotMarkAnUnfinishedRunComplete()
     {
         using var run=new DebugDataRun(new(),root:root);

@@ -49,6 +49,36 @@ public static class ManualMaskStore
             .Where(v => v != null && v.PhotoSha256 == photoHash).Cast<MaskVariant>()
             .OrderByDescending(v => v.CreatedUtc).ToArray();
     }
+
+    internal static void DiscardPhoto(PhotoStorageCleanup cleanup)
+    {
+        string folder = PhotoFolder(cleanup.PhotoSha256);
+        foreach (string entry in PhotoStorageCleanup.Directories(folder))
+        {
+            string name = Path.GetFileName(entry);
+            if (ValidId.IsMatch(name))
+            {
+                var variant = PhotoStorageCleanup.Read<MaskVariant>(Path.Combine(entry, "variant.json"));
+                if (variant?.PhotoSha256 != cleanup.PhotoSha256 || variant.Id != name) continue;
+                cleanup.RemoveFile(entry, "sky-mask.png"); cleanup.RemoveFile(entry, "variant.json");
+            }
+            else if (name is "AI" or "Imported")
+            {
+                foreach (string source in PhotoStorageCleanup.Directories(entry))
+                {
+                    string digest = Path.GetFileName(source);
+                    if (!PhotoStorageCleanup.IsHash(digest)) continue;
+                    string png = Path.Combine(source, "sky-mask.png");
+                    DebugDataStore.SafePath(png);
+                    if (File.Exists(png) && AppData.FileKey(png) == digest) cleanup.RemoveFile(source, "sky-mask.png");
+                    PhotoStorageCleanup.RemoveIfEmpty(source);
+                }
+            }
+            else continue;
+            PhotoStorageCleanup.RemoveIfEmpty(entry);
+        }
+        PhotoStorageCleanup.RemoveIfEmpty(folder);
+    }
     public static (MaskVariant Variant, byte[] Png) Load(string photoPath, string id)
     {
         string hash = PhotoHash(photoPath); CheckId(id);

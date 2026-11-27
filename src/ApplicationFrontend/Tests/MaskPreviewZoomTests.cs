@@ -210,7 +210,9 @@ public sealed class MaskPreviewZoomTests
                 File.Copy(photoB, photoA, true);
                 await window.RecheckSourcesAsync(); await window.InputsSettled;
             }
+            await window.InputsSettled;
             Assert.Equal(b.Id, window.IrradianceController.Settings.SelectedMaskId);
+            Assert.Empty(ManualMaskStore.List(a.PhotoSha256));
             Assert.Equal(b.Id, AppData.ReadSettings()!.SelectedMaskId);
             window.Show();
             Assert.True(Descendants<MaskViewport>(window).Single().HasImage);
