@@ -25,13 +25,13 @@ internal sealed record IrradianceExportColumn(IrradianceFields Field, string Hea
 {
     internal static IrradianceExportColumn[] ForModel(string model) =>
     [
-        new(IrradianceFields.PanelDirect, "Direct (W/m²)", "Unshaded direct irradiance on the panel.", 24),
-        new(IrradianceFields.PanelDiffuse, $"Diffuse {model} (W/m²)", "Unshaded sky diffuse irradiance on the panel.", 30),
-        new(IrradianceFields.DirectFactor, "Shading factor direct", "Shaded divided by unshaded direct irradiance. Blank when the denominator is zero.", 24),
-        new(IrradianceFields.DiffuseFactor, "Shading factor diffuse", "Shaded divided by unshaded diffuse irradiance. Blank when the denominator is zero.", 24),
-        new(IrradianceFields.ShadedTotal, "Final total (W/m²)", "Shaded direct and diffuse irradiance on the panel.", 24),
+        new(IrradianceFields.PanelDirect, "Direct on panel (W/m²)", "Before shading. For a flat panel over a full source hour, compare with NASA POWER direct horizontal (ALLSKY_SFC_SW_DIRH).", 30),
+        new(IrradianceFields.PanelDiffuse, $"Diffuse on panel · {model} (W/m²)", "Diffuse sky irradiance on the panel before shading.", 39),
+        new(IrradianceFields.DirectFactor, "Direct shading factor (0–1)", "Shaded divided by unshaded direct irradiance. Blank when the denominator is zero.", 24),
+        new(IrradianceFields.DiffuseFactor, "Diffuse shading factor (0–1)", "Shaded divided by unshaded diffuse irradiance. Blank when the denominator is zero.", 24),
+        new(IrradianceFields.ShadedTotal, "Shaded total on panel (W/m²)", "Shaded direct and diffuse irradiance on the panel.", 33),
         new(IrradianceFields.GlobalHorizontal, "Source GHI (W/m²)", "Global horizontal irradiance as supplied for the source interval. Missing source GHI stays blank.", 24),
-        new(IrradianceFields.DirectHorizontal, "Direct horizontal (W/m²)", "Direct irradiance on a horizontal surface from the saved weather input.", 28),
+        new(IrradianceFields.DirectHorizontal, "Direct horizontal (W/m²)", "Source beam irradiance on a horizontal surface (BHI). NASA POWER supplies ALLSKY_SFC_SW_DIRH.", 28),
         new(IrradianceFields.DiffuseHorizontal, "Diffuse horizontal (W/m²)", "Diffuse irradiance on a horizontal surface from the saved weather input.", 28)
     ];
 }
