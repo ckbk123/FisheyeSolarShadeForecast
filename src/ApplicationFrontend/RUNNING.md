@@ -94,6 +94,8 @@ The library saves the transparent PNG, compact projected-vertex XLSX and metadat
 
 The irradiance dataset owns the time series. Hourly source means produce hourly result intervals; 15-minute means produce 15-minute results. Explicit variable durations are supported by the prepared pipeline. Missing rows remain missing and requested coverage gaps fail visibly. The pipeline does not fill, interpolate or resample weather data. Its internal solar samples are numerical integration points, not additional irradiance observations.
 
+For a flat panel and a complete source hour, compare **Direct on panel (W/m²)** before shading to NASA POWER **ALLSKY_SFC_SW_DIRH** (direct horizontal). Compare diffuse to **ALLSKY_SFC_SW_DIFF**. **Source GHI** preserves **ALLSKY_SFC_SW_DWN** separately. Match the source interval and UTC offset when comparing downloads.
+
 The current NASA POWER and Open-Meteo endpoints used by the application request hourly means. The returned result declares its native cadence and label convention. The application does not infer a finer provider resolution from the solar integration setting.
 
 A legacy XLSX first worksheet or CSV needs a header followed by timestamp, direct horizontal irradiance (BHI), and diffuse horizontal irradiance (DHI), in W/m². Choose **Interval length (min)** and whether labels describe the start, end or centre of each interval. These explicit fallback settings apply only when the file lacks native interval metadata. A native exported irradiance workbook carries stable interval IDs, source/selected bounds, label convention, value kind, cadence, units and provenance; preserve those columns. Recorded location metadata must agree with the selected solar site.

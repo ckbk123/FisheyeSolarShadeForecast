@@ -93,6 +93,44 @@ public sealed class IrradianceDataExportTests
     }
 
     [Fact]
+    public async Task FlatPanelExcelMatchesRecordedNasaPowerHourlyHorizontalComponents()
+    {
+        // POWER hourly point, 43.60 N / 1.44 E, 2025-05-15, RE community, time-standard=UTC.
+        // Preserve DIRH, DIFF and DWN independently, including their disagreement at dawn.
+        double[] beam = [0,0,0,0,0,7.66,22.21,18.67,32.28,54.46,80.34,163.18,299.55,392.77,486.28,275.1,164.2,74.28,10.84,0,0,0,0,0];
+        double[] diffuse = [0,0,0,0,5.09,25.99,68.49,121.91,180.22,256.74,347.26,452.87,409.4,302.63,186.32,180.1,133.88,88.97,35.14,0,0,0,0,0];
+        double[] global = [0,0,0,0,3.35,33.65,90.7,140.57,212.5,311.2,427.6,616.05,708.95,695.4,672.6,455.2,298.08,163.25,45.97,0,0,0,0,0];
+        var midnight = new DateTimeOffset(2025, 5, 15, 0, 0, 0, TimeSpan.Zero);
+        var intervals = Enumerable.Range(0, 24).Select(hour =>
+        {
+            var start = midnight.AddHours(hour); var end = start.AddHours(1);
+            return new IrradianceInterval($"nasa-{hour}", start, start, end, start, end, beam[hour], diffuse[hour])
+                { GlobalHorizontal = global[hour] };
+        }).ToArray();
+        using var fixture = new Fixture();
+        using var service = new AppServices(fixture.Debug);
+        var settings = fixture.Settings with { Latitude = 43.60, Longitude = 1.44, PanelTilt = 0,
+            Isotropic = false, ImportPath = Path.Combine(fixture.Root, "nasa.xlsx") };
+        IrradianceDatasetFiles.Export(new(intervals, "NasaPower", "UTC", "NASA POWER hourly UTC start",
+            TimestampLabel.Start, TimeSpan.FromHours(1)), settings.ImportPath);
+        var result = await Calculate(service, settings);
+        var options = new DataExportOptions(Fields: IrradianceFields.PanelDirect | IrradianceFields.PanelDiffuse | IrradianceFields.Weather);
+        using var workbook = ZipFile.OpenRead(Path.Combine(AppServices.Export(result, fixture.Root, options), "irradiance.xlsx"));
+        var rows = Part(workbook, "xl/worksheets/sheet1.xml").Descendants(Spreadsheet + "row").ToArray();
+        Assert.Equal(25, rows.Length);
+        Assert.Equal("Direct on panel (W/m²)", Cell(rows[0], 'B'));
+        for (int h = 0; h < 24; h++)
+        {
+            var row = rows[h + 1];
+            Assert.Equal(beam[h], Number(row, 'B')!.Value, 8);
+            Assert.Equal(diffuse[h], Number(row, 'C')!.Value, 8);
+            Assert.Equal(global[h], Number(row, 'D'));
+            Assert.Equal(beam[h], Number(row, 'E'));
+            Assert.Equal(diffuse[h], Number(row, 'F'));
+        }
+    }
+
+    [Fact]
     public async Task EmptySelectionDoesNotCreateAnExport()
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
@@ -136,7 +174,7 @@ public sealed class IrradianceDataExportTests
         var table = Part(workbook, "xl/worksheets/sheet1.xml").Descendants(Spreadsheet + "row").ToArray();
         Assert.Equal(result.Run.Rows.Count + 1, table.Length);
         var headers = table[0].Descendants(Spreadsheet + "t").Select(t => t.Value).ToArray();
-        Assert.Equal(includePanel ? ["Timeseries", "Source interval start", "Source interval end", "Final total (W/m²)", "Source GHI (W/m²)"] :
+        Assert.Equal(includePanel ? ["Timeseries", "Source interval start", "Source interval end", "Shaded total on panel (W/m²)", "Source GHI (W/m²)"] :
             new[] { "Timeseries", "Source interval start", "Source interval end", "Source GHI (W/m²)" }, headers);
         for (int i = 0; i < result.Run.Rows.Count; i++)
         {
