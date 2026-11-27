@@ -98,6 +98,8 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(6) };
     private readonly Button savedStudies = new() { Content = "Saved studies" };
     private readonly Button choosePhoto = new() { Content = "Choose sky photo…", Margin = new(0, 4, 6, 4), Padding = new(10, 6, 10, 6) };
+    private readonly Button generateMask = new() { Content = "Generate mask" };
+    private CancellationTokenSource? maskPreparation;
     private readonly Button importMask = new() { Content = "Import existing mask…", Margin = new(0, 4, 6, 4), Padding = new(10, 6, 10, 6) };
     private readonly ComboBox maskChoice = new() { MinWidth = 120, HorizontalAlignment = HorizontalAlignment.Stretch };
     private sealed record MaskChoice(string? Id, string Title, bool Imported = false) { public override string ToString() => Title; }
@@ -189,6 +191,10 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
         var imageButtons = new WrapPanel(); imageButtons.Children.Add(choosePhoto); imageButtons.Children.Add(importMask); inputs.Children.Add(imageButtons);
         choosePhoto.Click += (_, _) => PickSkyPhoto(); importMask.Click += (_, _) => PickMask();
+        generateMask.Click += async (_, _) => await GenerateMask();
+        AutomationProperties.SetAutomationId(generateMask, "GenerateSkyMask");
+        StudioTheme.Help(generateMask, "Prepare the selected photo’s mask for inspection or editing. Weather and irradiance are calculated separately.");
+        inputs.Children.Add(generateMask);
         StudioTheme.Help(choosePhoto, "Choose the original sky photograph taken with the calibrated lens.");
         StudioTheme.Help(importMask, "Select a sky photograph first. Import an opaque black-and-white PNG at the same oriented dimensions. White means open sky by default. You can invert the mask during import.");
         images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) SelectSkyPhoto(Path.Combine(PortablePaths.Resolve(settings.SkyFolder), name)); };
@@ -359,6 +365,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     {
         if (closing) return;
         closing = true; revision++; pending?.Cancel();
+        maskPreparation?.Cancel();
         proposalRequest?.Cancel();
         skyViewport.ClearPhoto();
         owner.ContentRendered -= OnContentRendered; owner.Activated -= OnActivated;
@@ -837,6 +844,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if ((groups & (ArtifactGroup.Profile | ArtifactGroup.Mask)) != 0) maskEdgeWindow?.Close();
         if ((groups & ArtifactGroup.Mask) != 0)
         {
+            maskPreparation?.Cancel();
             bool geometryChanged = (groups & (ArtifactGroup.Profile | ArtifactGroup.Orientation)) != 0;
             ClearMaskPreview(geometryChanged);
         }
@@ -895,6 +903,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         RefreshEdgeDisplay();
         choosePhoto.IsEnabled = !calibrating && !exporting;
         importMask.IsEnabled = CanImportForCurrentPhoto && !updating && !calibrating && !exporting && File.Exists(PortablePaths.Resolve(settings.SkyImage));
+        generateMask.IsEnabled = importMask.IsEnabled && maskPreparation == null;
         savedStudies.IsEnabled = !updating && !calibrating && !exporting && !controller.DependentBusy && !controller.Verifying;
     }
     public void StopUpdate()
@@ -1012,7 +1021,47 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private void ShowMaskPending()
     {
         maskInfo.Text = "Mask pending";
-        StudioTheme.Help(maskInfo, "Update results to prepare the selected mask.");
+        StudioTheme.Help(maskInfo, "Choose Generate mask to inspect the mask, or Update results to calculate irradiance.");
+    }
+
+    internal async Task GenerateMask()
+    {
+        if (!generateMask.IsEnabled || maskPreparation != null || !CanImportForCurrentPhoto) return;
+        using var request = new CancellationTokenSource();
+        maskPreparation = request;
+        var study = settings with { };
+        generateMask.Content = "Generating mask…";
+        RefreshButtons();
+        try
+        {
+            await InputsSettled;
+            request.Token.ThrowIfCancellationRequested();
+            var asset = await services.PrepareEdgeMask(study, request.Token);
+            var source = await Task.Run(() => SourceIdentity.Read(study.SkyImage, null, true), request.Token);
+            request.Token.ThrowIfCancellationRequested();
+            if (settings.ActiveSkyPhoto?.Content != source.Content || asset.PhotoSha256 != source.Content)
+            {
+                RecheckSources();
+                return;
+            }
+            if (settings.SkyImage == study.SkyImage && settings.SelectedMaskId == study.SelectedMaskId &&
+                settings.Model == study.Model && settings.Resolution == study.Resolution && settings.CenteredDisk == study.CenteredDisk)
+                ShowMask(asset);
+        }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            if (!request.IsCancellationRequested)
+            {
+                maskInfo.Text = "Could not prepare mask · " + ex.Message;
+                StudioTheme.Help(maskInfo, ex.Message);
+            }
+        }
+        finally
+        {
+            maskPreparation = null;
+            if (!closing) { generateMask.Content = "Generate mask"; RefreshButtons(); }
+        }
     }
     public void ShowMask(MaskAsset asset)
     {
@@ -1366,7 +1415,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         reviewedProfileFingerprint = fingerprint;
         reviewCalibration.IsEnabled = calibrationReview != null;
         RefreshCalibrationOutcome();
-        const string profileHelp = "Choose camera-profile.json for this lens and oriented image size. The profile includes the calibrated field of view.";
+        const string profileHelp = "Open camera-profile.json from a previous calibration of the same camera, lens and oriented image size. The profile replaces the checkerboard photos for this study.";
         StudioTheme.Help(loadProfile, string.IsNullOrWhiteSpace(settings.ProfilePath) ? profileHelp :
             profileHelp + "\n" + PortablePaths.Resolve(settings.ProfilePath));
     }
