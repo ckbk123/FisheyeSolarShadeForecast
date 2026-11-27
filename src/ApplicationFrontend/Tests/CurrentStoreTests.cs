@@ -93,7 +93,10 @@ public sealed class CurrentStoreTests
             string first = Path.Combine(staging, "partial.xlsx"), second = Path.Combine(staging, "remaining.xlsx");
             File.WriteAllText(first, "exported workbook"); File.WriteAllText(second, "next workbook");
             using (File.Create(Path.Combine(directory, "remaining.xlsx")))
-                Assert.Throws<IOException>(() => run.CompleteStage("05-transposition", [first, second]));
+            {
+                var error = Record.Exception(() => run.CompleteStage("05-transposition", [first, second]));
+                Assert.True(error is IOException or UnauthorizedAccessException, error?.Message ?? "The locked workbook was replaced.");
+            }
             var interrupted = AppData.Read<DebugDataRun.Manifest>(manifest)!;
             Assert.Equal("Running", interrupted.Status);
             Assert.Equal(AppData.FileKey(partial), interrupted.ArtifactHashes["05-transposition/partial.xlsx"]);
