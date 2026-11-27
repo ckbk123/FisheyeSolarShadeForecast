@@ -12,7 +12,7 @@ public sealed class FailedCalibrationAttemptTests
 {
     private static void AssertOutcome(MainWindow window, string expected, Brush color)
     {
-        var outcome = Assert.IsType<TextBlock>(LogicalTreeHelper.FindLogicalNode(window.Irradiance, "CalibrationOutcome"));
+        var outcome = Assert.IsType<TextBlock>(LogicalTreeHelper.FindLogicalNode(window.Irradiance.ImagesAndCalibration, "CalibrationOutcome"));
         Assert.Equal(expected, outcome.Text);
         Assert.Equal(SystemParameters.HighContrast ? SystemColors.WindowTextBrush : color, outcome.Foreground);
         Assert.False(string.IsNullOrWhiteSpace(outcome.ToolTip as string));
