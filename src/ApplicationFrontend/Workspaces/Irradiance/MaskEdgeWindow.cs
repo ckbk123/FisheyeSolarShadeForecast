@@ -22,7 +22,7 @@ internal sealed class MaskEdgeWindow : Window
     private readonly TextBox degrees = new() { Width = 78, VerticalContentAlignment = VerticalAlignment.Center };
     private readonly TextBlock hint = IrradianceWorkspace.Label("", 12);
     private readonly Button reset = new() { Content = "Use suggestion", Visibility = Visibility.Collapsed };
-    private readonly Button save = new() { Content = "Save edge", MinWidth = 80, IsEnabled = false, Margin = new Thickness(0, 0, 6, 0) };
+    private readonly Button save = new() { Content = "Use edge for shading", MinWidth = 80, IsEnabled = false, Margin = new Thickness(0, 0, 6, 0) };
     private double? suggested;
     private bool editable, syncing, edited, loading = true;
     private string? failure;
@@ -76,6 +76,7 @@ internal sealed class MaskEdgeWindow : Window
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new(0, 8, 0, 0) };
         DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
         AutomationProperties.SetAutomationId(save, "SaveRefinedEdge");
+        StudioTheme.Help(save, "Save this photo’s field of view. Update results to recalculate shading with this edge.");
         save.Click += (_, _) =>
         {
             if (!save.IsEnabled) return;
