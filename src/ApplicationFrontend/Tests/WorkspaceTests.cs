@@ -35,7 +35,7 @@ public sealed class WorkspaceTests
         var window = new MainWindow(applicationServices: service);
         try
         {
-            Assert.Equal(new[] { "Orientation map", "Solar Irradiance", "PV Autonomy" },
+            Assert.Equal(new[] { "Images & calibration", "Orientation map", "Solar Irradiance", "PV Autonomy" },
                 window.Workspaces.Items.OfType<TabItem>().Select(tab => (string)tab.Header));
             Assert.Equal("Solar Irradiance", window.Workspaces.Active!.Title);
             Assert.False(window.IrradianceController.Source.IsReady);

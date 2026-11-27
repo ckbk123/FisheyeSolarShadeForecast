@@ -24,6 +24,7 @@ public sealed class MaskPreviewZoomTests
         try
         {
             window.Show();
+            Assert.True(window.Workspaces.Select("images")); window.UpdateLayout();
             var quality = Descendants<ComboBox>(window).Single(c => AutomationProperties.GetName(c) == "Mask quality");
             Assert.Equal(new[] { "Original Quality (Slower)", "Reduced Quality (Faster)" }, quality.Items.Cast<string>());
             Assert.Equal(choice, quality.SelectedIndex);

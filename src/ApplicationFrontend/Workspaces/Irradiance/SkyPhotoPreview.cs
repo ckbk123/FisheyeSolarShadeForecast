@@ -6,7 +6,7 @@ namespace SolarShade.Desktop;
 
 public sealed partial class IrradianceWorkspace
 {
-    private Grid CreatePreviewPair(RowDefinition previewRow)
+    private Grid CreatePreviewPair()
     {
         var pair = new Grid { Margin = new(12, 0, 12, 0) };
         pair.ColumnDefinitions.Add(new());
@@ -22,12 +22,12 @@ public sealed partial class IrradianceWorkspace
         maskPane.Children.Add(maskViewport);
         maskPane.Children.Add(editMask);
 
-        AddPreviewTools(skyViewport, skyPane, maskPane, previewRow, "SkyPhoto", "sky photo");
-        AddPreviewTools(maskViewport, maskPane, skyPane, previewRow, "SkyMask", "mask");
+        AddPreviewTools(skyViewport, skyPane, maskPane, "SkyPhoto", "sky photo");
+        AddPreviewTools(maskViewport, maskPane, skyPane, "SkyMask", "mask");
         return pair;
     }
 
-    private void AddPreviewTools(ImageViewport viewport, Grid pane, Grid otherPane, RowDefinition previewRow, string id, string name)
+    private void AddPreviewTools(ImageViewport viewport, Grid pane, Grid otherPane, string id, string name)
     {
         int column = Grid.GetColumn(pane);
         var tools = new ImageZoomTools(viewport, id, name);
@@ -39,7 +39,7 @@ public sealed partial class IrradianceWorkspace
             Grid.SetColumn(pane, expanded ? 0 : column);
             Grid.SetColumnSpan(pane, expanded ? 3 : 1);
             otherPane.Visibility = expanded ? Visibility.Collapsed : Visibility.Visible;
-            previewRow.Height = new(expanded ? Math.Clamp(owner.ActualHeight * .55, 320, 640) : 220);
+            previewExpanded = expanded; FitPreviewHeight();
             expand.Content = expanded ? "Restore" : "Expand";
             AutomationProperties.SetName(expand, expanded ? $"Restore {name} layout" : $"Expand {name}");
             StudioTheme.Help(expand, expanded ? "Show the sky photo and mask side by side." : $"Use the width of both previews to inspect the {name}.");

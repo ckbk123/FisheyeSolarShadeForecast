@@ -52,9 +52,15 @@ public static class SmokeTest
                     throw new InvalidOperationException("Loading inputs calculated or enabled export.");
                 if (startsExample)
                 {
+                    window.Workspaces.Select("images"); window.UpdateLayout();
                     await window.Irradiance.GenerateMask();
-                    if (window.Completed != null || window.ExportEnabledForTest || !Find<MaskViewport>(window, _ => true).HasImage)
+                    var setupMask = Find<MaskViewport>(window, _ => true);
+                    if (window.Completed != null || window.ExportEnabledForTest || !setupMask.HasImage)
                         throw new InvalidOperationException("Generating the example mask must show its pixels before any irradiance study.");
+                    Capture(window, Path.Combine(output, "images-and-calibration.png"));
+                    window.Workspaces.Select("irradiance"); window.UpdateLayout();
+                    if (!ReferenceEquals(setupMask, Find<MaskViewport>(window, _ => true)))
+                        throw new InvalidOperationException("Both tabs must show the same prepared mask.");
                     var refine = Find<Button>(window, b => System.Windows.Automation.AutomationProperties.GetAutomationId(b) == "RefineMaskEdge");
                     refine.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     var dialog = window.OwnedWindows.OfType<MaskEdgeWindow>().Single();

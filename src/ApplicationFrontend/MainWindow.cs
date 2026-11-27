@@ -58,6 +58,8 @@ public sealed class MainWindow : Window
             header.ColumnDefinitions[1].Width = narrow ? new(0) : GridLength.Auto;
         };
         root.Children.Add(host);
+        Irradiance = new(this, new(applicationServices ?? new()), systemZoneProvider, loadExampleOnFirstRun);
+        host.Register(new("images", "Images & calibration", Irradiance.ImagesAndCalibration));
         var orientation = new OrientationWorkspace();
         var orientationTab = host.Register(new("orientation", "Orientation map", orientation));
         orientationTab.MouseEnter += async (_, _) =>
@@ -66,7 +68,7 @@ public sealed class MainWindow : Window
             if (orientationTab.IsMouseOver) await orientation.Prepare();
         };
         orientationTab.GotKeyboardFocus += async (_, _) => await orientation.Prepare();
-        Irradiance = new(this, new(applicationServices ?? new()), systemZoneProvider, loadExampleOnFirstRun);
+
         host.Register(new("irradiance", "Solar Irradiance", Irradiance, Irradiance.Actions));
         host.Select("irradiance");
         var pvService = new PvEvaluationService(IrradianceController);
@@ -89,7 +91,11 @@ public sealed class MainWindow : Window
             if (!actions.Children.Contains(next)) actions.Children.Add(next);
             next.Visibility = Visibility.Visible;
         }
-        host.ActiveChanged += (_, _) => ShowActions(host.Active?.Actions);
+        host.ActiveChanged += (_, _) =>
+        {
+            Irradiance.ShowImageSetup(host.Active?.Id == "images");
+            ShowActions(host.Active?.Actions);
+        };
         ShowActions(Irradiance.Actions);
         Closed += (_, _) => host.Dispose();
     }
