@@ -68,7 +68,7 @@ public sealed record Evaluation(PanelRun Run, IrradianceDataset Raw, UserSetting
 /// <summary>UI stage sequencing and cache coordination. All scientific work and artifacts are library-owned.</summary>
 public sealed class AppServices : IIrradianceService
 {
-    internal const string MaskCacheSchema = "mask-orchestration-v1";
+    internal const string MaskCacheSchema = "mask-orchestration-v2";
     // Bump the orchestration schema when scientific sequencing changes. UI/PV builds must not evict upstream caches.
     internal static string SoftwareFingerprint => AppData.Key(new { Schema = "irradiance-orchestration-v3", Libraries = new[] { typeof(CalibrationWorkflow), typeof(CameraProfileFiles),
         typeof(IrradianceClient), typeof(TranspositionModule), typeof(SolarPositionModule), typeof(ShadingCorrectionModule), typeof(SkyPhotoMasker) }.Select(AppData.LibraryVersion).ToArray() });

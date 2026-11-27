@@ -237,6 +237,27 @@ public sealed class MaskEditingTests
     });
 
     [Fact]
+    public void PreviousAiCacheIsIgnoredWhileSavedEditsRemainAvailable() => Sta(() =>
+    {
+        using var fixture = new Fixture();
+        var settings = fixture.Settings;
+        var ai = Assert.IsType<MaskAsset>(AppServices.LoadCachedAiMask(settings));
+        var edit = ManualMaskStore.Save(settings.SkyImage, ai.Result, ai.AiAncestorSha256,
+            null, "Saved edit", ai.Png, ai.Png, expectedPhotoSha256: ai.PhotoSha256);
+
+        // Recreate an installed v0.3.13 cache that has no photo-to-mask provenance.
+        string cache = AppData.PathFor("mask-stages");
+        Directory.Move(cache, Path.Combine(fixture.Root, "fixture-cache"));
+        string previousKey = AppData.Key(new { Image = ai.PhotoSha256, settings.Model, settings.Resolution,
+            settings.CenteredDisk, Library = AppData.LibraryVersion(typeof(SkyPhotoMasker)), Package = "mask-orchestration-v1" });
+        SkyMaskExporter.Export(ai.Result, Path.Combine(cache, previousKey), "Previous version");
+
+        Assert.Null(AppServices.LoadCachedAiMask(settings));
+        Assert.Equal(ai.Png, ManualMaskStore.Load(settings.SkyImage, edit.Id).Png);
+        return Task.CompletedTask;
+    });
+
+    [Fact]
     public void PhotoSwitchBackRestoresOnlyTheExactVerifiedPhoto() => Sta(async () =>
     {
         using var fixture = new Fixture(); int calculations = 0;
