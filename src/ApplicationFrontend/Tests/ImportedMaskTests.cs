@@ -130,25 +130,158 @@ public sealed class ImportedMaskTests
     });
 
     [Fact]
-    public void PhotoAndMaskChoicesSurviveSwitchingRestartAndOriginalMaskRemoval() => Sta(async () =>
+    public void UpgradeRecoversAMovedPhotoFromThePreviousMaskRunBeforeAcceptingItsReplacement() => Sta(async () =>
     {
-        using var fixture = new Fixture(); string path = WriteMask(fixture, "saved-import");
-        string otherPhoto = Path.Combine(fixture.Root, "other-photo.png");
-        using (var image = new Mat(303, 201, MatType.CV_8UC3, new Scalar(130, 95, 45))) Cv2.ImWrite(otherPhoto, image);
-        string firstId, secondId;
+        using var fixture = new Fixture();
+        string original = fixture.Settings.SkyImage, digest = AppData.FileKey(original);
+        var dormant = ManualMaskStore.Import(original, WriteMask(fixture, "old-mask"), "Old mask", centeredDisk: true);
+        using (var oldSession = new AppServices(fixture.Debug))
+            await oldSession.Evaluate(fixture.Settings, false, _ => { }, null, CancellationToken.None);
+        // The 0.3.14 settings have no active-photo record, selected mask or pinned edge.
+        AppData.SaveSettings(fixture.Settings);
+        string run = Path.Combine(fixture.Debug, "run.json");
+        string mask = Path.Combine(fixture.Debug, "02-sky-mask", "sky-mask.png");
+        string oldMask = AppData.FileKey(mask), oldRun = AppData.FileKey(run);
+        string moved = Path.Combine(fixture.Root, "archived-original.png");
+        File.Move(original, moved);
+        string replacement = Path.Combine(fixture.Root, "new-site.png");
+        using (var image = new Mat(303, 201, MatType.CV_8UC3, Scalar.Green)) Cv2.ImWrite(replacement, image);
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try
+        {
+            await window.RecheckSourcesAsync(); await window.InputsSettled;
+            Assert.Equal(UpdateState.NeedsAttention, window.UpdateStateForTest);
+            Assert.Equal(digest, AppData.ReadSettings()!.ActiveSkyPhoto!.Content);
+            Assert.Equal(oldRun, AppData.FileKey(run)); Assert.Equal(oldMask, AppData.FileKey(mask));
+            Assert.Equal(dormant.Id, Assert.Single(ManualMaskStore.List(digest)).Id);
+            window.Irradiance.SelectSkyPhotoForTest(replacement); await window.InputsSettled;
+            Assert.Equal(AppData.FileKey(replacement), AppData.ReadSettings()!.ActiveSkyPhoto!.Content);
+            Assert.Empty(ManualMaskStore.List(digest)); Assert.False(File.Exists(mask));
+            Assert.Equal(digest, AppData.FileKey(moved));
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
+    [Fact]
+    public void AByteIdenticalPhotoAtAnotherPathKeepsTheActiveMaskAndRefinement() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        string input = WriteMask(fixture, "mask");
+        var imported = ManualMaskStore.Import(fixture.Settings.SkyImage, input, "Current", centeredDisk: true);
+        string copy = Path.Combine(fixture.Root, "same-photo.png");
+        File.Copy(fixture.Settings.SkyImage, copy);
+        AppData.SaveSettings(fixture.Settings with { SelectedMaskId = imported.Id, ApparentFullFovDegrees = 147,
+            LastMaskByPhoto = new() { [imported.PhotoSha256] = imported.Id } });
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try
+        {
+            window.Irradiance.SelectSkyPhotoForTest(copy); await window.InputsSettled;
+            Assert.Equal(copy, window.IrradianceController.Settings.SkyImage);
+            Assert.Equal(147, window.IrradianceController.Settings.ApparentFullFovDegrees);
+            Assert.Equal(imported.Id, window.IrradianceController.Settings.SelectedMaskId);
+            Assert.Single(ManualMaskStore.List(imported.PhotoSha256));
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
+    [Fact]
+    public void HalfWrittenReplacementKeepsTheOutgoingDebugMaskUntilAValidPhotoArrives() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        using var service = new AppServices(fixture.Debug);
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try
+        {
+            string photo = fixture.Settings.SkyImage;
+            var old = window.Irradiance.ImportMaskForTest(WriteMask(fixture, "source"), "A");
+            await window.InputsSettled;
+            window.Calculate(); await Until(() => !window.UpdatingForTest);
+            string png = Path.Combine(fixture.Debug, "02-sky-mask", "sky-mask.png");
+            string oldMask = AppData.FileKey(png);
+            File.WriteAllText(photo, "partial photo");
+            await window.RecheckSourcesAsync(); await window.InputsSettled;
+            window.Calculate(); await window.InputsSettled;
+            Assert.Equal(UpdateState.NeedsAttention, window.UpdateStateForTest);
+            Assert.Throws<InvalidOperationException>(() => window.Irradiance.ImportMaskForTest(png, "Incomplete photo"));
+            Assert.Equal(oldMask, AppData.FileKey(png));
+            Assert.Single(ManualMaskStore.List(old.PhotoSha256));
+            using (var image = new Mat(303, 201, MatType.CV_8UC3, Scalar.Green)) Cv2.ImWrite(photo, image);
+            await window.RecheckSourcesAsync(); await window.InputsSettled;
+            Assert.Equal(AppData.FileKey(photo), AppData.ReadSettings()!.ActiveSkyPhoto!.Content);
+            Assert.Empty(ManualMaskStore.List(old.PhotoSha256));
+            Assert.False(File.Exists(png));
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
+    [Fact]
+    public void APhotoChangeResumesAfterALockedGeneratedMaskIsReleasedAndTheAppRestarts() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        string replacement = Path.Combine(fixture.Root, "replacement.png");
+        using (var pixels = new Mat(303, 201, MatType.CV_8UC3, Scalar.Green)) Cv2.ImWrite(replacement, pixels);
+        string outgoing;
         using (var service = new AppServices(fixture.Debug))
         {
             var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
             try
             {
-                firstId = window.Irradiance.ImportMaskForTest(path, "First photo").Id;
+                var variant = window.Irradiance.ImportMaskForTest(WriteMask(fixture, "original"), "Original");
+                outgoing = variant.PhotoSha256;
+                await window.InputsSettled;
+                using var hold = File.OpenRead(ManualMaskStore.VariantPngPath(outgoing, variant.Id));
+                window.Irradiance.SelectSkyPhotoForTest(replacement);
+                await window.InputsSettled;
+                Assert.Equal(UpdateState.Failed, window.UpdateStateForTest);
+                Assert.Throws<InvalidOperationException>(() => window.Irradiance.ImportMaskForTest(replacement, "Before retry"));
+                Assert.False(window.ExportEnabledForTest);
+                Assert.Equal(outgoing, AppData.ReadSettings()!.ActiveSkyPhoto!.Content);
+            }
+            finally { window.Close(); await window.InputsSettled; }
+        }
+        using var nextService = new AppServices(fixture.Debug);
+        var restarted = new MainWindow(applicationServices: nextService, loadExampleOnFirstRun: false);
+        try
+        {
+            await restarted.InputsSettled;
+            Assert.Equal(AppData.FileKey(replacement), AppData.ReadSettings()!.ActiveSkyPhoto!.Content);
+            Assert.Empty(ManualMaskStore.List(outgoing));
+            Assert.Null(restarted.Completed);
+            Assert.True(File.Exists(fixture.Settings.SkyImage));
+        }
+        finally { restarted.Close(); await restarted.InputsSettled; }
+    });
+
+    [Fact]
+    public void SwitchingPhotoDiscardsItsVariantsButRestartingTheActivePhotoKeepsItsImport() => Sta(async () =>
+    {
+        using var fixture = new Fixture(); string path = WriteMask(fixture, "saved-import");
+        string otherPhoto = Path.Combine(fixture.Root, "other-photo.png");
+        using (var image = new Mat(303, 201, MatType.CV_8UC3, new Scalar(130, 95, 45))) Cv2.ImWrite(otherPhoto, image);
+        string secondId;
+        using (var service = new AppServices(fixture.Debug))
+        {
+            var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+            try
+            {
+                var first = window.Irradiance.ImportMaskForTest(path, "First photo");
+                string emptyFolder = Directory.CreateDirectory(Path.Combine(fixture.Root, "empty")).FullName;
+                window.Irradiance.BrowseSkyFolder(emptyFolder);
+                Assert.Equal(fixture.Settings.SkyImage, window.IrradianceController.Settings.SkyImage);
+                Assert.Single(ManualMaskStore.List(first.PhotoSha256));
+                string invalid = Path.Combine(emptyFolder, "invalid.jpg");
+                File.WriteAllText(invalid, "incomplete");
+                window.Irradiance.SelectSkyPhotoForTest(invalid); await window.InputsSettled;
+                Assert.Equal(fixture.Settings.SkyImage, window.IrradianceController.Settings.SkyImage);
+                Assert.Single(ManualMaskStore.List(first.PhotoSha256));
                 window.Irradiance.SelectSkyPhotoForTest(otherPhoto); await window.InputsSettled;
                 Assert.Null(window.IrradianceController.Settings.SelectedMaskId);
+                Assert.Empty(ManualMaskStore.List(first.PhotoSha256));
+                Assert.True(File.Exists(fixture.Settings.SkyImage));
+                Assert.True(File.Exists(path));
                 secondId = window.Irradiance.ImportMaskForTest(path, "Second photo").Id;
-                window.Irradiance.SelectSkyPhotoForTest(fixture.Settings.SkyImage); await window.InputsSettled;
-                Assert.Equal(firstId, window.IrradianceController.Settings.SelectedMaskId);
-                window.Irradiance.SelectMaskForTest(null); await window.InputsSettled;
-                window.Irradiance.SelectMaskForTest(firstId); await window.InputsSettled;
                 File.Delete(path); // Saved variants do not depend on the external import file.
             }
             finally { window.Close(); }
@@ -157,11 +290,13 @@ public sealed class ImportedMaskTests
         var restarted = new MainWindow(applicationServices: restartedService, loadExampleOnFirstRun: false);
         try
         {
-            Assert.Equal(firstId, restarted.IrradianceController.Settings.SelectedMaskId);
-            restarted.Irradiance.SelectSkyPhotoForTest(otherPhoto); await restarted.InputsSettled;
             Assert.Equal(secondId, restarted.IrradianceController.Settings.SelectedMaskId);
             restarted.Calculate(); await Until(() => !restarted.UpdatingForTest);
             Assert.True(restarted.ExportEnabledForTest); Assert.True(restarted.Completed!.Mask!.Variant!.IsImported);
+            restarted.Irradiance.SelectSkyPhotoForTest(fixture.Settings.SkyImage); await restarted.InputsSettled;
+            Assert.Null(restarted.IrradianceController.Settings.SelectedMaskId);
+            Assert.Empty(ManualMaskStore.List(ManualMaskStore.PhotoHash(otherPhoto)));
+            Assert.Empty(ManualMaskStore.List(ManualMaskStore.PhotoHash(fixture.Settings.SkyImage)));
         }
         finally { restarted.Close(); }
     });

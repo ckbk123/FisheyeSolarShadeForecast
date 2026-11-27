@@ -79,12 +79,19 @@ public sealed class DebugDataRun : IDisposable
         var state = AppData.Read<Manifest>(Path.Combine(store.Root, "run.json"));
         if (state?.Owner != "SolarShade.CurrentDebugData.v1") throw new IOException("This debug folder has an unrecognized manifest. Choose a separate debug folder.");
         foreach (string file in state.ArtifactHashes.Keys)
-            if (!DebugDataStore.Within(store.Root, Path.Combine(store.Root, file)) || InputDependencies.ForArtifact(file) == ArtifactGroup.None)
+            if (!IsArtifactPath(store.Root, file) || InputDependencies.ForArtifact(file) == ArtifactGroup.None)
                 throw new IOException("Invalid path in debug manifest.");
         return new(store, state);
     }
     internal static readonly string[] AllStages = ["01-calibration", "02-sky-mask", "02-orientation", "03-irradiance", "04-solar-positions", "05-transposition", "06-shading"];
     internal static ArtifactGroup StageGroups(string name) => name == "04-solar-positions" ? ArtifactGroup.Solar | ArtifactGroup.SunPath : InputDependencies.ForArtifact(name + "/artifact");
+    private static bool IsArtifactPath(string root, string relative)
+    {
+        string[] parts = relative.Replace('\\', '/').Split('/');
+        return parts.Length > 1 && AllStages.Contains(parts[0]) &&
+            parts.All(part => part.Length > 0 && part is not ("." or "..")) &&
+            DebugDataStore.Within(Path.Combine(root, parts[0]), Path.Combine(root, relative));
+    }
     internal ArtifactGroup Differences(InputDependencies next) => state.Software != AppServices.SoftwareFingerprint ? ArtifactGroup.All :
         InputDependencies.Groups.Where(g => !state.Keys.TryGetValue(g, out var key) || key != next.Keys[g]).Aggregate(ArtifactGroup.None, (a, g) => a | g);
     private void Check() { store.Check(); if (store.Current != this) throw new InvalidOperationException("This result has been replaced by a newer update."); }
@@ -116,12 +123,19 @@ public sealed class DebugDataRun : IDisposable
                 if (!DebugDataStore.Within(staging, file) || !File.Exists(file)) throw new IOException("A stage reported a missing or external artifact: " + file);
             }
             var published = state.ArtifactHashes.Keys.Where(p => p.StartsWith(name + "/") && File.Exists(Path.Combine(DirectoryPath, p))).ToHashSet();
+            // Persist ownership before moving any files so even a partial publication can be cleared after a crash.
+            foreach (string file in paths)
+            {
+                string relative = Path.GetRelativePath(store.Staging, file).Replace('\\', '/');
+                state.ArtifactHashes[relative] = AppData.FileKey(file);
+            }
+            if (paths.Length != 0) Status("Running");
             foreach (string file in paths)
             {
                 string relative = Path.GetRelativePath(store.Staging, file).Replace('\\', '/');
                 string target = Path.Combine(DirectoryPath, relative); DebugDataStore.SafePath(target);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                File.Move(file, target, true); state.ArtifactHashes[relative] = AppData.FileKey(target); published.Add(relative);
+                File.Move(file, target, true); published.Add(relative);
             }
             state.Invalidated &= ~StageGroups(name);
             state.PendingGroups.Remove(name);
@@ -209,19 +223,70 @@ public sealed class DebugDataRun : IDisposable
             RemoveInvalid(protectedInputs); cleanupPending = false;
         }
     }
+    internal SourceIdentity? LastRecordedSkyPhoto(string path)
+    {
+        lock (SyncRoot)
+        {
+            Check();
+            string fullPath = PortablePaths.Resolve(path);
+            if (!string.Equals(PortablePaths.Resolve(state.Settings.SkyImage), fullPath, StringComparison.OrdinalIgnoreCase) ||
+                state.Stages.GetValueOrDefault("02-sky-mask")?.Status != "Complete" ||
+                !state.ArtifactHashes.ContainsKey("02-sky-mask/sky-mask.png") ||
+                !state.Inputs.TryGetValue("sky-mask", out var mask) || mask.ValueKind != JsonValueKind.Object ||
+                !mask.TryGetProperty("PhotoSha256", out var digest) ||
+                digest.ValueKind != JsonValueKind.String || !PhotoStorageCleanup.IsHash(digest.GetString())) return null;
+            return new(fullPath, digest.GetString()!);
+        }
+    }
+    internal void DiscardPhotoArtifacts(SourceIdentity previous, UserSettings replacement, InputDependencies inputs)
+    {
+        lock (SyncRoot)
+        {
+            Check();
+            // Archived/current runs prior to 0.3.14 identify the source by path only.
+            bool ownsPhoto = state.Inputs.TryGetValue("sky-mask", out var mask) && mask.ValueKind == JsonValueKind.Object &&
+                mask.TryGetProperty("PhotoSha256", out var hash)
+                ? hash.ValueKind == JsonValueKind.String && hash.GetString() == previous.Content
+                : string.Equals(PortablePaths.Resolve(state.Settings.SkyImage), previous.Path, StringComparison.OrdinalIgnoreCase);
+            if (!ownsPhoto) return;
+            new CurrentValueCache(DirectoryPath).DiscardPhotoResults();
+            DependentResultStore.DiscardPhotoPublication(store, state.Id);
+            // Actual checkerboard calibration is shared across sites; the exported study profile includes the photo's edge.
+            bool sharedCalibration = state.Kind == "calibration" &&
+                state.ArtifactHashes.GetValueOrDefault("01-calibration/camera-profile.json") == inputs.Profile.Content;
+            var groups = sharedCalibration ? ArtifactGroup.All & ~ArtifactGroup.Profile : ArtifactGroup.All;
+            state.Invalidated |= groups;
+            Status("Stale", "Clearing the previous sky photo's results.");
+            foreach (string name in state.Inputs.Keys.Where(k => !sharedCalibration || k != "calibration-files").ToArray())
+                state.Inputs.Remove(name);
+            state.MaskEdge = null; state.StudyPeriod = null; state.LastSuccessfulUpdateUtc = null;
+            RemoveInvalid(inputs.SourcePaths);
+            foreach (string stage in state.Stages.Keys.ToArray())
+            {
+                if ((StageGroups(stage) & groups) == 0) continue;
+                state.Stages[stage] = new("Pending", "", "", []);
+                state.PendingGroups.Remove(stage);
+            }
+            state.Settings = PortablePaths.Map(replacement, path => PortablePaths.Store(path));
+            state.Keys = inputs.Keys.ToDictionary();
+            Status("Stale", "Sky photo changed. Update results for the selected photo.");
+        }
+    }
     private void RemoveInvalid(IEnumerable<string> protectedInputs)
     {
         var protectedPaths = protectedInputs.Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (string stage in AllStages)
+        // Older manifests could be interrupted after moving a standard file but before recording its hash.
+        var interrupted = SnapshotExport.RequiredArtifacts.Append("02-sky-mask/mask-provenance.json").Where(relative =>
+            state.PendingGroups.TryGetValue(relative.Split('/')[0], out var groups) && (InputDependencies.ForArtifact(relative) & groups) != 0);
+        foreach (string relative in state.ArtifactHashes.Keys.Concat(interrupted).Distinct().ToArray())
         {
-            string directory = Path.Combine(DirectoryPath, stage); if (!Directory.Exists(directory)) continue;
-            foreach (string candidate in DebugDataStore.Files(directory))
-            {
-                string relative = Path.GetRelativePath(DirectoryPath, candidate).Replace('\\', '/');
-                if ((InputDependencies.ForArtifact(relative) & state.Invalidated) == 0) continue;
-                if (protectedPaths.Contains(candidate)) throw new IOException("A selected input must be saved outside debug output before cleanup: " + candidate);
-                File.Delete(candidate); state.ArtifactHashes.Remove(relative);
-            }
+            if ((InputDependencies.ForArtifact(relative) & state.Invalidated) == 0) continue;
+            string candidate = Path.GetFullPath(Path.Combine(DirectoryPath, relative));
+            if (!IsArtifactPath(DirectoryPath, relative)) throw new IOException("Invalid debug artifact path.");
+            if (protectedPaths.Contains(candidate)) throw new IOException("A selected input must be saved outside debug output before cleanup: " + candidate);
+            DebugDataStore.SafePath(candidate);
+            if (File.Exists(candidate)) File.Delete(candidate);
+            state.ArtifactHashes.Remove(relative);
         }
     }
     internal void Finish()

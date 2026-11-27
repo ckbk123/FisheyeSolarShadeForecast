@@ -1,4 +1,4 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.14
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.15
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
@@ -20,7 +20,9 @@ WebView2 or through the tab's option to open it locally in a browser.
    measured clockwise from south and are undefined at zero tilt.
    Existing studies keep their saved pose.
 
-   Choose sky photo selects a photograph directly. Import existing mask accepts
+   Choosing a different sky photo clears the previous photo's masks, saved edits
+   and study results. To keep its selected mask, copy 02-sky-mask/sky-mask.png
+   from Debug Data after Update results and before switching. Import existing mask accepts
    an opaque, exact black/white grayscale PNG at the oriented photo dimensions
    without AI. Choose white or black for open sky, name the mask, then import it.
 2. Click Update results. Open Study details beneath the graph for weather and run information.
@@ -49,8 +51,8 @@ The 24 load values repeat by local hour throughout the entire study. The battery
 is not reset at midnight. No unmet load in historical data does not guarantee
 supply during future weather. See Help for the model assumptions.
 
-This preview supports imported and edited masks with source provenance and restores
-verified accepted studies when you return to matching photos, masks and inputs.
+For the active photo, SolarShade can restore a previously calculated mask and
+study configuration. Selecting a different photo starts a new working study.
 Full scientific diagnostics are retained.
 A full-year update still takes longer than a month; Stop cancels acceptance of
 pending results even if an active native operation must finish in the background.

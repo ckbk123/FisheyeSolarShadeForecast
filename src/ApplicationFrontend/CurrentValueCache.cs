@@ -22,6 +22,19 @@ internal sealed class CurrentValueCache(string debugRoot)
         }
     }
     internal string PathFor(string stage) => AppData.PathFor(Path.Combine("current-values-v2", AppData.Key(Path.GetFullPath(debugRoot).ToUpperInvariant()), stage + ".cache"));
+    internal void DiscardPhotoResults()
+    {
+        foreach (string stage in new[] { "cardinals", "sun-path", "shading" })
+        {
+            string path = PathFor(stage);
+            DebugDataStore.SafePath(path);
+            if (!File.Exists(path)) continue;
+            bool owned;
+            using (var reader = new BinaryReader(File.OpenRead(path)))
+                owned = reader.BaseStream.Length >= sizeof(uint) && reader.ReadUInt32() == Magic;
+            if (owned) File.Delete(path);
+        }
+    }
     public T? Read<T>(string stage, string key) where T : class
     {
         using var timing = PerformanceTrace.Phase("cache-read", stage);

@@ -10,15 +10,43 @@ internal static class PvAcceptedVault
         IReadOnlyList<BatteryStep> Steps, IReadOnlyList<BatteryHour> Hours, BatterySummary Summary);
     private sealed record Manifest(string Owner, string SourceKey, string SettingsKey,
         string ResultSha256, Dictionary<string, string> Hashes);
-    private static string Folder(IrradianceSnapshot source, string settingsKey) =>
-        Path.Combine(AppData.PathFor("AcceptedResults"), AcceptedResultVault.Key(source.Settings), "Pv", settingsKey);
+    private static string Folder(string studyKey, string settingsKey) =>
+        Path.Combine(AppData.PathFor("AcceptedResults"), studyKey, "Pv", settingsKey);
+
+    internal static void DiscardStudy(PhotoStorageCleanup cleanup, string studyFolder, string studyKey)
+    {
+        string root = Path.Combine(studyFolder, "Pv");
+        foreach (string settingsFolder in PhotoStorageCleanup.Directories(root))
+        {
+            string key = Path.GetFileName(settingsFolder);
+            if (!PhotoStorageCleanup.IsHash(key)) continue;
+            foreach (string folder in ManagedVaultDirectory.Locations(settingsFolder))
+            {
+                var manifest = PhotoStorageCleanup.Read<Manifest>(Path.Combine(folder, "vault.json"));
+                if (manifest?.Owner != Owner || manifest.SourceKey != studyKey || manifest.SettingsKey != key) continue;
+                foreach (string artifact in Artifacts) cleanup.RemoveFile(folder, artifact);
+                cleanup.RemoveFile(folder, "result.json"); cleanup.RemoveFile(folder, "vault.json");
+                PhotoStorageCleanup.RemoveIfEmpty(folder);
+            }
+            PhotoStorageCleanup.RemoveIfEmpty(settingsFolder);
+        }
+        PhotoStorageCleanup.RemoveIfEmpty(root);
+    }
 
     internal static void Archive(IrradianceSnapshot source, string settingsKey,
         DependentResultStore store, BatterySimulationResult result)
     {
-        if (!store.IsCurrent(source, settingsKey)) throw new InvalidOperationException("PV output is not current.");
-        string target = Folder(source, settingsKey);
-        if (Directory.Exists(target)) { Verify(target, source, settingsKey); return; }
+        // Serialize archival with source invalidation so an outgoing PV calculation cannot recreate its discarded study.
+        store.WithVerifiedPublication(source, settingsKey, () => ArchiveCurrent(source, settingsKey, store, result));
+    }
+
+    private static void ArchiveCurrent(IrradianceSnapshot source, string settingsKey,
+        DependentResultStore store, BatterySimulationResult result)
+    {
+        string studyKey = AcceptedResultVault.Key(source.Settings), settingsFolder = Folder(studyKey, settingsKey);
+        string? existing = ManagedVaultDirectory.Find(settingsFolder, Owner, settingsKey, studyKey);
+        if (existing != null) { Verify(existing, source, settingsKey); return; }
+        string target = ManagedVaultDirectory.NewDestination(settingsFolder);
         string parent = Path.GetDirectoryName(target)!; Directory.CreateDirectory(parent);
         string staging = Path.Combine(parent, "." + Guid.NewGuid().ToString("N") + ".partial");
         try
@@ -34,7 +62,7 @@ internal static class PvAcceptedVault
             }
             AppData.Write(Path.Combine(staging, "result.json"), new SavedPv(result.InputFingerprint, result.Input,
                 result.Steps, result.Hours, result.Summary));
-            AppData.Write(Path.Combine(staging, "vault.json"), new Manifest(Owner, AcceptedResultVault.Key(source.Settings),
+            AppData.Write(Path.Combine(staging, "vault.json"), new Manifest(Owner, studyKey,
                 settingsKey, AppData.FileKey(Path.Combine(staging, "result.json")), hashes));
             Verify(staging, source, settingsKey);
             Directory.Move(staging, target);
@@ -43,8 +71,9 @@ internal static class PvAcceptedVault
     }
     internal static BatterySimulationResult? Restore(IrradianceSnapshot source, string settingsKey, DependentResultStore store)
     {
-        string folder = Folder(source, settingsKey);
-        if (!Directory.Exists(folder)) return null;
+        string studyKey = AcceptedResultVault.Key(source.Settings);
+        string? folder = ManagedVaultDirectory.Find(Folder(studyKey, settingsKey), Owner, settingsKey, studyKey);
+        if (folder == null) return null;
         var saved = Verify(folder, source, settingsKey);
         store.Publish(source, settingsKey, destination =>
         {

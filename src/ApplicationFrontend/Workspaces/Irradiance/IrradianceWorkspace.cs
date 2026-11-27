@@ -35,7 +35,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private Task inputWork = Task.CompletedTask;
     private InputDependencies? uiInputs;
     private ArtifactGroup uiInvalid;
-    public Task InputsSettled => inputWork;
+    public Task InputsSettled => WaitForInputWork();
     private CancellationTokenSource? pending { get => controller.Pending; set => controller.Pending = value; }
     private long revision { get => controller.Revision; set => controller.Revision = value; }
     private bool loading, closing, exporting;
@@ -191,7 +191,8 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         choosePhoto.Click += (_, _) => PickSkyPhoto(); importMask.Click += (_, _) => PickMask();
         StudioTheme.Help(choosePhoto, "Choose the original sky photograph taken with the calibrated lens.");
         StudioTheme.Help(importMask, "Select a sky photograph first. Import an opaque black-and-white PNG at the same oriented dimensions. White means open sky by default. You can invert the mask during import.");
-        images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) { settings.SkyImage = Path.Combine(settings.SkyFolder, name); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } };
+        images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) SelectSkyPhoto(Path.Combine(PortablePaths.Resolve(settings.SkyFolder), name)); };
+        StudioTheme.Help(choosePhoto, PhotoSwitchHelp);
         model = Combo(inputs, "Sky segmentation", Enum.GetNames<SkyModel>()); model.SelectionChanged += (_, _) => { if (!loading && model.SelectedIndex >= 0) { settings.Model = (SkyModel)model.SelectedIndex; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
         resolution = Combo(inputs, "Mask quality", ["Original Quality (Slower)", "Reduced Quality (Faster)"]); resolution.SelectionChanged += (_, _) => { if (!loading) { settings.Resolution = resolution.SelectedIndex == 1 ? 512 : 1024; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };
         AddPhoneControls(inputs);
@@ -322,17 +323,21 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         settings = services.PrepareInputs(settings);
         LoadFields();
         uiInputs = InputDependencies.Capture(settings);
-        bool maskChanged = SelectedMaskBelongsToAnotherPhoto(uiInputs.Image);
-        if (maskChanged) { RestorePhotoMaskSelection(); RefreshMaskChoices(); }
-        if (settings.VerifyRefinedEdge(uiInputs) || maskChanged)
+        bool replacingPhoto = ResumePhotoSelection(uiInputs.Image);
+        if (!replacingPhoto)
         {
-            uiInputs = InputDependencies.Capture(settings, uiInputs, false);
-            SaveInputs();
+            bool maskChanged = SelectedMaskBelongsToAnotherPhoto(uiInputs.Image);
+            if (maskChanged) { RestorePhotoMaskSelection(); RefreshMaskChoices(); }
+            if (settings.VerifyRefinedEdge(uiInputs) || maskChanged)
+            {
+                uiInputs = InputDependencies.Capture(settings, uiInputs, false);
+                SaveInputs();
+            }
+            ShowSelectedMaskPreview();
+            services.ObserveInputs(settings, refreshSources: true);
         }
-        ShowSelectedMaskPreview();
-        services.ObserveInputs(settings, refreshSources: true);
         WatchSources();
-        RefreshInputState();
+        if (!replacingPhoto) RefreshInputState();
         loadFirstExample = loadExampleOnFirstRun && settings.FirstRun;
         owner.ContentRendered += OnContentRendered;
         owner.Activated += OnActivated;
@@ -343,6 +348,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private bool loadFirstExample;
     private async void OnContentRendered(object? sender, EventArgs e)
     {
+        if (photoChanging || photoCleanupFailed) return;
         if (!loadFirstExample) { QueueObservation(true, true); return; }
         loadFirstExample = false;
         try { await LoadExample(); } catch (Exception ex) { ShowError(ex); }
@@ -493,8 +499,10 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     {
         string folder = PortablePaths.Resolve(settings.SkyFolder);
         var files = Directory.Exists(folder) ? Directory.EnumerateFiles(folder).Where(p => new[] { ".jpg", ".jpeg", ".png" }.Contains(Path.GetExtension(p).ToLowerInvariant())).OrderBy(p => p).Select(Path.GetFileName).ToArray() : [];
-        images.ItemsSource = files; images.SelectedItem = Path.GetFileName(settings.SkyImage);
-        if (files.Length == 1 && images.SelectedIndex < 0) { images.SelectedIndex = 0; settings.SkyImage = Path.Combine(settings.SkyFolder, files[0]!); }
+        images.ItemsSource = files;
+        string? selectedFolder = Path.GetDirectoryName(PortablePaths.Resolve(settings.SkyImage));
+        images.SelectedItem = string.Equals(selectedFolder, folder, StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(settings.SkyImage) : null;
+        if (files.Length == 1 && string.IsNullOrEmpty(settings.SkyImage)) { images.SelectedIndex = 0; settings.SkyImage = Path.Combine(settings.SkyFolder, files[0]!); }
     }
     private void RestorePhotoMaskSelection()
     {
@@ -574,6 +582,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void ShowSelectedMaskPreview()
     {
+        if (photoChanging || photoCleanupFailed || photoUnavailable) return;
         try
         {
             if (settings.SelectedMaskId == null)
@@ -658,7 +667,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void Changed(bool saveSettings = true, bool refreshSources = false, bool verifyArtifacts = false)
     {
-        if (loading || closing) return;
+        if (loading || closing || photoChanging || photoCleanupFailed) return;
         try
         {
             if (settings.LastCalibrationFailure is { } failure && !failure.Matches(settings))
@@ -670,7 +679,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             }
             var next = InputDependencies.Capture(settings, uiInputs, false);
             if (settings.ApparentFullFovDegrees.HasValue && uiInputs != null &&
-                (!string.Equals(uiInputs.Image.Path, next.Image.Path, StringComparison.OrdinalIgnoreCase) ||
+                (uiInputs.Image.Content != next.Image.Content ||
                  !string.Equals(uiInputs.Profile.Path, next.Profile.Path, StringComparison.OrdinalIgnoreCase)))
             {
                 // A visually chosen rim belongs to the selected photo and its lens calibration.
@@ -694,6 +703,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void QueueObservation(bool refreshSources, bool verifyArtifacts)
     {
+        if (photoChanging || photoCleanupFailed || photoUnavailable && !refreshSources) return;
         var previous = inputWork; var snapshot = settings with { };
         var invalid = invalidFields.Where(f => InputDependencies.ForField(f, snapshot) != ArtifactGroup.None).ToArray();
         long observedRevision = revision;
@@ -709,11 +719,15 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 var result = await Task.Run(() =>
                 {
                     var prepared = services.PrepareInputs(snapshot);
+                    // Inspect a replaced file before the current debug run invalidates the outgoing photo.
+                    if (refreshSources && ChangedPhoto(prepared) is { } replacement)
+                        return (prepared, changed: ArtifactGroup.None, restored: (Evaluation?)null,
+                            verified: (InputDependencies?)null, replacement: (SourceIdentity?)replacement);
                     var changed = services.ObserveInputs(prepared, out var verified, invalid, refreshSources, verifyArtifacts);
                     Evaluation? restored = null;
                     if (invalid.Length == 0 && (changed != ArtifactGroup.None || updateState != UpdateState.UpToDate))
                         restored = services.TryRestoreAccepted(prepared);
-                    return (prepared, changed, restored, verified);
+                    return (prepared, changed, restored, verified: (InputDependencies?)verified, replacement: (SourceIdentity?)null);
                 });
                 if (closing) return;
                 if (result.prepared != snapshot)
@@ -732,10 +746,16 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                     WatchSources(); SaveInputs();
                 }
                 if (observedRevision != revision) return;
+                if (result.replacement != null)
+                {
+                    StartPhotoChange(settings with { }, result.replacement);
+                    return;
+                }
                 if (refreshSources)
                 {
+                    if (photoUnavailable) { photoUnavailable = false; RefreshInputState(); ShowSelectedMaskPreview(); }
                     var previousImage = uiInputs?.Image;
-                    uiInputs = result.verified;
+                    uiInputs = result.verified!;
                     bool edgeChanged = settings.VerifyRefinedEdge(uiInputs);
                     bool replaced = previousImage is { HasDigest: true } && uiInputs.Image.HasDigest &&
                         string.Equals(previousImage.Path, uiInputs.Image.Path, StringComparison.OrdinalIgnoreCase) &&
@@ -778,13 +798,22 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private void WatchSources() => sourceWatch.SetFiles(InputDependencies.Capture(settings, uiInputs, false).SourcePaths);
     public void RecheckSources()
     {
-        if (closing) return;
+        if (closing || photoChanging || photoCleanupFailed) return;
         if (updating || calibrating) { checkAfterUpdate = true; return; }
         if (!fullCheckQueued) QueueObservation(true, true);
     }
-    public Task RecheckSourcesAsync() { RecheckSources(); return inputWork; }
+    public Task RecheckSourcesAsync() { RecheckSources(); return InputsSettled; }
     private void ReloadChangedSkyPhoto()
     {
+        if (settings.ActiveSkyPhoto is { } active)
+        {
+            var current = SourceIdentity.Read(settings.SkyImage, null, true);
+            if (current.HasDigest && current.Content != active.Content)
+            {
+                StartPhotoChange(settings with { }, current);
+                return;
+            }
+        }
         revision++; pending?.Cancel();
         ApplyInvalidation(ArtifactGroup.Mask | ArtifactGroup.Profile | InputDependencies.PoseChain);
         RestorePhotoMaskSelection();
@@ -851,7 +880,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void RefreshButtons()
     {
-        update.IsEnabled = refreshData.IsEnabled = !controller.DependentBusy && !updating && !calibrating && InputProblem() == null;
+        update.IsEnabled = refreshData.IsEnabled = !controller.DependentBusy && !updating && !calibrating && (photoCleanupFailed || InputProblem() == null);
         refreshData.IsEnabled &= WeatherSourceSelection.UsesServices(settings);
         StudioTheme.Help(update, controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : "Update results reuses matching weather data, calibration and masks. Changed inputs are recalculated.");
         StudioTheme.Help(refreshData, controller.DependentBusy ? "Wait for PV Autonomy or stop its operation first." : WeatherSourceSelection.UsesServices(settings)
@@ -865,7 +894,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         maskEdgeWindow?.SetStudyEditable(CanChangeMaskCoverage);
         RefreshEdgeDisplay();
         choosePhoto.IsEnabled = !calibrating && !exporting;
-        importMask.IsEnabled = !updating && !calibrating && !exporting && File.Exists(PortablePaths.Resolve(settings.SkyImage));
+        importMask.IsEnabled = CanImportForCurrentPhoto && !updating && !calibrating && !exporting && File.Exists(PortablePaths.Resolve(settings.SkyImage));
         savedStudies.IsEnabled = !updating && !calibrating && !exporting && !controller.DependentBusy && !controller.Verifying;
     }
     public void StopUpdate()
@@ -902,7 +931,19 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     { if (e.Category == UserPreferenceCategory.Locale) SystemTimeChanged(sender, e); }
     public async void Begin(bool refresh)
     {
+        if (photoChanging) return;
         if (closing || updating || calibrating || controller.DependentBusy) return;
+        var replaced = ChangedPhoto(settings);
+        if (photoCleanupFailed || replaced != null)
+        {
+            if (StartPhotoChange(settings with { }, replaced ?? SourceIdentity.Read(settings.SkyImage, null, true)))
+            {
+                await InputsSettled;
+                if (!photoCleanupFailed && !closing) Begin(refresh);
+            }
+            return;
+        }
+        photoUnavailable = false;
         if (TimeZoneSelection.ApplySystemZone(settings, systemZone())) { UpdateTimeZoneControls(); Changed(); }
         if (InputProblem() is { } problem) { SetUpdateState(UpdateState.NeedsAttention, problem); return; }
         controller.Revalidating = !refresh && updateState == UpdateState.UpToDate && completed != null;
@@ -1014,7 +1055,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if (maskEdgeWindow != null && (!refineEdge.IsEnabled ||
             !maskEdgeWindow.Matches(settings.SkyImage, displayedAsset, currentFieldOfView.EffectiveCalibration)))
             maskEdgeWindow.Close();
-        StudioTheme.Help(images, "Select the sky photo used for the mask and edge.");
+        StudioTheme.Help(images, PhotoSwitchHelp);
         PrepareEdgeProposal();
         RefreshEdgeDisplay();
     }
@@ -1202,11 +1243,20 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void SelectSkyPhoto(string path)
     {
-        settings.SkyImage = PortablePaths.Store(path); settings.SkyFolder = PortablePaths.Store(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        RestorePhotoMaskSelection(); LoadFields(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
+        if (closing || photoChanging) return;
+        try
+        {
+            var next = settings with { SkyImage = PortablePaths.Store(path),
+                SkyFolder = PortablePaths.Store(Path.GetDirectoryName(PortablePaths.Resolve(path))!) };
+            SelectPhotoStudy(next);
+        }
+        catch (Exception ex) { LoadFields(); detail.Text = ex.Message; }
     }
+    private bool CanImportForCurrentPhoto => !closing && !photoChanging && !photoCleanupFailed && !photoUnavailable;
+    private Task pendingMaskImport = Task.CompletedTask;
     private void PickMask()
     {
+        if (!CanImportForCurrentPhoto) return;
         var pick = new OpenFileDialog { Title = "Import an existing mask without AI", Filter = "Black-and-white PNG|*.png" };
         if (pick.ShowDialog(owner) != true) return;
         var dialog = new Window { Title = "Import existing mask · no AI", Width = 510, Height = 600,
@@ -1230,17 +1280,22 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             importing = true; panel.IsEnabled = false; error.Text = "Checking and importing mask…";
             try
             {
-                var variant = await Task.Run(() => ManualMaskStore.Import(photoPath, pick.FileName, label, inverted, centeredDisk));
-                if (closing || settings.SkyImage != photoPath) throw new IOException("The selected photo changed. Choose the mask again.");
+                if (!CanImportForCurrentPhoto) throw new IOException("Finish the photo change before importing a mask.");
+                var work = Task.Run(() => ManualMaskStore.Import(photoPath, pick.FileName, label, inverted, centeredDisk));
+                pendingMaskImport = work;
+                var variant = await work;
+                if (!CanImportForCurrentPhoto || settings.SkyImage != photoPath || settings.ActiveSkyPhoto?.Content != variant.PhotoSha256)
+                    throw new IOException("The selected photo changed. Choose the mask again.");
                 SelectImportedMask(variant); importing = false; dialog.Close();
             }
             catch (Exception ex) { error.Text = ex.Message; }
-            finally { importing = false; panel.IsEnabled = true; }
+            finally { pendingMaskImport = Task.CompletedTask; importing = false; panel.IsEnabled = true; }
         }));
         commands.Children.Add(Button("Cancel", dialog.Close)); dialog.ShowDialog();
     }
     private MaskVariant ImportExistingMask(string path, string label, bool inverted, bool centeredDisk)
     {
+        if (!CanImportForCurrentPhoto) throw new InvalidOperationException("Finish the photo change before importing a mask.");
         var variant = ManualMaskStore.Import(settings.SkyImage, path, label, inverted, centeredDisk);
         SelectImportedMask(variant); return variant;
     }
@@ -1250,7 +1305,20 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         settings.LastMaskByPhoto = new(settings.LastMaskByPhoto) { [variant.PhotoSha256] = variant.Id };
         Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
     }
-    private void PickSkyFolder() { var p = new OpenFolderDialog { Title = "Choose the folder containing your sky photograph" }; if (p.ShowDialog(owner) == true) { settings.SkyFolder = PortablePaths.Store(p.FolderName); settings.SkyImage = ""; settings.SelectedMaskId = null; LoadFields(); RestorePhotoMaskSelection(); Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview(); } }
+    private void PickSkyFolder()
+    {
+        var p = new OpenFolderDialog { Title = "Choose the folder containing your sky photograph" };
+        if (p.ShowDialog(owner) == true) BrowseSkyFolder(p.FolderName);
+    }
+    internal void BrowseSkyFolder(string folder)
+    {
+        if (closing || photoChanging || photoCleanupFailed) return;
+        string[] imagesInFolder = Directory.EnumerateFiles(folder).Where(p =>
+            Path.GetExtension(p).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png").Take(2).ToArray();
+        if (imagesInFolder.Length == 1) { SelectSkyPhoto(imagesInFolder[0]); return; }
+        settings.SkyFolder = PortablePaths.Store(folder);
+        LoadFields(); SaveInputs();
+    }
     public static OpenFileDialog CameraProfilePicker() => new()
     {
         Title = "Load camera parameters · camera-profile.json",
@@ -1424,16 +1492,18 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         pending?.Cancel();
         profileSelectionRevision++;
         TimeZoneSelection.ApplySystemZone(settings, systemZone());
-        settings = PortablePaths.Example() with { FirstRun = false, Zone = settings.Zone, UseSystemTimeZone = settings.UseSystemTimeZone, ShowSunPath = settings.ShowSunPath, ShowCardinalDirections = settings.ShowCardinalDirections };
-        LoadFields(); Changed(); RefreshFieldOfView();
-        return Task.CompletedTask;
+        if (photoChanging || photoCleanupFailed) return InputsSettled;
+        var example = PortablePaths.Example() with { FirstRun = false, Zone = settings.Zone, UseSystemTimeZone = settings.UseSystemTimeZone, ShowSunPath = settings.ShowSunPath, ShowCardinalDirections = settings.ShowCardinalDirections,
+            ActiveSkyPhoto = settings.ActiveSkyPhoto, LastMaskByPhoto = new(settings.LastMaskByPhoto) };
+        SelectPhotoStudy(example);
+        return InputsSettled;
     }
     private void ShowHelp()
     {
         HelpWindow.OpenGuide(ref helpWindow, owner, $"Using SolarShade · preview {Program.PreviewVersion}",
         [
             ("Camera calibration", "1. Select checkerboard photographs. Enter INNER columns/rows and the size of ONE square in mm, then Calibrate. Calibrate saves native calibration.yml, camera-profile.json and diagnostics in Debug Data/01-calibration, with durable copies under Data/Profiles."),
-            ("Sky photos and masks", "2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show sky grid marks the fitted lens center with a cyan cross. The rings measure 30° steps away from the lens axis. Dotted N–S and E–W lines follow geographic directions through true zenith. Tilting the phone moves zenith away from the lens center. Hover over Show sky grid for the center in original photo pixels. Scroll over either preview or use + and − to zoom, drag to pan, and choose Fit to see the whole frame. Expand gives the selected preview the width of both panes. The mask and its sun path zoom together. The green line is the edge used for irradiance. Choose Refine edge to see the 95%-black suggestion, then adjust the full angle and save. Only the part of the circle inside the photo is shown.\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Original masks stay available. A new variant needs Update results; returning to a previously accepted exact photo, mask and study restores verified results and export without recalculation. The internal Debug Data includes mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Keep Data/Masks and Data/AcceptedResults when moving the application."),
+            ("Sky photos and masks", "2. Select your sky photo folder, then its active photo and segmentation model. The physical lens and oriented image dimensions must match calibration. The mask is saved as a black-and-white PNG. Show sun path adds a separate transparent preview for the selected period as soon as solar geometry is ready. The toggle only changes its visibility; the binary mask remains unchanged. Show sky grid marks the fitted lens center with a cyan cross. The rings measure 30° steps away from the lens axis. Dotted N–S and E–W lines follow geographic directions through true zenith. Tilting the phone moves zenith away from the lens center. Hover over Show sky grid for the center in original photo pixels. Scroll over either preview or use + and − to zoom, drag to pan, and choose Fit to see the whole frame. Expand gives the selected preview the width of both panes. The mask and its sun path zoom together. The green line is the edge used for irradiance. Choose Refine edge to see the 95%-black suggestion, then adjust the full angle and save. Only the part of the circle inside the photo is shown.\n\nChoosing photos and existing masks: Choose sky photo opens a photograph directly; the folder and active-photo list follow your choice. Import existing mask reads an already segmented black-and-white PNG without AI. Choose whether white or black means open sky; white is the default. The mask must match the oriented photo's dimensions, use exact black/white grayscale pixels and be opaque. Lens-disk detection uses the photo, not the mask; choose Centered full disk only for a centered full-disk photo. Outside-lens pixels become black. Give the mask a name. Import selects a durable copy immediately, ready for Update results; the original import file is no longer required. AI settings are unavailable while an imported mask is selected. Choose AI mask in Mask for calculation to use segmentation again.\n\nMask editing: Click Edit mask on an imported mask or a generated AI mask. The separate window blocks main-study changes until you save or cancel. Paint black for obstruction or white for open sky; change brush size, mask opacity and zoom while editing. Saving creates a new named variant and selects it in Mask for calculation. Variants stay available while this photo is active. Update results after editing a mask. Choosing a different photo removes this photo’s generated results and mask edits. The internal Debug Data includes mask-provenance.json, identifying imported pixels, explicit inversion and subsequent edits. Export any results you need to keep before choosing another photo."),
             ("Phone, panel and site orientation", "Lay the panel flat, front up. Its top heading runs from its center toward the marked edge that you raise for tilt. On the phone, use the lens end as the top. Measure both headings clockwise from true north, with east 90°, south 180° and west 270°. Enter tilt from horizontal, 0° flat to 90° vertical. The top heading is always the bearing you would measure with the equipment laid flat. At vertical the raised edge points straight up, and the retained heading still determines the direction the front faces.\n\nThe calculated lens and panel front azimuths follow the outward axes, clockwise from geographic south. South is 0°, west +90°, north ±180° and east −90°. A south-facing 28° panel has a north top heading (0°) and a south front azimuth (0°). When flat, the front points up and has no azimuth. Turning the panel still rotates its marked top. Turning the phone rotates its photograph and overlays. With image top north, east appears on the left.\n\nCopy panel pose to phone aligns the phone’s lens end with the marked panel top and copies its tilt and heading once, including at 0° tilt. A saved camera with roll keeps its original image orientation. The pose readout identifies older placements that need the explicit uphill placement control before editing.\n\nEnter site coordinates in decimal degrees, for example latitude 43.56, longitude 1.48. Southern latitudes and western longitudes are negative. Solar azimuth is clockwise from true north. Study dates include the complete end day."),
             ("Weather, imports and calculation", "4. Edit your inputs, then click Update results. Edits never start calculations. Yellow means an update is needed or running, red means attention is needed, and green means complete results match the current inputs. Export is available only when green. Irradiance data determines the output intervals: hourly inputs stay hourly and 15-minute inputs stay 15-minute. The current NASA POWER and Open-Meteo endpoints supply hourly means. Solar integration samples improve geometry within each interval; they do not create finer weather data.\n\nImport XLSX/CSV uses a header followed by timestamp, BHI and DHI (W/m²). Native exported workbooks carry their own interval IDs, bounds and conventions. For a three-column file, set the interval duration in minutes and choose start, end or center labels. Local Excel dates and DD.MM.YYYY HH:mm use the selected time zone; ambiguous daylight-saving times need an explicit offset. Download template saves an editable example. Upload weather file opens your XLSX or CSV. Its intervals set the study period, including partial days. Gaps are reported.\n\n5. Tune the panel. Both graph curves are irradiance ON THE PANEL, using Hay–Davies or the isotropic option in Weather data. Circumsolar diffuse follows the 0.25° solar disk. Unseen sky is conservatively blocked; fitted calibration coverage is provisional."),
             ("Data exports", "Choose the Excel columns to export and a destination folder. Every row includes the source timestamp and its UTC offset. Choose source interval start and end to compare providers by the same physical hour. The default columns are direct and diffuse panel irradiance, the two shading factors and the final shaded total. A factor is blank when its unshaded component is zero. For weather diagnostics select Source GHI, Direct horizontal or Diffuse horizontal. Source GHI is available when the weather input saved the original global horizontal readings. The Weather source sheet identifies the source and explains the timestamp convention. The workbook and its receipt are saved in a new scenario folder after a complete shaded update. Cancel closes the window without writing files. The full diagnostic snapshot includes Summary.pdf and SunPathReport.pdf."),
@@ -1452,7 +1522,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         try
         {
             var (count, bytes) = AcceptedResultVault.StorageUsage();
-            string message = $"{count} saved studies use {bytes / 1048576.0:F1} MB. They let the app restore earlier photo, mask and study results without recalculating.\n\nClear saved studies now? The current result and saved masks remain available.";
+            string message = $"{count} saved studies use {bytes / 1048576.0:F1} MB. They let the app reuse earlier results for the active photo.\n\nClear saved studies now? The current result and saved masks remain available.";
             if (MessageBox.Show(owner, message, "Saved studies", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
             int removed = AcceptedResultVault.ClearKnown();
             MessageBox.Show(owner, $"Removed {removed} saved studies. Your current result and edited masks are unchanged.", "Saved studies");

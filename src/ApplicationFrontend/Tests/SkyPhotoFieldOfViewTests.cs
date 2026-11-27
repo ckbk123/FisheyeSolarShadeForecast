@@ -157,6 +157,9 @@ public sealed class SkyPhotoFieldOfViewTests
         var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
         try
         {
+            await window.Irradiance.EdgePreviewReady;
+            Assert.NotNull(AppServices.LoadCachedAiMask(fixture.Settings));
+            Assert.StartsWith("Edge ·", window.Irradiance.FieldOfViewTextForTest);
             window.Irradiance.SelectSkyPhotoForTest(sameSize); await window.InputsSettled;
             Assert.Equal("Open Refine edge to preview the limit.", window.Irradiance.FieldOfViewTextForTest);
             Assert.Contains("140° full", window.Irradiance.FieldOfViewHelpForTest);
@@ -164,7 +167,8 @@ public sealed class SkyPhotoFieldOfViewTests
             Assert.Equal("FOV unavailable", window.Irradiance.FieldOfViewTextForTest);
             window.Irradiance.SelectSkyPhotoForTest(fixture.Settings.SkyImage); await window.InputsSettled;
             await window.Irradiance.EdgePreviewReady;
-            Assert.StartsWith("Edge ·", window.Irradiance.FieldOfViewTextForTest);
+            Assert.Null(AppServices.LoadCachedAiMask(fixture.Settings));
+            Assert.Equal("Open Refine edge to preview the limit.", window.Irradiance.FieldOfViewTextForTest);
             Assert.Contains("140° full", window.Irradiance.FieldOfViewHelpForTest);
             Assert.Null(window.Completed); Assert.False(Directory.Exists(Path.Combine(AppData.Root, "models-v1")));
         }

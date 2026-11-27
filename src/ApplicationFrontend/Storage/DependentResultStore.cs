@@ -5,6 +5,7 @@ namespace SolarShade.Desktop;
 public sealed class DependentResultStore
 {
     private const string Owner = "SolarShade.DependentResult.v1";
+    private const string PublishingManifest = ".module-publishing.json";
     private readonly DebugDataStore store;
     private readonly Action<IrradianceSnapshot, Action> withSource;
     private readonly object operation = new();
@@ -21,7 +22,7 @@ public sealed class DependentResultStore
         if (!System.Text.RegularExpressions.Regex.IsMatch(folder, "^[0-9]{2}-[a-z][a-z0-9-]*$") ||
             DebugDataRun.AllStages.Contains(folder)) throw new ArgumentException("A separate optional result folder is required.");
         if (required.Length == 0 || required.Distinct(StringComparer.OrdinalIgnoreCase).Count() != required.Length ||
-            required.Any(f => Path.GetFileName(f) != f || f is "module.json" or ".owner" || string.IsNullOrWhiteSpace(f)))
+            required.Any(f => Path.GetFileName(f) != f || f is "module.json" or PublishingManifest or ".owner" || string.IsNullOrWhiteSpace(f)))
             throw new ArgumentException("Unique simple artifact filenames required.");
         this.store = store; this.withSource = withSource; this.software = software; this.required = required.ToArray();
         DirectoryPath = Path.Combine(store.Root, folder);
@@ -61,8 +62,19 @@ public sealed class DependentResultStore
                 withSource(source, () =>
                 {
                     ct.ThrowIfCancellationRequested();
-                    if (Directory.Exists(DirectoryPath)) RemoveOwned(DirectoryPath);
-                    Directory.Move(Staging, DirectoryPath);
+                    if (Directory.Exists(DirectoryPath)) RemovePublication(DirectoryPath, required);
+                    if (!Directory.Exists(DirectoryPath)) Directory.Move(Staging, DirectoryPath);
+                    else
+                    {
+                        // Keep other files in place. Persist the source before moving any output so a partial publish can be retired.
+                        if (required.Append("module.json").Any(name => Path.Exists(Path.Combine(DirectoryPath, name))))
+                            throw new IOException("An existing file is using an optional-result filename.");
+                        string publishing = Path.Combine(DirectoryPath, PublishingManifest);
+                        File.Move(Path.Combine(Staging, "module.json"), publishing);
+                        foreach (string name in required)
+                            File.Move(Path.Combine(Staging, name), Path.Combine(DirectoryPath, name));
+                        File.Move(publishing, Path.Combine(DirectoryPath, "module.json"));
+                    }
                 });
             }
             finally { lock (store.Gate) { if (Directory.Exists(Staging)) RemoveOwned(Staging); } }
@@ -98,9 +110,49 @@ public sealed class DependentResultStore
         lock (store.Gate)
         {
             store.Check();
-            if (Directory.Exists(DirectoryPath)) RemoveOwned(DirectoryPath);
+            if (Directory.Exists(DirectoryPath)) RemovePublication(DirectoryPath, required);
         }
     }
+
+    internal static void DiscardPhotoPublication(DebugDataStore store, string sourceId)
+    {
+        string path = Path.Combine(store.Root, "07-battery");
+        if (Directory.Exists(path))
+            RemovePublication(path, ["battery-hourly.csv", "battery-hourly.xlsx", "battery-result.json"], sourceId);
+    }
+
+    private static void RemovePublication(string path, string[] files, string? sourceId = null)
+    {
+        DebugDataStore.SafePath(path);
+        if (!Directory.EnumerateFileSystemEntries(path).Any())
+        { if (sourceId == null) RemoveOwned(path); return; }
+        string marker = Path.Combine(path, ".owner");
+        DebugDataStore.SafePath(marker);
+        if (!File.Exists(marker) || File.ReadAllText(marker) != Owner)
+        {
+            if (sourceId != null) return;
+            throw new IOException("Unrecognized optional-result folder; it was preserved: " + path);
+        }
+        string manifestPath = Path.Combine(path, "module.json");
+        if (!File.Exists(manifestPath)) manifestPath = Path.Combine(path, PublishingManifest);
+        var manifest = PhotoStorageCleanup.Read<Manifest>(manifestPath);
+        if (manifest?.Owner != Owner || sourceId != null && sourceId != manifest.SourceId) return;
+        foreach (string name in files)
+        {
+            string file = Path.Combine(path, name);
+            DebugDataStore.SafePath(file);
+            if (File.Exists(file)) File.Delete(file);
+        }
+        File.Delete(manifestPath);
+        if (Directory.EnumerateFileSystemEntries(path).All(entry => entry == marker))
+        {
+            File.Delete(marker);
+            RemoveOwned(path);
+        }
+    }
+
+    internal void WithVerifiedPublication(IrradianceSnapshot source, string settingsKey, Action write) =>
+        withSource(source, () => { Verify(source, settingsKey); write(); });
 
     public string Export(IrradianceSnapshot source, string settingsKey, string parent, CancellationToken ct = default)
     {

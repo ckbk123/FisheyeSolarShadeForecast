@@ -4,6 +4,8 @@ Windows desktop application and C# scientific libraries for estimating solar irr
 
 ## Current application — 27 November 2026
 
+**Preview 0.3.15** keeps one sky photo active. Choosing a different photo clears the previous photo’s generated masks, saved edits, and calculation results. To keep the selected mask, copy `Debug Data/02-sky-mask/sky-mask.png` after updating and before switching photos.
+
 **Preview 0.3.14** checks the source photograph when opening and saving a mask edit. If a photo is replaced under the same name, SolarShade clears the old preview and loads the replacement photo's mask when available. Each new calculation records the photo and mask checksums in Debug Data.
 
 **Preview 0.3.13** uses one field-of-view edge for each study. SolarShade proposes it from the mask using a fixed 95% black threshold. Open **Refine edge…** to adjust the circle up to 270° full FOV. The sky grid, sun path and shading use the saved edge. [See the illustrated example](docs/MASK_EDGE_EXPERIMENT.md).
@@ -22,7 +24,7 @@ Windows desktop application and C# scientific libraries for estimating solar irr
 
 Solar Irradiance and the offline **Orientation map** use one **top heading** for each device, from flat through vertical. Map controls change only the illustration. Hover over a field or focus it and press **F1** for its explanation. **Help** opens the full guide in a separate window.
 
-Solar Irradiance estimates shading from a chosen sky photo. You can import a prepared binary mask, paint and select saved mask variants, and export the results with your choice of panel, shading and source weather columns in Excel. Full scientific diagnostics are in Debug Data. Returning to a saved photo, mask and input combination restores its verified result. Phone and panel inputs measure top heading clockwise from true north and tilt from horizontal. The lens and panel-front azimuth readouts use geographic south as zero. PV Autonomy evaluates a repeating daily load against the accepted shaded result and exports CSV, JSON and XLSX files. See [application usage](src/ApplicationFrontend/RUNNING.md), [architecture](docs/APPLICATION_ARCHITECTURE.md), the [mask-editor plan](docs/MASK_EDITOR_IMPLEMENTATION_PLAN.md), and the [Preview 0.1.1 source and export review](docs/SOURCE_AND_EXPORT_REVIEW_2026-10-04.md).
+Solar Irradiance estimates shading from a chosen sky photo. You can import a prepared binary mask, paint and select saved mask variants, and export the results with your choice of panel, shading and source weather columns in Excel. Full scientific diagnostics are in Debug Data. While the same photo is active, returning to a saved mask and input combination restores its verified result. Phone and panel inputs measure top heading clockwise from true north and tilt from horizontal. The lens and panel-front azimuth readouts use geographic south as zero. PV Autonomy evaluates a repeating daily load against the accepted shaded result and exports CSV, JSON and XLSX files. See [application usage](src/ApplicationFrontend/RUNNING.md), [architecture](docs/APPLICATION_ARCHITECTURE.md), the [mask-editor plan](docs/MASK_EDITOR_IMPLEMENTATION_PLAN.md), and the [Preview 0.1.1 source and export review](docs/SOURCE_AND_EXPORT_REVIEW_2026-10-04.md).
 
 The tag `baseline-2026-09-27` preserves the earlier application before these changes. The four manual-update/export milestones and their 395-test result are historical; see [milestone progress](docs/IMPLEMENTATION_PROGRESS.md).
 

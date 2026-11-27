@@ -37,6 +37,7 @@ public sealed class PvWorkspaceController : IDisposable
     }
     private void SourceChanged(object? sender, EventArgs e)
     {
+        if (source.Completed == null) { Result = null; acceptedSource = null; acceptedKey = null; }
         Invalidate(source.Source.IsReady ? "Irradiance is ready. Evaluate system." : source.Source.Reason);
         Notify(); _ = TryRestoreAsync();
     }

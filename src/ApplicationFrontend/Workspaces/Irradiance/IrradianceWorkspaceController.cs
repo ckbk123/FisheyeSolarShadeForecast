@@ -25,6 +25,12 @@ public sealed class IrradianceWorkspaceController : IDisposable
     public event EventHandler? SourceChanged;
     private bool disposed;
     public IrradianceWorkspaceController(IIrradianceService service) => Service = service;
+    internal void DiscardPhotoResult()
+    {
+        Completed = null;
+        Source = new(null, "Update Solar Irradiance for the selected sky photo.");
+        SourceChanged?.Invoke(this, EventArgs.Empty);
+    }
     public void RefreshSource()
     {
         if (disposed || Verifying && State == UpdateState.UpToDate || Revalidating && Updating && State is UpdateState.Updating or UpdateState.UpToDate) return;

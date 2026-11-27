@@ -82,23 +82,35 @@ public sealed class CurrentStoreTests
         using (var service = new AppServices(fixture.Debug)) await Calculate(service, fixture.Settings);
         var before = Artifacts(fixture.Debug);
         string manifest = Path.Combine(fixture.Debug, "run.json");
-        var state = AppData.Read<DebugDataRun.Manifest>(manifest)!;
-        state.Status = "Running"; state.Invalidated |= InputDependencies.PanelChain;
-        state.PendingGroups["05-transposition"] = ArtifactGroup.Transposition;
-        state.Stages["05-transposition"] = state.Stages["05-transposition"] with { Status = "Running" };
-        AppData.Write(manifest, state);
-        File.WriteAllText(Path.Combine(fixture.Debug, "05-transposition", "partial.xlsx"), "interrupted write");
-        string staging = fixture.Debug + ".staging"; Directory.CreateDirectory(staging);
-        File.WriteAllText(Path.Combine(staging, ".solarshade-staging"), "SolarShade current dataset staging v1");
-        File.WriteAllText(Path.Combine(staging, "incomplete.tmp"), "partial");
+        var changed = fixture.Settings with { PanelTilt = fixture.Settings.PanelTilt + 1 };
+        string directory = Path.Combine(fixture.Debug, "05-transposition");
+        string partial = Path.Combine(directory, "partial.xlsx"), note = Path.Combine(directory, "field-notes.xlsx");
+        File.WriteAllText(note, "observer's workbook");
+        using (var store = new DebugDataStore(fixture.Debug))
+        {
+            var run = new DebugDataRun(store, changed);
+            string staging = run.BeginStage("05-transposition", "Computed", typeof(CurrentStoreTests));
+            string first = Path.Combine(staging, "partial.xlsx"), second = Path.Combine(staging, "remaining.xlsx");
+            File.WriteAllText(first, "exported workbook"); File.WriteAllText(second, "next workbook");
+            using (File.Create(Path.Combine(directory, "remaining.xlsx")))
+            {
+                var error = Record.Exception(() => run.CompleteStage("05-transposition", [first, second]));
+                Assert.True(error is IOException or UnauthorizedAccessException, error?.Message ?? "The locked workbook was replaced.");
+            }
+            var interrupted = AppData.Read<DebugDataRun.Manifest>(manifest)!;
+            Assert.Equal("Running", interrupted.Status);
+            Assert.Equal(AppData.FileKey(partial), interrupted.ArtifactHashes["05-transposition/partial.xlsx"]);
+            Assert.True(File.Exists(second));
+        }
         using var restarted = new AppServices(fixture.Debug);
-        restarted.PrepareInputs(fixture.Settings);
+        restarted.PrepareInputs(changed);
         Assert.Equal("Interrupted", AppData.Read<DebugDataRun.Manifest>(manifest)!.Status);
-        Assert.False(Directory.Exists(staging));
-        Assert.Empty(Directory.GetFiles(Path.Combine(fixture.Debug, "05-transposition")));
+        Assert.False(Directory.Exists(fixture.Debug + ".staging"));
+        Assert.Equal(note, Assert.Single(Directory.GetFiles(directory)));
         AssertPreserved(fixture.Debug, before, InputDependencies.PanelChain);
-        Assert.True(restarted.IsCurrent(await Calculate(restarted, fixture.Settings)));
-        Assert.False(File.Exists(Path.Combine(fixture.Debug, "05-transposition", "partial.xlsx")));
+        Assert.True(restarted.IsCurrent(await Calculate(restarted, changed)));
+        Assert.False(File.Exists(partial));
+        Assert.Equal("observer's workbook", File.ReadAllText(note));
     }
     [Fact]
     public async Task StopDuringSunPathPublicationPreservesNumericalSolarData()

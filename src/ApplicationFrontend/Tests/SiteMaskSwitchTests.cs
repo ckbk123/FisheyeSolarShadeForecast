@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using OpenCvSharp;
+using SolarShade.Camera;
 using SolarShade.Desktop;
 using SolarShade.MaskEditor;
 using SolarShade.Shading;
@@ -16,6 +17,93 @@ using static ManualUpdateTests;
 [Collection("Manual update UI")]
 public sealed class SiteMaskSwitchTests
 {
+    [Fact]
+    public void RetryingAnEarlierPhotoChangePreservesTheCurrentSitesReusableShading()
+    {
+        using var fixture = new Fixture();
+        var current = fixture.Settings;
+        using var run = new DebugDataRun(current, "calculation", fixture.Debug);
+        var inputs = InputDependencies.Capture(current);
+        run.RecordInput("sky-mask", new { PhotoSha256 = inputs.Image.Content });
+        var values = new CurrentValueCache(fixture.Debug);
+        values.Write("shading", "current", "shading for the current photo");
+        var previous = new SourceIdentity(current.SkyImage, new string('B', 64));
+        run.DiscardPhotoArtifacts(previous, current, inputs);
+        Assert.Equal("shading for the current photo", values.Read<string>("shading", "current"));
+    }
+
+    [Fact]
+    public void ChangingTheSkyPhotoKeepsAnIndependentCheckerboardCalibration()
+    {
+        using var fixture = new Fixture();
+        var first = fixture.Settings;
+        string secondPhoto = Path.Combine(fixture.Root, "replacement.png");
+        using (var image = new Mat(303, 201, MatType.CV_8UC3, Scalar.Blue)) Cv2.ImWrite(secondPhoto, image);
+        var next = first with { SkyImage = secondPhoto };
+        using var run = new DebugDataRun(first, "calibration", fixture.Debug);
+        string stage = run.BeginStage("01-calibration", "Checkerboard fit", typeof(CameraProfileFiles));
+        string published = Path.Combine(stage, "camera-profile.json");
+        File.Copy(first.ProfilePath, published);
+        run.CompleteStage("01-calibration", [published]); run.Complete();
+        var inputs = InputDependencies.Capture(next);
+        run.DiscardPhotoArtifacts(InputDependencies.Capture(first).Image, next, inputs);
+        Assert.False(run.Differences(inputs).HasFlag(ArtifactGroup.Profile));
+        string profile = Path.Combine(fixture.Debug, "01-calibration", "camera-profile.json");
+        Assert.Equal(AppData.FileKey(first.ProfilePath), AppData.FileKey(profile));
+    }
+
+    [Fact]
+    public void SwitchingPhotosWhileShadingRejectsLateResultsAndPublishesOnlyTheNewMask() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        using var release = new ManualResetEventSlim();
+        int shadeCalls = 0;
+        using var service = new AppServices(fixture.Debug, (input, scene, ct) =>
+        {
+            if (Interlocked.Increment(ref shadeCalls) == 1)
+            {
+                if (!release.Wait(TimeSpan.FromSeconds(15))) throw new TimeoutException("Site A shading was not released.");
+                // Let native work return a result even after cancellation.
+                return ShadingCorrectionModule.ApplyToPanel(input, scene, CancellationToken.None);
+            }
+            return ShadingCorrectionModule.ApplyToPanel(input, scene, ct);
+        });
+        var window = new MainWindow(applicationServices: service, loadExampleOnFirstRun: false);
+        try
+        {
+            string source = Path.Combine(fixture.Root, "input-mask.png"), photoB = Path.Combine(fixture.Root, "b.png");
+            using (var black = new Mat(303, 201, MatType.CV_8UC1, Scalar.Black)) Cv2.ImWrite(source, black);
+            using (var image = new Mat(303, 201, MatType.CV_8UC3, Scalar.Green)) Cv2.ImWrite(photoB, image);
+            window.Show();
+            var viewport = Descendants<MaskViewport>(window).Single();
+            var a = window.Irradiance.ImportMaskForTest(source, "Site A");
+            await window.InputsSettled;
+            window.Calculate(); await Until(() => Volatile.Read(ref shadeCalls) == 1);
+            window.Irradiance.SelectSkyPhotoForTest(photoB);
+            Assert.Null(window.Completed); Assert.False(viewport.HasImage);
+            Assert.False(window.ExportEnabledForTest);
+            Assert.Throws<InvalidOperationException>(() => window.Irradiance.ImportMaskForTest(source, "During switch"));
+            release.Set();
+            await window.InputsSettled; await Until(() => !window.UpdatingForTest);
+            string debugMask = Path.Combine(fixture.Debug, "02-sky-mask", "sky-mask.png");
+            Assert.Null(window.Completed); Assert.False(viewport.HasImage); Assert.False(File.Exists(debugMask));
+            Assert.False(window.ExportEnabledForTest); Assert.Empty(ManualMaskStore.List(a.PhotoSha256));
+
+            using (var white = new Mat(303, 201, MatType.CV_8UC1, Scalar.White)) Cv2.ImWrite(source, white);
+            var b = window.Irradiance.ImportMaskForTest(source, "Site B");
+            await window.InputsSettled;
+            window.Calculate(); await Until(() => !window.UpdatingForTest);
+            Assert.Equal(2, shadeCalls); Assert.True(window.ExportEnabledForTest);
+            Assert.Equal(b.PhotoSha256, window.Completed!.Mask!.PhotoSha256);
+            Assert.Equal(b.Id, window.Completed.Mask.Variant!.Id);
+            Assert.Equal(b.PngSha256, AppData.FileKey(debugMask)); Assert.NotEqual(a.PngSha256, b.PngSha256);
+            var manifest = AppData.Read<DebugDataRun.Manifest>(Path.Combine(fixture.Debug, "run.json"))!;
+            Assert.Equal("Complete", manifest.Status);
+            Assert.Equal(b.PhotoSha256, manifest.Inputs["sky-mask"].GetProperty("PhotoSha256").GetString());
+        }
+        finally { release.Set(); window.Close(); await window.InputsSettled; }
+    });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -62,15 +150,47 @@ public sealed class SiteMaskSwitchTests
             string maskPath = Path.Combine(fixture.Debug, "02-sky-mask", "sky-mask.png");
             string manifestPath = Path.Combine(fixture.Debug, "run.json");
             Assert.Equal(edited.PngSha256, AppData.FileKey(maskPath));
+            var firstRun = window.Completed!;
+            string external = AppServices.Export(firstRun, Path.Combine(fixture.Root, "saved-export"));
+            string exportedMask = Path.Combine(external, "02-sky-mask", "sky-mask.png");
+            string existingUserFile = Path.Combine(fixture.Debug, "02-sky-mask", "field-note.txt");
+            File.WriteAllText(existingUserFile, "Keep this site note.");
+            string weatherOutput = Path.Combine(fixture.Debug, "03-irradiance", "horizontal-irradiance.xlsx");
+            Assert.True(File.Exists(weatherOutput));
+            string[] keep = [first.SkyImage, first.ProfilePath, first.ImportPath, blocked, exportedMask, existingUserFile];
+            var originalHashes = keep.ToDictionary(path => path, AppData.FileKey);
+            var pv = window.PvAutonomy.Controller;
+            pv.SetDraft(PvSettingsDraft.Example()); await pv.EvaluateAsync();
+            Assert.True(pv.IsCurrent, pv.Status);
+            string savedBattery = Path.Combine(fixture.Debug, "07-battery", "battery-result.json");
+            Assert.True(File.Exists(savedBattery));
+            string pvNote = Path.Combine(fixture.Debug, "07-battery", "observations.txt");
+            File.WriteAllText(pvNote, "Preserve alongside PV outputs.");
 
             window.Irradiance.SelectSkyPhotoForTest(secondPhoto);
             Assert.Equal(secondPhoto, PortablePaths.Resolve(window.IrradianceController.Settings.SkyImage));
             Assert.Null(window.IrradianceController.Settings.SelectedMaskId);
+            Assert.Null(window.Completed); Assert.Null(pv.Result); Assert.False(pv.CanExport);
             Assert.False(viewport.HasImage);
             Assert.False(editorButton.IsEnabled);
-            await window.InputsSettled;
-            Assert.Equal("Stale", AppData.Read<DebugDataRun.Manifest>(manifestPath)!.Status);
+            await window.InputsSettled; await pv.CleanupSettled;
+            var pending = AppData.Read<DebugDataRun.Manifest>(manifestPath)!;
+            Assert.Equal("Stale", pending.Status);
+            Assert.Equal(secondPhoto, PortablePaths.Resolve(pending.Settings.SkyImage));
+            Assert.Null(pending.MaskEdge); Assert.False(pending.Inputs.ContainsKey("sky-mask"));
+            Assert.Null(pending.LastSuccessfulUpdateUtc);
+            Assert.Empty(pending.ArtifactHashes); Assert.Empty(pending.Inputs);
+            Assert.All(pending.Stages.Values, stage => Assert.Empty(stage.Artifacts));
+            Assert.False(File.Exists(weatherOutput));
             Assert.False(File.Exists(maskPath));
+            Assert.False(File.Exists(savedBattery));
+            Assert.Equal("Preserve alongside PV outputs.", File.ReadAllText(pvNote));
+            Assert.Empty(ManualMaskStore.List(imported.PhotoSha256));
+            var currentCache = new CurrentValueCache(fixture.Debug);
+            foreach (string stage in new[] { "cardinals", "sun-path", "shading" })
+                Assert.False(File.Exists(currentCache.PathFor(stage)));
+            Assert.True(File.Exists(currentCache.PathFor("solar")));
+            foreach (var (path, hash) in originalHashes) Assert.Equal(hash, AppData.FileKey(path));
 
             // Supply a known AI-stage output for this exact photo so model changes cannot affect this routing test.
             string key = AppData.Key(new { Image = AppData.FileKey(secondPhoto), first.Model, first.Resolution, first.CenteredDisk,
@@ -100,6 +220,9 @@ public sealed class SiteMaskSwitchTests
             Assert.Equal(AppData.FileKey(maskPath), run.ArtifactHashes["02-sky-mask/sky-mask.png"]);
             Assert.Equal(expectedPng, File.ReadAllBytes(maskPath));
             Assert.Equal(expectedPng, window.Completed!.Mask!.Png);
+            await pv.EvaluateAsync();
+            Assert.True(pv.IsCurrent, pv.Status); Assert.True(File.Exists(savedBattery));
+            Assert.Equal("Preserve alongside PV outputs.", File.ReadAllText(pvNote));
             var preview = ((Grid)viewport.Layers.Child).Children.OfType<Image>().First();
             Assert.Equal(expectedPixels, GrayPixels((BitmapSource)preview.Source));
 

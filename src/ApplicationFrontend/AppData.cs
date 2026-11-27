@@ -29,6 +29,8 @@ public sealed partial record UserSettings
     public FailedCalibrationAttempt? LastCalibrationFailure { get; set; }
     public string SkyFolder { get; set; } = "";
     public string SkyImage { get; set; } = "";
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public SourceIdentity? ActiveSkyPhoto { get; set; }
     public string ProfilePath { get; set; } = "";
     public string ImportPath { get; set; } = "";
     // Null keeps legacy settings: an import path selects imports; otherwise use services.
