@@ -2,7 +2,9 @@
 
 Windows desktop application and C# scientific libraries for estimating solar irradiance and fisheye-image shading. The authoritative repository is [ckbk123/FisheyeSolarShadeForecast](https://github.com/ckbk123/FisheyeSolarShadeForecast).
 
-## Current application — 25 November 2026
+## Current application — 27 November 2026
+
+**Preview 0.3.14** checks the source photograph when opening and saving a mask edit. If a photo is replaced under the same name, SolarShade clears the old preview and loads the replacement photo's mask when available. Each new calculation records the photo and mask checksums in Debug Data.
 
 **Preview 0.3.13** uses one field-of-view edge for each study. SolarShade proposes it from the mask using a fixed 95% black threshold. Open **Refine edge…** to adjust the circle up to 270° full FOV. The sky grid, sun path and shading use the saved edge. [See the illustrated example](docs/MASK_EDGE_EXPERIMENT.md).
 

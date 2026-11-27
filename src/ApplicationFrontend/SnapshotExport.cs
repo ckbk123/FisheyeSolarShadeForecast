@@ -76,12 +76,14 @@ internal static class SnapshotExport
         internal readonly List<FileStream> Handles = [];
         public void Dispose() { foreach (var handle in Handles) handle.Dispose(); }
     }
-    internal static IDisposable LockInputs(UserSettings settings)
+    internal static IDisposable LockInputs(UserSettings settings) => LockInputs(InputDependencies.Capture(settings));
+
+    internal static IDisposable LockInputs(InputDependencies inputs)
     {
         var result = new InputLocks();
         try
         {
-            foreach (string path in InputDependencies.Capture(settings).SourcePaths.Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (string path in inputs.SourcePaths.Distinct(StringComparer.OrdinalIgnoreCase))
             { DebugDataStore.SafePath(path); result.Handles.Add(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)); }
             return result;
         }
