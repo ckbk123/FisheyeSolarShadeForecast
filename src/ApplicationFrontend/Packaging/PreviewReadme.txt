@@ -1,4 +1,4 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.15
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.16
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
@@ -9,10 +9,13 @@ Hover over a study control for guidance, or focus it and press F1. Escape closes
 keyboard help. Open Help for the full guide while working on your study.
 
 In Orientation map, Apply angles to Solar Irradiance copies the four numbered
-phone and panel angles in degrees. The illustrated sun stays in the map. The map works offline with Microsoft Edge
-WebView2 or through the tab's option to open it locally in a browser.
+phone and panel angles in degrees. The example sun stays in the map. The map
+runs offline using Microsoft Edge WebView2. A standalone browser can also display it.
 
-1. Open Solar Irradiance. Load the example or select your study inputs.
+1. Load the example, or open Images & calibration to prepare your own sky photo.
+   Calibrate with checkerboards or load camera-profile.json from the same camera,
+   lens and oriented image geometry. Choose a sky photo, then Generate mask.
+   Solar Irradiance shows the same mask. Set the panel and phone angles there.
    Set each top heading clockwise from true north as if the device lay flat.
    The phone top is its lens end. Raise the marked top edge to set the tilt.
    You can also turn either top while flat. Copy panel pose to phone aligns
@@ -31,7 +34,7 @@ WebView2 or through the tab's option to open it locally in a browser.
    Show sky grid marks the lens center, 30-degree rings and dotted compass lines.
    Zoom either preview to inspect the sky grid or the mask and its sun path.
    The green circle shows the study edge. To adjust it, choose Refine edge,
-   move the slider or enter the full FOV (up to 270 degrees), then Save edge.
+   move the slider or enter the full FOV (up to 270 degrees), then Use edge for shading.
    Update results uses that edge for shading and the sun path.
    A CALIBRATION FAILED stamp on the sky photo means the checkerboard run
    failed. Open Review checkerboard photos for the cause. PROFILE UNUSABLE
