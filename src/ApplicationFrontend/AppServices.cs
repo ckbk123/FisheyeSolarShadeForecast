@@ -159,7 +159,7 @@ public sealed class AppServices : IIrradianceService
     {
         lock (inputGate)
         {
-            if (activeRun != null || evaluationGate.CurrentCount == 0 || WeatherSourceSelection.Problem(settings) != null) return null;
+            if (settings.NoMaskSelected || activeRun != null || evaluationGate.CurrentCount == 0 || WeatherSourceSelection.Problem(settings) != null) return null;
             var restored = AcceptedResultVault.Restore(Storage, settings);
             if (restored == null) return null;
             var result = restored.Value.Evaluation;
@@ -225,7 +225,7 @@ public sealed class AppServices : IIrradianceService
     public Task<Evaluation> Evaluate(UserSettings s, bool refresh, Action<string> progress,
         Action<MaskAsset>? onMask, CancellationToken ct, Action<SunPathOverlayResult?>? onSunPath = null, Action<CardinalDirectionOverlayResult?>? onCardinals = null)
     {
-        var snapshot = s with { };
+        var snapshot = s with { NoMaskSelected = false };
         var elapsed = Stopwatch.StartNew();
         return Task.Run(async () =>
         {
@@ -496,9 +496,11 @@ public sealed class AppServices : IIrradianceService
                 {
                     var files = SkyMaskExporter.Export(activeMask.Result, directory, maskOrigin, ct).ToList();
                     string pixelConvention = "255 = open sky; 0 = obstruction or outside lens; no automatic inversion";
-                    if (activeMask.Variant?.Source == "Edited")
+                    if (activeMask.Variant != null)
                     {
-                        pixelConvention = "255 = open sky; 0 = obstruction. Edits cover the full oriented image. Projection is limited by the active angular range, lens disk and image. In an AI-derived extension, only the nearest classified pixel is observed. Inside calibration the mask is sampled bilinearly.";
+                        pixelConvention = activeMask.Variant.Source == "Imported"
+                            ? "255 = open sky; 0 = obstruction. Imported mask pixels cover the full oriented image. Projection uses the study field of view."
+                            : "255 = open sky; 0 = obstruction. Edits cover the full oriented image. Projection is limited by the active angular range, lens disk and image. In an AI-derived extension, only the nearest classified pixel is observed. Inside calibration the mask is sampled bilinearly.";
                         string detailsPath = Path.Combine(directory, "mask-details.json");
                         var details = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(detailsPath))!.AsObject();
                         details["PixelConvention"] = pixelConvention;
@@ -672,6 +674,47 @@ public sealed class AppServices : IIrradianceService
                 else Values.DiscardPhotoResults();
                 currentInputs = inputs; accepted = null; mask = null; maskKey = null;
                 profile = null; profileEdge = null; scene = null; cardinals = null; sunPath = null; resultCache = null;
+            }
+        }
+        finally { ReleaseOperation(); }
+    });
+
+    public Task RemoveMaskAsync(UserSettings selection, string photoSha256) => Task.Run(async () =>
+    {
+        await evaluationGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            lock (inputGate)
+            {
+                string photo = PortablePaths.Resolve(selection.SkyImage);
+                using var source = File.OpenRead(photo);
+                VerifyMaskPhoto(source, photoSha256);
+                var empty = selection with { SelectedMaskId = null, NoMaskSelected = true };
+                empty.LastMaskByPhoto = new(selection.LastMaskByPhoto);
+                empty.LastMaskByPhoto.Remove(photoSha256);
+                var inputs = InputDependencies.Capture(empty);
+                var cleanup = new PhotoStorageCleanup(new(photo, photoSha256), inputs.SourcePaths);
+                var libraries = new HashSet<string> { AppData.LibraryVersion(typeof(SkyPhotoMasker)) };
+                var discardArchives = AcceptedResultVault.PreparePhotoRemoval(cleanup, libraries, selection);
+                // Invalidate live output before touching the recoverable source or its saved variants.
+                ObserveInputs(empty);
+                Values.DiscardPhotoResults();
+                accepted = null; mask = null; maskKey = null; resultCache = null;
+                scene = null; profile = null; profileEdge = null; cardinals = null; sunPath = null;
+                discardArchives();
+                // If the application closes during file cleanup, the next session must start empty.
+                AppData.SaveSettings(empty);
+                if (selection.SelectedMaskId is { } id)
+                    ManualMaskStore.RemoveVariant(cleanup, id);
+                else
+                {
+                    string key = AiMaskKey(selection, photoSha256);
+                    string folder = AppData.PathFor(Path.Combine("mask-stages", key));
+                    cleanup.RemoveFile(folder, "sky-mask.png");
+                    cleanup.RemoveFile(folder, "mask-details.json");
+                    cleanup.RemoveFile(folder, "photo-source.json");
+                    PhotoStorageCleanup.RemoveIfEmpty(folder);
+                }
             }
         }
         finally { ReleaseOperation(); }

@@ -266,8 +266,12 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         previewInfo.Children.Add(sunPathInfo); previewInfo.Children.Add(cardinalInfo);
         System.Windows.Automation.AutomationProperties.SetAutomationId(fieldOfViewInfo, "SkyPhotoFieldOfView");
         var maskPicker = new StackPanel(); maskPicker.Children.Add(Label("Mask for calculation", 11)); maskPicker.Children.Add(maskChoice);
-        maskPicker.Children.Add(importMask);
-        importMask.HorizontalAlignment = HorizontalAlignment.Left;
+        var maskActions = new WrapPanel();
+        maskActions.Children.Add(importMask); maskActions.Children.Add(removeMask);
+        maskPicker.Children.Add(maskActions);
+        removeMask.Click += async (_, _) => await RemoveSelectedMask();
+        AutomationProperties.SetAutomationId(removeMask, "RemoveSelectedMask");
+        StudioTheme.Help(removeMask, "Remove this mask from the current photo. Update results can generate an AI mask again.");
         AutomationProperties.SetName(maskChoice, "Mask for calculation");
         maskChoice.SelectionChanged += (_, _) => SelectMaskChoice(); previewInfo.Children.Add(maskPicker);
         Grid.SetRow(previewInfo, 2); preview.Children.Add(previewInfo);
@@ -482,6 +486,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private void RestorePhotoMaskSelection()
     {
         settings.SelectedMaskId = null;
+        if (settings.NoMaskSelected) return;
         if (string.IsNullOrEmpty(settings.SkyImage) || !File.Exists(PortablePaths.Resolve(settings.SkyImage))) return;
         string hash = ManualMaskStore.PhotoHash(settings.SkyImage);
         if (settings.LastMaskByPhoto.TryGetValue(hash, out string? id))
@@ -520,7 +525,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if (settings.SelectedMaskId != null && choices.All(c => c.Id != settings.SelectedMaskId))
             choices.Add(new(settings.SelectedMaskId, "Selected edited mask is missing or invalid"));
         bool previous = loading; loading = true;
-        try { maskChoice.ItemsSource = choices; maskChoice.SelectedItem = choices.First(c => c.Id == settings.SelectedMaskId); }
+        try { maskChoice.ItemsSource = choices; maskChoice.SelectedItem = settings.NoMaskSelected ? null : choices.First(c => c.Id == settings.SelectedMaskId); }
         finally { loading = previous; }
         SetMaskOptions((maskChoice.SelectedItem as MaskChoice)?.Imported == true);
     }
@@ -534,7 +539,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void SelectMaskChoice()
     {
-        if (loading || maskChoice.SelectedItem is not MaskChoice choice || choice.Id == settings.SelectedMaskId) return;
+        if (loading || maskChoice.SelectedItem is not MaskChoice choice || (!settings.NoMaskSelected && choice.Id == settings.SelectedMaskId)) return;
         try
         {
             if (choice.Id != null)
@@ -543,7 +548,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
                 if (!ManualMaskStore.IsCompatible(selected, settings))
                     throw new InvalidOperationException("Use this mask's original AI model, resolution and disk setting before selecting it.");
             }
-            settings.SelectedMaskId = choice.Id;
+            settings.NoMaskSelected = false; settings.SelectedMaskId = choice.Id;
             if (!string.IsNullOrEmpty(settings.SkyImage) && File.Exists(PortablePaths.Resolve(settings.SkyImage)))
             {
                 string hash = ManualMaskStore.PhotoHash(settings.SkyImage);
@@ -562,7 +567,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         {
             if (settings.SelectedMaskId == null)
             {
-                if (AppServices.LoadCachedAiMask(settings) is { } ai) ShowMask(ai);
+                if (!settings.NoMaskSelected && AppServices.LoadCachedAiMask(settings) is { } ai) ShowMask(ai);
                 else if (File.Exists(PortablePaths.Resolve(settings.SkyImage)))
                 {
                     using var unmaskedPhoto = ReadPhoto(settings.SkyImage, out string photoHash);
@@ -773,7 +778,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     private void WatchSources() => sourceWatch.SetFiles(InputDependencies.Capture(settings, uiInputs, false).SourcePaths);
     public void RecheckSources()
     {
-        if (closing || photoChanging || photoCleanupFailed) return;
+        if (closing || photoChanging || photoCleanupFailed || removingMask) return;
         if (updating || calibrating) { checkAfterUpdate = true; return; }
         if (!fullCheckQueued) QueueObservation(true, true);
     }
@@ -872,6 +877,8 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         choosePhoto.IsEnabled = !calibrating && !exporting;
         importMask.IsEnabled = CanImportForCurrentPhoto && !updating && !calibrating && !exporting && File.Exists(PortablePaths.Resolve(settings.SkyImage));
         generateMask.IsEnabled = importMask.IsEnabled && maskPreparation == null;
+        removeMask.IsEnabled = generateMask.IsEnabled && !settings.NoMaskSelected && !controller.DependentBusy &&
+            !controller.Verifying && (displayedAsset != null || settings.SelectedMaskId != null);
         savedStudies.IsEnabled = !updating && !calibrating && !exporting && !controller.DependentBusy && !controller.Verifying;
     }
     public void StopUpdate()
@@ -908,7 +915,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     { if (e.Category == UserPreferenceCategory.Locale) SystemTimeChanged(sender, e); }
     public async void Begin(bool refresh)
     {
-        if (photoChanging) return;
+        if (photoChanging || removingMask) return;
         if (closing || updating || calibrating || controller.DependentBusy) return;
         var replaced = ChangedPhoto(settings);
         if (photoCleanupFailed || replaced != null)
@@ -935,13 +942,14 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             await inputWork;
             if (closing || current != revision) return;
             ct.ThrowIfCancellationRequested();
-            snapshot = settings with { };
+            snapshot = settings with { NoMaskSelected = false };
             var result = await services.Evaluate(snapshot, refresh,
                 text => Dispatcher.InvokeAsync(() => { if (current == revision) status.Text = text; }),
-                asset => Dispatcher.InvokeAsync(() => { if (current == revision && imageRevision == orientationRevision && !closing) ShowMask(asset); }), ct,
+                asset => Dispatcher.InvokeAsync(() => { if (current == revision && imageRevision == orientationRevision && !closing) { AcceptGeneratedSelection(); ShowMask(asset); } }), ct,
                 path => Dispatcher.InvokeAsync(() => { if (current == revision && !closing) { ShowSunPath(path); sunPathPublishedEarly = path != null; } }),
                 overlay => Dispatcher.InvokeAsync(() => { if (current == revision && imageRevision == orientationRevision && !closing) ShowCardinals(overlay); }));
             if (current != revision || closing) return;
+            if (result.Mask != null) AcceptGeneratedSelection();
             PresentResult(result, restored: false);
         }
         catch (OperationCanceledException) { if (current == revision && !closing) SetUpdateState(UpdateState.Stopped, "Update stopped. Click Update results to retry."); }
@@ -988,8 +996,9 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void ShowMaskPending()
     {
-        maskInfo.Text = "Mask pending";
-        StudioTheme.Help(maskInfo, "Choose Generate mask to inspect the mask, or Update results to calculate irradiance.");
+        noMaskStamp.Visibility = settings.NoMaskSelected ? Visibility.Visible : Visibility.Collapsed;
+        maskInfo.Text = settings.NoMaskSelected ? "No mask selected" : "Mask pending";
+        StudioTheme.Help(maskInfo, settings.NoMaskSelected ? NoMaskHelp : "Choose Generate mask to inspect the mask, or Update results to calculate irradiance.");
     }
 
     internal async Task GenerateMask()
@@ -997,7 +1006,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         if (!generateMask.IsEnabled || maskPreparation != null || !CanImportForCurrentPhoto) return;
         using var request = new CancellationTokenSource();
         maskPreparation = request;
-        var study = settings with { };
+        var study = settings with { NoMaskSelected = false };
         generateMask.Content = "Generating mask…";
         RefreshButtons();
         try
@@ -1014,7 +1023,14 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             }
             if (settings.SkyImage == study.SkyImage && settings.SelectedMaskId == study.SelectedMaskId &&
                 settings.Model == study.Model && settings.Resolution == study.Resolution && settings.CenteredDisk == study.CenteredDisk)
+            {
+                if (settings.NoMaskSelected)
+                {
+                    AcceptGeneratedSelection();
+                    Changed(refreshSources: true);
+                }
                 ShowMask(asset);
+            }
         }
         catch (OperationCanceledException) when (request.IsCancellationRequested) { }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -1049,6 +1065,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
             displayedMaskPng = asset.Png;
             if (sunPathIsCurrent && completed?.SunPath != null) ShowSunPath(completed.SunPath);
         }
+        noMaskStamp.Visibility = Visibility.Collapsed;
         maskInfo.Text = "Mask ready";
         StudioTheme.Help(maskInfo, asset.Description);
         displayedAsset = asset; orientedPhotoWidth = asset.Result.Width; orientedPhotoHeight = asset.Result.Height;
@@ -1077,7 +1094,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         RefreshEdgeDisplay();
     }
 
-    private bool CanRefineEdge => !calibrating && currentFieldOfView.EffectiveCalibration != null && displayedPhoto != null;
+    private bool CanRefineEdge => !settings.NoMaskSelected && !removingMask && !calibrating && currentFieldOfView.EffectiveCalibration != null && displayedPhoto != null;
     private bool CanChangeMaskCoverage => !updating && !calibrating && !exporting && !controller.DependentBusy && !closing;
 
     private void PrepareEdgeProposal()
@@ -1269,7 +1286,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         }
         catch (Exception ex) { LoadFields(); detail.Text = ex.Message; }
     }
-    private bool CanImportForCurrentPhoto => !closing && !photoChanging && !photoCleanupFailed && !photoUnavailable;
+    private bool CanImportForCurrentPhoto => !removingMask && !closing && !photoChanging && !photoCleanupFailed && !photoUnavailable;
     private Task pendingMaskImport = Task.CompletedTask;
     private void PickMask()
     {
@@ -1316,7 +1333,7 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
     }
     private void SelectImportedMask(MaskVariant variant)
     {
-        settings.SelectedMaskId = variant.Id;
+        settings.NoMaskSelected = false; settings.SelectedMaskId = variant.Id;
         settings.LastMaskByPhoto = new(settings.LastMaskByPhoto) { [variant.PhotoSha256] = variant.Id };
         Changed(); RefreshMaskChoices(); ShowSelectedMaskPreview();
     }

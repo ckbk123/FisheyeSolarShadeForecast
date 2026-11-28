@@ -73,10 +73,23 @@ public static class SmokeTest
                             throw new InvalidOperationException("The first-use edge proposal requires a prepared mask and must not run the irradiance study.");
                     }
                     finally { dialog.Close(); }
+                    await window.InputsSettled;
+                    await window.Irradiance.RemoveSelectedMask();
+                    await window.InputsSettled;
+                    if (setupMask.HasImage || !window.IrradianceController.Settings.NoMaskSelected ||
+                        AppServices.LoadCachedAiMask(window.IrradianceController.Settings) != null)
+                        throw new InvalidOperationException("Removing the AI mask must clear its preview and cache.");
+                    var stamp = Find<Border>(window, element => System.Windows.Automation.AutomationProperties.GetAutomationId(element) == "NoMaskStamp");
+                    if (!stamp.IsVisible || stamp.ToolTip is not string help || !help.Contains("Update results"))
+                        throw new InvalidOperationException("An empty mask preview must explain how to recover.");
+                    Capture(window, Path.Combine(output, "no-mask.png"));
                 }
                 window.Calculate();
                 await Until(() => window.Completed != null, 120);
                 var first = window.Completed!; double firstMs = timer.Elapsed.TotalMilliseconds;
+                if (startsExample && (first.Mask == null || window.IrradianceController.Settings.NoMaskSelected ||
+                    AppServices.LoadCachedAiMask(first.Settings) == null))
+                    throw new InvalidOperationException("Update results must regenerate the removed AI mask.");
                 if (portable)
                 {
                     if (!Path.GetFullPath(AppData.Root).Equals(Path.Combine(AppContext.BaseDirectory, "Data"), StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Portable state escaped the package.");

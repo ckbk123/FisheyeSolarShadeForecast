@@ -89,6 +89,7 @@ public sealed partial record UserSettings
     public bool Isotropic { get; set; }
     public bool ShowSunPath { get; set; } = true;
     public bool ShowCardinalDirections { get; set; } = true;
+    public bool NoMaskSelected { get; set; }
     public string? SelectedMaskId { get; set; }
     public Dictionary<string, string> LastMaskByPhoto { get; set; } = new();
 }

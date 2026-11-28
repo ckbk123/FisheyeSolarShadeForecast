@@ -91,7 +91,7 @@ public sealed partial class IrradianceWorkspace
             next.SetRefinedEdge(null);
             next.LastMaskByPhoto = new(next.LastMaskByPhoto);
             next.LastMaskByPhoto.Remove(previous.Content);
-            next.SelectedMaskId = null;
+            next.SelectedMaskId = null; next.NoMaskSelected = false;
             // Writing the new source together with the outgoing identity makes an interrupted cleanup retryable.
             AppData.SaveSettings(next);
             settings = next;

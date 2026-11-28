@@ -58,6 +58,7 @@ public sealed class InputDependencies
         string? importedGeometry = variant?.IsImported == true ? AppData.Key(variant.BaseMask.Disk) : null;
         var keys = new Dictionary<ArtifactGroup, string>();
         keys[ArtifactGroup.Mask] = AppData.Key(new { Image, s.Model, s.Resolution, s.CenteredDisk, s.SelectedMaskId, EditedMask, EditedMetadata, MaskAncestor });
+        if (s.NoMaskSelected) keys[ArtifactGroup.Mask] = AppData.Key(new { Empty = true, Image });
         keys[ArtifactGroup.Profile] = AppData.Key(new { Profile, Image, s.CoverageAngle });
         if (s.ApparentFullFovDegrees.HasValue)
             keys[ArtifactGroup.Profile] = AppData.Key(new { Measured = keys[ArtifactGroup.Profile], s.ApparentFullFovDegrees });

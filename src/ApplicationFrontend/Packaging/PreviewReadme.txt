@@ -1,4 +1,4 @@
-SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.16
+SOLARSHADE - COLLEAGUE EVALUATION PREVIEW 0.3.17
 
 Windows x64. Extract this entire ZIP to a writable local folder, then open
 APPLICATION.exe. Keep Example, Data and Debug Data beside the application.
@@ -40,6 +40,8 @@ runs offline using Microsoft Edge WebView2. A standalone browser can also displa
    failed. Open Review checkerboard photos for the cause. PROFILE UNUSABLE
    means the selected profile could not be applied to this sky photo.
    Select the mask for calculation below the preview and update results.
+   Remove mask clears the selection and its saved calculation results. When
+   NO MASK appears, choose another mask or click Update results to use AI.
 3. Once a complete shaded irradiance result is ready, open PV Autonomy.
 4. Enter 24 hourly load values in Wh, panel area and efficiencies, battery
    capacity in Wh and initial charge. Click Evaluate system.
