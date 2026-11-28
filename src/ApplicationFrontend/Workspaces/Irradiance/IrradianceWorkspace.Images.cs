@@ -57,14 +57,14 @@ public sealed partial class IrradianceWorkspace
         inputs.Children.Add(calButtons); inputs.Children.Add(calibrationInfo);
         Section(inputs, "Sky mask");
         PathField(inputs, "Sky photo folder", "SkyFolder", PickSkyFolder);
-        var imageButtons = new WrapPanel(); imageButtons.Children.Add(choosePhoto); imageButtons.Children.Add(importMask); inputs.Children.Add(imageButtons);
+        var imageButtons = new WrapPanel(); imageButtons.Children.Add(choosePhoto); inputs.Children.Add(imageButtons);
         choosePhoto.Click += (_, _) => PickSkyPhoto(); importMask.Click += (_, _) => PickMask();
         generateMask.Click += async (_, _) => await GenerateMask();
         AutomationProperties.SetAutomationId(generateMask, "GenerateSkyMask");
         StudioTheme.Help(generateMask, "Prepare the selected photo’s mask for inspection or editing. Weather and irradiance are calculated separately.");
         inputs.Children.Add(generateMask);
         StudioTheme.Help(choosePhoto, "Choose the original sky photograph taken with the calibrated lens.");
-        StudioTheme.Help(importMask, "Select a sky photograph first. Import an opaque black-and-white PNG at the same oriented dimensions. White means open sky by default. You can invert the mask during import.");
+        StudioTheme.Help(importMask, "Import a mask image with the same dimensions as the sky photo. Bright pixels mean open sky by default.");
         images = Combo(inputs, "Active sky photo", []); images.SelectionChanged += (_, _) => { if (!loading && images.SelectedItem is string name) SelectSkyPhoto(Path.Combine(PortablePaths.Resolve(settings.SkyFolder), name)); };
         StudioTheme.Help(choosePhoto, PhotoSwitchHelp);
         model = Combo(inputs, "Sky segmentation", Enum.GetNames<SkyModel>()); model.SelectionChanged += (_, _) => { if (!loading && model.SelectedIndex >= 0) { settings.Model = (SkyModel)model.SelectedIndex; settings.SelectedMaskId = null; Changed(); RefreshMaskChoices(); } };

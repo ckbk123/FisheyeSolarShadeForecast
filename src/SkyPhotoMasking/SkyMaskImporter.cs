@@ -11,22 +11,30 @@ public static class SkyMaskImporter
     {
         using var photo = Cv2.ImRead(photoPath, ImreadModes.Color);
         if (photo.Empty()) throw new InvalidDataException("The sky photograph could not be decoded.");
-        using var source = Cv2.ImRead(maskPath, ImreadModes.Unchanged);
-        if (source.Empty()) throw new InvalidDataException("The mask could not be decoded. Choose a black-and-white PNG.");
-        if (source.Width != photo.Width || source.Height != photo.Height)
-            throw new InvalidDataException($"Mask dimensions {source.Width} × {source.Height} must match the oriented photo ({photo.Width} × {photo.Height}). Do not resize the mask.");
-        if (source.Depth() != MatType.CV_8U || source.Channels() is not (1 or 3 or 4))
-            throw new InvalidDataException("The mask must contain 8-bit black (0) and white (255) pixels.");
-        var disk = SkyPhotoMasker.FindDisk(photo, diskDetection);
-        SkyPhotoMasker.ValidateDisk(disk, photo.Width, photo.Height);
-        using var binary = new Mat(source.Height, source.Width, MatType.CV_8UC1);
-        CopyBinaryPixels(source, binary, disk, inverted);
+        // Decode both images in display orientation. OpenCV converts color and bit depth to
+        // 8-bit luminance here. Alpha is deliberately ignored, as documented in the importer.
+        using var source = Cv2.ImRead(maskPath, ImreadModes.Grayscale);
+        if (source.Empty()) throw new InvalidDataException("The mask image could not be decoded.");
+        if (source.Size() != photo.Size())
+            throw new InvalidDataException($"Mask dimensions {source.Width} × {source.Height} must match the oriented photo ({photo.Width} × {photo.Height}).");
+        using var binary = new Mat();
+        Cv2.Threshold(source, binary, 127, 255, inverted ? ThresholdTypes.BinaryInv : ThresholdTypes.Binary);
+
+        // Disk geometry is a hint for the viewer. It must never crop a user-supplied mask.
+        LensDisk disk;
+        if (Math.Min(photo.Height, photo.Width) < 33) diskDetection = DiskDetection.Centered;
+        try { disk = SkyPhotoMasker.FindDisk(photo, diskDetection); }
+        catch (InvalidDataException) when (diskDetection == DiskDetection.Auto)
+        {
+            diskDetection = DiskDetection.Centered;
+            disk = SkyPhotoMasker.FindDisk(photo, diskDetection);
+        }
         Cv2.ImEncode(".png", binary, out byte[] png);
-        return new(png, default, photo.Width, photo.Height, 0, disk, SkyPhotoMasker.CropForDisk(disk),
+        return new(png, default, photo.Width, photo.Height, 0, disk, new(0, 0, photo.Width, photo.Height),
             diskDetection.ToString(), "Imported binary mask · no AI", null, 0, 0, 0, null, null);
     }
 
-    internal static void CopyBinaryPixels(Mat source, Mat binary, LensDisk? disk = null, bool inverted = false,
+    internal static void CopyBinaryPixels(Mat source, Mat binary,
         CancellationToken ct = default)
     {
         int channels = source.Channels(), width = source.Width, height = source.Height;
@@ -44,14 +52,7 @@ public static class SkyMaskImporter
                     throw new InvalidDataException("The mask must be grayscale and exactly black or white. Gray edges and colored pixels are not accepted.");
                 if (channels == 4 && sourceRow[offset + 3] != 255)
                     throw new InvalidDataException("The mask must be opaque. Remove transparent pixels before importing.");
-                // Outside-lens pixels have no sky meaning. Apply the photo disk to either polarity.
-                byte pixel = inverted ? (byte)(255 - value) : value;
-                if (disk != null)
-                {
-                    double dx = x - disk.CenterX, dy = y - disk.CenterY;
-                    if (dx * dx + dy * dy > disk.Radius * disk.Radius) pixel = 0;
-                }
-                binaryRow[x] = pixel;
+                binaryRow[x] = value;
             }
             System.Runtime.InteropServices.Marshal.Copy(binaryRow, 0, binary.Ptr(y), binaryRow.Length);
         }

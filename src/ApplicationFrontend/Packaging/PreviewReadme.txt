@@ -25,8 +25,8 @@ runs offline using Microsoft Edge WebView2. A standalone browser can also displa
 
    Choosing a different sky photo clears the previous photo's masks, saved edits
    and study results. To keep its selected mask, copy 02-sky-mask/sky-mask.png
-   from Debug Data after Update results and before switching. Import existing mask accepts
-   an opaque, exact black/white grayscale PNG at the oriented photo dimensions
+   from Debug Data after Update results and before switching. Import mask accepts
+   a mask image at the oriented photo dimensions
    without AI. Choose white or black for open sky, name the mask, then import it.
 2. Click Update results. Open Study details beneath the graph for weather and run information.
    Use Edit mask at the top right of the mask preview to paint a new variant.
