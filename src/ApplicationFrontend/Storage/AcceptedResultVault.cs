@@ -109,7 +109,7 @@ internal static class AcceptedResultVault
         return ManagedVaultDirectory.Find(Folder(key), Owner, key) != null;
     }
 
-    internal static Action PreparePhotoRemoval(PhotoStorageCleanup cleanup, HashSet<string> maskLibraries)
+    internal static Action PreparePhotoRemoval(PhotoStorageCleanup cleanup, HashSet<string> maskLibraries, UserSettings? selectedMask = null)
     {
         var entries = ReadVaults(out bool referencesKnown);
         var outgoing = new List<(string Folder, VaultManifest Vault)>();
@@ -117,6 +117,7 @@ internal static class AcceptedResultVault
         foreach (var entry in entries)
         {
             var (folder, vault) = entry;
+            bool matchesMask = selectedMask == null;
             string vaultPath = Path.Combine(folder, "vault.json");
             if (vault.PhotoSha256 == null || vault.PhotoSha256 == cleanup.PhotoSha256)
             {
@@ -125,6 +126,10 @@ internal static class AcceptedResultVault
                 if (run?.Owner == "SolarShade.CurrentDebugData.v1" && run.Stages != null && run.Inputs != null &&
                     run.Settings != null && AppData.FileKey(runPath) == vault.RunSha256)
                 {
+                    if (selectedMask != null)
+                        matchesMask = run.Settings.SelectedMaskId == selectedMask.SelectedMaskId &&
+                            (selectedMask.SelectedMaskId != null || (run.Settings.Model == selectedMask.Model &&
+                            run.Settings.Resolution == selectedMask.Resolution && run.Settings.CenteredDisk == selectedMask.CenteredDisk));
                     if (run.Stages.TryGetValue("02-sky-mask", out var mask) && Guid.TryParse(mask.LibraryVersion, out _))
                         maskLibraries.Add(mask.LibraryVersion);
                     if (vault.PhotoSha256 == null && MatchesLegacyPhoto(cleanup.PhotoSha256, run, vault))
@@ -135,7 +140,7 @@ internal static class AcceptedResultVault
                     }
                 }
             }
-            if (vault.PhotoSha256 == cleanup.PhotoSha256) outgoing.Add((folder, vault));
+            if (vault.PhotoSha256 == cleanup.PhotoSha256 && matchesMask) outgoing.Add((folder, vault));
             else keepBlobs.UnionWith(vault.ArtifactHashes.Values);
         }
         return () => RemovePhotoArchives(cleanup, outgoing, keepBlobs, referencesKnown);

@@ -20,6 +20,11 @@ public sealed partial class IrradianceWorkspace
         pair.Children.Add(maskPane);
         skyPane.Children.Add(skyViewport);
         maskPane.Children.Add(maskViewport);
+        StudioTheme.Help(noMaskStamp, NoMaskHelp);
+        AutomationProperties.SetAutomationId(noMaskStamp, "NoMaskStamp");
+        AutomationProperties.SetName(noMaskStamp, "No mask");
+        AutomationProperties.SetLiveSetting(noMaskStamp, AutomationLiveSetting.Polite);
+        maskPane.Children.Add(noMaskStamp);
         maskPane.Children.Add(editMask);
 
         AddPreviewTools(skyViewport, skyPane, maskPane, "SkyPhoto", "sky photo");

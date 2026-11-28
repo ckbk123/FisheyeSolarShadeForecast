@@ -15,6 +15,7 @@ public interface IIrradianceService : IDisposable
     bool IsCurrent(Evaluation evaluation);
     Evaluation? TryRestoreAccepted(UserSettings settings) => null;
     Task<MaskAsset> PrepareEdgeMask(UserSettings settings, CancellationToken ct);
+    Task RemoveMaskAsync(UserSettings selection, string photoSha256);
     Task DiscardPhotoAsync(SourceIdentity previousPhoto, UserSettings replacement, string expectedPhotoSha256);
     SourceIdentity? LastRecordedSkyPhoto(string path);
     DependentResultStore CreateDependentStore(string folder, string software, params string[] requiredFiles);

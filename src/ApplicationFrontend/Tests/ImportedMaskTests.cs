@@ -127,6 +127,50 @@ public sealed class ImportedMaskTests
     });
 
     [Fact]
+    public void RemovingOneMaskPersistsTheEmptySelectionAndKeepsSiblingEdits() => Sta(async () =>
+    {
+        using var fixture = new Fixture();
+        var window = new MainWindow(applicationServices: new AppServices(fixture.Debug), loadExampleOnFirstRun: false);
+        try
+        {
+            var original = WriteMask(fixture, "painted");
+            var selected = window.Irradiance.ImportMaskForTest(original, "First");
+            var data = ManualMaskStore.Load(fixture.Settings.SkyImage, selected.Id);
+            var child = ManualMaskStore.Save(fixture.Settings.SkyImage, selected.BaseMask, "",
+                selected.Id, "Second", data.Png);
+            window.Calculate(); await Until(() => window.Completed != null && !window.UpdatingForTest);
+            var previous = window.Completed!;
+            Assert.True(AcceptedResultVault.Exists(previous.Settings));
+            string archive = Path.Combine(AppData.Root, "AcceptedResults", AcceptedResultVault.Key(previous.Settings), "vault.json");
+            Assert.True(File.Exists(archive));
+            await window.InputsSettled;
+            await window.Irradiance.RemoveSelectedMask(); await window.InputsSettled;
+            Assert.True(window.IrradianceController.Settings.NoMaskSelected);
+            Assert.Null(window.Completed); Assert.False(window.ExportEnabledForTest);
+            Assert.False(File.Exists(Path.Combine(fixture.Debug, "02-sky-mask", "sky-mask.png")));
+            Assert.False(File.Exists(ManualMaskStore.VariantPngPath(selected.PhotoSha256, selected.Id)));
+            Assert.False(File.Exists(archive));
+            Assert.True(File.Exists(original));
+            Assert.Equal(data.Png, ManualMaskStore.Load(fixture.Settings.SkyImage, child.Id).Png);
+            window.Close(); await window.InputsSettled;
+            window = new MainWindow(applicationServices: new AppServices(fixture.Debug), loadExampleOnFirstRun: false);
+            await window.RecheckSourcesAsync();
+            Assert.True(window.IrradianceController.Settings.NoMaskSelected);
+            Assert.Null(window.Completed);
+            window.Irradiance.SelectMaskForTest(child.Id); await window.InputsSettled;
+            Assert.False(window.IrradianceController.Settings.NoMaskSelected);
+            window.Calculate(); await Until(() => window.Completed != null && !window.UpdatingForTest);
+            Assert.Equal(child.Id, window.Completed!.Mask!.Variant!.Id);
+            window.Irradiance.SelectMaskForTest(null); await window.InputsSettled;
+            await window.Irradiance.RemoveSelectedMask(); await window.InputsSettled;
+            Assert.Null(AppServices.LoadCachedAiMask(fixture.Settings));
+            Assert.True(window.IrradianceController.Settings.NoMaskSelected);
+            Assert.Equal(data.Png, ManualMaskStore.Load(fixture.Settings.SkyImage, child.Id).Png);
+        }
+        finally { window.Close(); await window.InputsSettled; }
+    });
+
+    [Fact]
     public void UpgradeRecoversAMovedPhotoFromThePreviousMaskRunBeforeAcceptingItsReplacement() => Sta(async () =>
     {
         using var fixture = new Fixture();

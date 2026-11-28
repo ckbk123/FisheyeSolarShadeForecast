@@ -50,6 +50,29 @@ public static class ManualMaskStore
             .OrderByDescending(v => v.CreatedUtc).ToArray();
     }
 
+    internal static void RemoveVariant(PhotoStorageCleanup cleanup, string id)
+    {
+        string folder = Path.GetDirectoryName(VariantPngPath(cleanup.PhotoSha256, id))!;
+        var variant = PhotoStorageCleanup.Read<MaskVariant>(Path.Combine(folder, "variant.json"));
+        if (variant != null && (variant.Id != id || variant.PhotoSha256 != cleanup.PhotoSha256))
+            throw new IOException("This mask belongs to another photo.");
+        cleanup.RemoveFile(folder, "sky-mask.png");
+        cleanup.RemoveFile(folder, "variant.json");
+        PhotoStorageCleanup.RemoveIfEmpty(folder);
+        if (variant == null) return;
+
+        // Children store a complete mask and share their immutable source with siblings.
+        foreach (string other in PhotoStorageCleanup.Directories(PhotoFolder(cleanup.PhotoSha256)))
+        {
+            if (!ValidId.IsMatch(Path.GetFileName(other))) continue;
+            var saved = PhotoStorageCleanup.Read<MaskVariant>(Path.Combine(other, "variant.json"));
+            if (saved == null || (saved.IsImported == variant.IsImported && saved.AncestorSha256 == variant.AncestorSha256)) return;
+        }
+        string ancestor = SourcePngPath(cleanup.PhotoSha256, variant);
+        cleanup.RemoveFile(Path.GetDirectoryName(ancestor)!, "sky-mask.png");
+        PhotoStorageCleanup.RemoveIfEmpty(Path.GetDirectoryName(ancestor)!);
+    }
+
     internal static void DiscardPhoto(PhotoStorageCleanup cleanup)
     {
         string folder = PhotoFolder(cleanup.PhotoSha256);

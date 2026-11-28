@@ -4,6 +4,8 @@ Windows desktop application and C# scientific libraries for estimating solar irr
 
 ## Current application — 28 November 2026
 
+**Preview 0.3.17** adds **Remove mask** and **Import mask** under the preview. Removing the selected mask shows **NO MASK**. Choose another saved mask or click **Update results** to use AI. Imported images match the oriented sky photo’s dimensions and keep their full frame.
+
 **Preview 0.3.16** adds **Images & calibration** for preparing and inspecting a mask before calculating. **Apply angles to Solar Irradiance** copies the four numbered panel and phone angles from the 3D map. Both tabs show the same names and degree units. The weather selector and Excel column names identify the data source and receiving surface.
 
 **Preview 0.3.15** keeps one sky photo active. Choosing a different photo clears the previous photo’s generated masks, saved edits, and calculation results. To keep the selected mask, copy `Debug Data/02-sky-mask/sky-mask.png` after updating and before switching photos.

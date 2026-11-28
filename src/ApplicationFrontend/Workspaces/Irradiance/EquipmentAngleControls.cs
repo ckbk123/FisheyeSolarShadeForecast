@@ -90,7 +90,7 @@ public sealed partial class IrradianceWorkspace
 
     internal bool ApplyMapAngles(EquipmentMapAngles angles)
     {
-        if (closing || loading || photoChanging || photoCleanupFailed || updating || calibrating || exporting || controller.DependentBusy) return false;
+        if (removingMask || closing || loading || photoChanging || photoCleanupFailed || updating || calibrating || exporting || controller.DependentBusy) return false;
         settings.PanelTilt = angles.PanelTilt;
         settings.PanelTopHeading = angles.PanelTopHeading;
         EquipmentOrientation.SetUphillPhone(settings, angles.PhoneTilt, angles.PhoneTopHeading);
