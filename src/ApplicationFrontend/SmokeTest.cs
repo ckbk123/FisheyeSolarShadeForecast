@@ -80,7 +80,8 @@ public static class SmokeTest
                         AppServices.LoadCachedAiMask(window.IrradianceController.Settings) != null)
                         throw new InvalidOperationException("Removing the AI mask must clear its preview and cache.");
                     var stamp = Find<Border>(window, element => System.Windows.Automation.AutomationProperties.GetAutomationId(element) == "NoMaskStamp");
-                    if (!stamp.IsVisible || stamp.ToolTip is not string help || !help.Contains("Update results"))
+                    if (!stamp.IsVisible || stamp.ToolTip is not string help || !help.Contains("Update results") ||
+                        window.Irradiance.FieldOfViewTextForTest.Contains("Open Refine edge"))
                         throw new InvalidOperationException("An empty mask preview must explain how to recover.");
                     Capture(window, Path.Combine(output, "no-mask.png"));
                 }

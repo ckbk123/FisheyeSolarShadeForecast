@@ -1177,9 +1177,17 @@ public sealed partial class IrradianceWorkspace : UserControl, IDisposable
         else
         {
             skyViewport.SetEdge(0, 0, null);
-            fieldOfViewInfo.Text = full.HasValue ? "Refine the edge for this lens." : proposalRequest != null ? "Finding the edge…" :
-                proposalError != null ? "Mask suggestion unavailable" : "Open Refine edge to preview the limit.";
-            help = proposalError ?? "Choose Refine edge to set a full field of view from the photo.";
+            if (settings.NoMaskSelected)
+            {
+                fieldOfViewInfo.Text = "";
+                help = NoMaskHelp;
+            }
+            else
+            {
+                fieldOfViewInfo.Text = full.HasValue ? "Refine the edge for this lens." : proposalRequest != null ? "Finding the edge…" :
+                    proposalError != null ? "Mask suggestion unavailable" : "Open Refine edge to preview the limit.";
+                help = proposalError ?? "Choose Refine edge to set a full field of view from the photo.";
+            }
         }
         fieldOfViewInfo.Foreground = full.HasValue ? Brushes.DarkGreen : StudioTheme.Muted;
         StudioTheme.Help(fieldOfViewInfo, help + $" Measured calibration: {2 * measured.MaximumIncidentAngleDegrees:0.###}° full.");
