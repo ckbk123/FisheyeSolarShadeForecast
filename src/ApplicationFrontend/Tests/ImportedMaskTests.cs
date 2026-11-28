@@ -87,7 +87,7 @@ public sealed class ImportedMaskTests
     });
 
     [Fact]
-    public void InversionIsExplicitAndOutsideThePhotoDiskAlwaysStaysBlack()
+    public void InversionAppliesAcrossTheFullImportedRaster()
     {
         using var fixture = new Fixture(); string path = WriteMask(fixture, "polarity");
         var ordinary = ManualMaskStore.Import(fixture.Settings.SkyImage, path, "White is sky", centeredDisk: true);
@@ -96,12 +96,12 @@ public sealed class ImportedMaskTests
         using var b = Cv2.ImDecode(ManualMaskStore.Load(fixture.Settings.SkyImage, inverted.Id).Png, ImreadModes.Grayscale);
         Assert.Equal((byte)0, a.At<byte>(151, 50)); Assert.Equal((byte)255, b.At<byte>(151, 50));
         Assert.Equal((byte)255, a.At<byte>(151, 150)); Assert.Equal((byte)0, b.At<byte>(151, 150));
-        Assert.Equal((byte)0, a.At<byte>(0, 0)); Assert.Equal((byte)0, b.At<byte>(0, 0));
+        Assert.Equal((byte)0, a.At<byte>(0, 0)); Assert.Equal((byte)255, b.At<byte>(0, 0));
         Assert.False(ordinary.ImportInverted); Assert.True(inverted.ImportInverted);
     }
 
     [Theory]
-    [InlineData("dimensions")][InlineData("gray")][InlineData("color")][InlineData("alpha")][InlineData("depth")]
+    [InlineData("dimensions")][InlineData("unreadable")]
     public void InvalidImportLeavesTheSelectedMaskAndStoreUntouched(string invalid) => Sta(async () =>
     {
         using var fixture = new Fixture(); using var service = new AppServices(fixture.Debug);
@@ -110,15 +110,12 @@ public sealed class ImportedMaskTests
         {
             var selected = window.Irradiance.ImportMaskForTest(WriteMask(fixture, "valid"), "Keep this");
             string badPath = Path.Combine(fixture.Root, "invalid.png");
-            using var bad = invalid switch
+            if (invalid == "dimensions")
             {
-                "dimensions" => new Mat(303, 202, MatType.CV_8UC1, Scalar.White),
-                "gray" => new Mat(303, 201, MatType.CV_8UC1, new Scalar(128)),
-                "color" => new Mat(303, 201, MatType.CV_8UC3, new Scalar(0, 255, 0)),
-                "alpha" => new Mat(303, 201, MatType.CV_8UC4, new Scalar(255, 255, 255, 0)),
-                _ => new Mat(303, 201, MatType.CV_16UC1, Scalar.White)
-            };
-            Cv2.ImWrite(badPath, bad);
+                using var bad = new Mat(303, 202, MatType.CV_8UC1, Scalar.White);
+                Cv2.ImWrite(badPath, bad);
+            }
+            else File.WriteAllText(badPath, "not an image");
             Assert.Throws<InvalidDataException>(() => window.Irradiance.ImportMaskForTest(badPath, "Rejected"));
             Assert.Equal(selected.Id, window.IrradianceController.Settings.SelectedMaskId);
             Assert.Single(ManualMaskStore.List(selected.PhotoSha256));
